@@ -4,6 +4,9 @@ import cors from 'cors';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import adminGeographyRoutes from './routes/admin-geography.routes.js';
+import geographyRoutes from './routes/geography.routes.js';
+import ownerRoutes from './routes/owner.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +17,9 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/geography', adminGeographyRoutes);
+app.use('/api/geography', geographyRoutes);
+app.use('/api/owner', ownerRoutes);
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

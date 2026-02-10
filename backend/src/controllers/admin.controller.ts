@@ -285,3 +285,89 @@ export async function deleteUser(req: Request, res: Response) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }
+
+// ---------- Area ownerships (admin approval) ----------
+export async function listAreaOwnerships(req: Request, res: Response) {
+  try {
+    const { status, page = 1, pageSize = 20 } = req.query;
+    const offset = (Number(page) - 1) * Number(pageSize);
+    const limit = Math.min(Number(pageSize) || 20, 100);
+
+    let where = '1=1';
+    const whereParams: unknown[] = [];
+    if (status) {
+      where += ' AND ao.status = $1';
+      whereParams.push(status);
+    }
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM area_owners ao WHERE ${where}`,
+      whereParams
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
+    const params = [...whereParams, limit, offset];
+    const limitParam = whereParams.length + 1;
+    const offsetParam = whereParams.length + 2;
+
+    const { rows } = await pool.query(
+      `SELECT ao.id_area_owner, ao.id_area, ao.id_user, ao.status,
+              u.email, u.full_name, u.phone,
+              a.name AS area_name, c.name AS city_name, co.name AS country_name
+       FROM area_owners ao
+       JOIN users u ON u.id_user = ao.id_user
+       JOIN area a ON a.id_area = ao.id_area
+       JOIN cities c ON c.id_city = a.id_city
+       JOIN countries co ON co.id_country = c.id_country
+       WHERE ${where}
+       ORDER BY ao.id_area_owner DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params
+    );
+
+    res.json({
+      data: rows.map((r: Record<string, unknown>) => ({
+        id: r.id_area_owner,
+        areaId: r.id_area,
+        userId: r.id_user,
+        status: r.status,
+        email: r.email,
+        fullName: r.full_name,
+        phone: r.phone,
+        areaName: r.area_name,
+        cityName: r.city_name,
+        countryName: r.country_name,
+      })),
+      total,
+      page: Number(page),
+      pageSize: limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error('List area ownerships error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+export async function updateAreaOwnershipStatus(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!['pending', 'active', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
+    }
+    const { rows } = await pool.query(
+      'UPDATE area_owners SET status = $1 WHERE id_area_owner = $2 RETURNING id_area_owner, id_area, id_user, status',
+      [status, id]
+    );
+    if (rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy đăng ký khu vực' });
+    res.json({
+      id: rows[0].id_area_owner,
+      areaId: rows[0].id_area,
+      userId: rows[0].id_user,
+      status: rows[0].status,
+    });
+  } catch (err) {
+    console.error('Update area ownership status error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}

@@ -279,11 +279,123 @@
    revenueChart: { date: string; revenue: number }[];
  }
  
- export interface HomePageData {
-   heroBanners: { id: string; image: string; title: string; subtitle: string; link: string }[];
-   categories: { id: string; name: string; icon: string; count: number }[];
-   featuredServices: Service[];
-   topRatedServices: Service[];
-   featuredVouchers: Voucher[];
-   popularDestinations: { id: string; name: string; image: string; serviceCount: number }[];
- }
+export interface HomePageData {
+  heroBanners: { id: string; image: string; title: string; subtitle: string; link: string }[];
+  categories: { id: string; name: string; icon: string; count: number }[];
+  featuredServices: Service[];
+  topRatedServices: Service[];
+  featuredVouchers: Voucher[];
+  popularDestinations: { id: string; name: string; image: string; serviceCount: number }[];
+}
+
+// ============ Geography (Area.attribute, POI.poi_type) ============
+
+export interface AreaAttributeTemperature {
+  min: number;
+  max: number;
+  unit: 'celsius' | 'fahrenheit';
+}
+
+export interface AreaAttributeRainySeason {
+  from_month: number;
+  to_month: number;
+}
+
+export interface AreaAttributeKeyFeature {
+  name: string;
+  details: string;
+}
+
+export interface AreaAttributeLocalRegulations {
+  noise_restriction_hours?: string;
+  building_height_limit_m?: number;
+  [key: string]: unknown;
+}
+
+export interface AreaAttribute {
+  climate_type?: string;
+  average_temperature?: AreaAttributeTemperature;
+  rainy_season?: AreaAttributeRainySeason;
+  best_travel_months?: number[];
+  weather_notes?: string[];
+  local_regulations?: AreaAttributeLocalRegulations;
+  key_features?: AreaAttributeKeyFeature[];
+}
+
+export type PoiCategory = 'food' | 'attraction' | 'cafe' | 'entertainment';
+export type PoiSubType = 'restaurant' | 'street_food' | 'beach' | 'museum' | 'bar' | string;
+
+export interface PoiTypeRating {
+  score: number;
+  reviews_count: number;
+}
+
+export interface PoiTypePriceRange {
+  level?: string;
+  min?: number;
+  max?: number;
+  currency?: string;
+}
+
+export interface PoiTypeRecommendedTime {
+  time_of_day?: string[];
+  avg_duration_minutes?: number;
+}
+
+export interface PoiTypeCrowdLevel {
+  weekday?: string;
+  weekend?: string;
+}
+
+export interface PoiTypeSuitability {
+  solo?: boolean;
+  couple?: boolean;
+  family?: boolean;
+  group?: boolean;
+}
+
+export interface PoiType {
+  poi_category?: PoiCategory;
+  poi_sub_type?: PoiSubType;
+  rating?: PoiTypeRating;
+  price_range?: PoiTypePriceRange;
+  activities?: string[];
+  recommended_time?: PoiTypeRecommendedTime;
+  crowd_level?: PoiTypeCrowdLevel;
+  suitability?: PoiTypeSuitability;
+  tags?: string[];
+  operating_hours?: Record<string, string>;
+  accessibility?: { wheelchair_accessible?: boolean; braille_signs?: boolean; [key: string]: unknown };
+  contact_info?: { phone?: string; website?: string };
+}
+
+export interface Country {
+  id: string;
+  code: string;
+  name: string | null;
+  nameVi: string | null;
+}
+
+export interface City {
+  id: string;
+  countryId: string;
+  name: string;
+  nameVi: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface Area {
+  id: string;
+  cityId: string;
+  name: string;
+  attribute: AreaAttribute | null;
+  status: string;
+}
+
+export interface PointOfInterest {
+  id: string;
+  areaId: string;
+  name: string;
+  poiType: PoiType | null;
+}

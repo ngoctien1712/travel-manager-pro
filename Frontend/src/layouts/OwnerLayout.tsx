@@ -12,6 +12,8 @@
    LogOut,
    ChevronDown,
    Bell,
+   MapPin,
+   Building2,
  } from 'lucide-react';
  import { Button } from '@/components/ui/button';
  import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,13 +26,15 @@
  } from '@/components/ui/dropdown-menu';
  import { cn } from '@/lib/utils';
  
- const sidebarItems = [
-   { icon: LayoutDashboard, label: 'Tổng quan', path: '/owner/dashboard' },
-   { icon: Map, label: 'Dịch vụ của tôi', path: '/owner/services' },
-   { icon: Image, label: 'Quản lý media', path: '/owner/media' },
-   { icon: ShoppingBag, label: 'Đơn hàng', path: '/owner/orders' },
-   { icon: User, label: 'Hồ sơ', path: '/owner/profile' },
- ];
+const sidebarItems = [
+  { icon: LayoutDashboard, label: 'Tổng quan', path: '/owner/dashboard' },
+  { icon: MapPin, label: 'Khu vực của tôi', path: '/owner/areas' },
+  { icon: Building2, label: 'Nhà cung cấp', path: '/owner/providers' },
+  { icon: Map, label: 'Dịch vụ của tôi', path: '/owner/services' },
+  { icon: Image, label: 'Quản lý media', path: '/owner/media' },
+  { icon: ShoppingBag, label: 'Đơn hàng', path: '/owner/orders' },
+  { icon: User, label: 'Hồ sơ', path: '/owner/profile' },
+];
  
  export const OwnerLayout = () => {
    const [sidebarOpen, setSidebarOpen] = useState(true);

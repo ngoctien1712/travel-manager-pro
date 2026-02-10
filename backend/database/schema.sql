@@ -7,28 +7,39 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============ GEOGRAPHY ============
 CREATE TABLE countries (
   id_country UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  code VARCHAR(10) NOT NULL UNIQUE
+  code VARCHAR(10) NOT NULL UNIQUE,
+  name VARCHAR(255),
+  name_vi VARCHAR(255)
 );
 
 CREATE TABLE cities (
   id_city UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   id_country UUID NOT NULL REFERENCES countries(id_country),
-  name VARCHAR(255) NOT NULL
+  name VARCHAR(255) NOT NULL,
+  name_vi VARCHAR(255),
+  latitude DECIMAL(10, 7),
+  longitude DECIMAL(10, 7)
 );
 
 CREATE TABLE area (
   id_area UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   id_city UUID NOT NULL REFERENCES cities(id_city),
   name VARCHAR(255) NOT NULL,
-  attribute JSONB
+  attribute JSONB,
+  status VARCHAR(20) DEFAULT 'active'
 );
 
 CREATE TABLE point_of_interest (
   id_poi UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   id_area UUID NOT NULL REFERENCES area(id_area),
   name VARCHAR(255) NOT NULL,
-  poi_type VARCHAR(50)
+  poi_type JSONB
 );
+
+CREATE INDEX idx_area_status ON area(status);
+CREATE INDEX idx_area_city ON area(id_city);
+CREATE INDEX idx_poi_area ON point_of_interest(id_area);
+CREATE INDEX idx_cities_country ON cities(id_country);
 
 -- ============ USERS & ROLES ============
 CREATE TABLE users (

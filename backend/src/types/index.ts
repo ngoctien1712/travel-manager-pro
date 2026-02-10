@@ -1,6 +1,8 @@
 export type UserRole = 'admin' | 'customer' | 'owner';
 export type UserStatus = 'pending' | 'active' | 'inactive' | 'banned';
 
+export * from './geography.js';
+
 export interface UserRow {
   id_user: string;
   email: string;

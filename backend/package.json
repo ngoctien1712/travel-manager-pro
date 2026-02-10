@@ -9,7 +9,14 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:migrate": "psql -f database/schema.sql",
-    "db:seed-admin": "tsx scripts/seed-admin.ts"
+    "db:migrate:geography": "psql -f database/migrations/001_geography_schema.sql",
+    "db:seed-admin": "tsx scripts/seed-admin.ts",
+    "crawl:countries": "tsx scripts/crawl-countries.ts",
+    "crawl:cities": "tsx scripts/crawl-cities.ts",
+    "crawl:areas": "tsx scripts/crawl-areas.ts",
+    "crawl:poi": "tsx scripts/crawl-poi.ts",
+    "crawl:vietnam": "tsx scripts/crawl-vietnam.ts",
+    "crawl:all": "npm run crawl:countries && npm run crawl:cities && npm run crawl:areas && npm run crawl:poi"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -14,6 +14,8 @@
    ChevronDown,
    Bell,
    Search,
+   Globe,
+   MapPin,
  } from 'lucide-react';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
@@ -27,14 +29,16 @@
  } from '@/components/ui/dropdown-menu';
  import { cn } from '@/lib/utils';
  
- const sidebarItems = [
-   { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
-   { icon: Users, label: 'Người dùng', path: '/admin/users' },
-   { icon: Building2, label: 'Nhà cung cấp', path: '/admin/providers' },
-   { icon: Map, label: 'Dịch vụ', path: '/admin/services' },
-   { icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
-   { icon: Ticket, label: 'Voucher', path: '/admin/vouchers' },
- ];
+const sidebarItems = [
+  { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
+  { icon: Users, label: 'Người dùng', path: '/admin/users' },
+  { icon: Globe, label: 'Địa điểm', path: '/admin/geography' },
+  { icon: MapPin, label: 'Duyệt khu vực', path: '/admin/area-ownerships' },
+  { icon: Building2, label: 'Nhà cung cấp', path: '/admin/providers' },
+  { icon: Map, label: 'Dịch vụ', path: '/admin/services' },
+  { icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
+  { icon: Ticket, label: 'Voucher', path: '/admin/vouchers' },
+];
  
  export const AdminLayout = () => {
    const [sidebarOpen, setSidebarOpen] = useState(true);

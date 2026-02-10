@@ -21,7 +21,11 @@ import NotFound from "@/pages/NotFound";
 import Home from "@/pages/customer/Home";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminUsers from "@/pages/admin/Users";
+import AdminGeography from "@/pages/admin/Geography";
+import AdminAreaOwnerships from "@/pages/admin/AreaOwnerships";
 import OwnerDashboard from "@/pages/owner/Dashboard";
+import OwnerMyAreas from "@/pages/owner/MyAreas";
+import OwnerMyProviders from "@/pages/owner/MyProviders";
 import Profile from "@/pages/Profile";
 
 const queryClient = new QueryClient();
@@ -67,6 +71,8 @@ const App = () => (
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="users/:id" element={<AdminUsers />} />
+              <Route path="geography" element={<AdminGeography />} />
+              <Route path="area-ownerships" element={<AdminAreaOwnerships />} />
               <Route path="providers" element={<AdminDashboard />} />
               <Route path="providers/:id" element={<AdminDashboard />} />
               <Route path="services" element={<AdminDashboard />} />
@@ -89,6 +95,8 @@ const App = () => (
             >
               <Route index element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="dashboard" element={<OwnerDashboard />} />
+              <Route path="areas" element={<OwnerMyAreas />} />
+              <Route path="providers" element={<OwnerMyProviders />} />
               <Route path="services" element={<OwnerDashboard />} />
               <Route path="services/:id" element={<OwnerDashboard />} />
               <Route path="media" element={<OwnerDashboard />} />

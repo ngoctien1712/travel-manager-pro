@@ -35,4 +35,7 @@ router.patch(
 );
 router.delete('/users/:id', adminController.deleteUser);
 
+router.get('/area-ownerships', adminController.listAreaOwnerships);
+router.patch('/area-ownerships/:id/status', adminController.updateAreaOwnershipStatus);
+
 export default router;
