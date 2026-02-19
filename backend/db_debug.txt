@@ -1,0 +1,26 @@
+--- Providers ---
+[
+  {
+    "id_provider": "1c6db80b-0a71-469b-80a1-caf5662cefc1",
+    "id_user": "bbb1c5bd-3b51-48e7-98f2-032c61a6889d",
+    "id_area": "03e414e7-06e3-4a9c-9500-c014775a72a9",
+    "name": "Karma Company",
+    "phone": "0935317495",
+    "image": "/uploads/66b6fb36-099f-4fbb-8c6d-fed4867ff84b.jpg",
+    "status": "pending"
+  }
+]
+
+--- Users & Role Details ---
+[
+  {
+    "id_user": "8e11be3d-8eaf-454d-b9c1-ee9743cf7b0f",
+    "email": "admin@travel.vn",
+    "code": "ADMIN"
+  },
+  {
+    "id_user": "bbb1c5bd-3b51-48e7-98f2-032c61a6889d",
+    "email": "huynhngoctien1712@gmail.com",
+    "code": "AREA_OWNER"
+  }
+]

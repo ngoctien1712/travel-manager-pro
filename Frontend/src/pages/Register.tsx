@@ -37,8 +37,8 @@ export const Register = () => {
     setLoading(true);
     try {
       await authApi.register({ email, password, fullName, phone, role });
-      const user = JSON.parse(localStorage.getItem('userRole') || '"customer"');
-      navigate(roleRedirects[user], { replace: true });
+      // Redirect based on the role the user just registered with
+      navigate(roleRedirects[role], { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
     } finally {

@@ -17,10 +17,12 @@ export interface OwnerProvider {
   id: string;
   name: string;
   areaId: string;
-  areaOwnerId: string;
   areaName: string;
   cityName: string;
   countryName: string;
+  phone?: string;
+  image?: string;
+  status: string;
 }
 
 export const ownerGeographyApi = {
@@ -33,8 +35,14 @@ export const ownerGeographyApi = {
   getMyProviders: () =>
     httpClient.get<{ data: OwnerProvider[] }>('/owner/providers'),
 
-  createProvider: (data: { name: string; areaId: string }) =>
+  listMyBookableItems: (providerId: string) =>
+    httpClient.get<{ data: any[] }>(`/owner/providers/${providerId}/bookable-items`),
+
+  createProvider: (data: FormData) =>
     httpClient.post<OwnerProvider>('/owner/providers', data),
+
+  addItemMedia: (idItem: string, data: FormData) =>
+    httpClient.post(`/owner/bookable-items/${idItem}/media`, data),
 
   createBookableItem: (data: {
     providerId: string;
@@ -43,5 +51,12 @@ export const ownerGeographyApi = {
     title: string;
     attribute?: Record<string, unknown>;
     price?: number;
+    extraData?: Record<string, any>;
   }) => httpClient.post<{ id: string; id_provider: string; id_area: string; item_type: string; title: string; price?: number }>('/owner/bookable-items', data),
+
+  addAccommodationRoom: (idItem: string, data: { nameRoom: string; maxGuest: number; attribute?: any; price: number }) =>
+    httpClient.post(`/owner/bookable-items/${idItem}/rooms`, data),
+
+  manageVehicle: (idItem: string, data: { codeVehicle: string; maxGuest: number; attribute?: any }) =>
+    httpClient.post(`/owner/bookable-items/${idItem}/vehicle`, data),
 };

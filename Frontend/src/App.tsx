@@ -19,13 +19,21 @@ import ResetPassword from "@/pages/ResetPassword";
 import VerifyAccount from "@/pages/VerifyAccount";
 import NotFound from "@/pages/NotFound";
 import Home from "@/pages/customer/Home";
+import Services from "@/pages/customer/Services";
+import ServiceDetail from "@/pages/customer/ServiceDetail";
+import Cart from "@/pages/customer/Cart";
+import Checkout from "@/pages/customer/Checkout";
+import MyOrders from "@/pages/customer/MyOrders";
+import OrderDetail from "@/pages/customer/OrderDetail";
+import TripPlanner from "@/pages/customer/TripPlanner";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminUsers from "@/pages/admin/Users";
 import AdminGeography from "@/pages/admin/Geography";
-import AdminAreaOwnerships from "@/pages/admin/AreaOwnerships";
+import AdminProviders from "@/pages/admin/Providers";
 import OwnerDashboard from "@/pages/owner/Dashboard";
 import OwnerMyAreas from "@/pages/owner/MyAreas";
 import OwnerMyProviders from "@/pages/owner/MyProviders";
+import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
 import Profile from "@/pages/Profile";
 
 const queryClient = new QueryClient();
@@ -48,13 +56,48 @@ const App = () => (
             {/* Customer Routes */}
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/services" element={<Home />} />
-              <Route path="/services/:id" element={<Home />} />
-              <Route path="/cart" element={<ProtectedRoute allowedRoles={['customer']}><Home /></ProtectedRoute>} />
-              <Route path="/checkout" element={<ProtectedRoute allowedRoles={['customer']}><Home /></ProtectedRoute>} />
-              <Route path="/my-orders" element={<ProtectedRoute allowedRoles={['customer']}><Home /></ProtectedRoute>} />
-              <Route path="/my-orders/:id" element={<ProtectedRoute allowedRoles={['customer']}><Home /></ProtectedRoute>} />
-              <Route path="/trip-planner" element={<Home />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/services/:id" element={<ServiceDetail />} />
+              <Route
+                path="/cart"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <Cart />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-orders"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <MyOrders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/my-orders/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <OrderDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/trip-planner"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <TripPlanner />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer']}><Profile /></ProtectedRoute>} />
             </Route>
 
@@ -72,9 +115,9 @@ const App = () => (
               <Route path="users" element={<AdminUsers />} />
               <Route path="users/:id" element={<AdminUsers />} />
               <Route path="geography" element={<AdminGeography />} />
-              <Route path="area-ownerships" element={<AdminAreaOwnerships />} />
-              <Route path="providers" element={<AdminDashboard />} />
-              <Route path="providers/:id" element={<AdminDashboard />} />
+              <Route path="area-ownerships" element={<AdminProviders />} />
+              <Route path="providers" element={<AdminProviders />} />
+              <Route path="providers/:id" element={<AdminProviders />} />
               <Route path="services" element={<AdminDashboard />} />
               <Route path="services/:id" element={<AdminDashboard />} />
               <Route path="orders" element={<AdminDashboard />} />
@@ -95,10 +138,9 @@ const App = () => (
             >
               <Route index element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="dashboard" element={<OwnerDashboard />} />
-              <Route path="areas" element={<OwnerMyAreas />} />
               <Route path="providers" element={<OwnerMyProviders />} />
               <Route path="services" element={<OwnerDashboard />} />
-              <Route path="services/:id" element={<OwnerDashboard />} />
+              <Route path="services/:idItem" element={<OwnerServiceDetail />} />
               <Route path="media" element={<OwnerDashboard />} />
               <Route path="orders" element={<OwnerDashboard />} />
               <Route path="orders/:id" element={<OwnerDashboard />} />

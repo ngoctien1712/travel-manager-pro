@@ -74,31 +74,19 @@ CREATE TABLE customer_profiles (
   travel_style VARCHAR(255)
 );
 
-CREATE TABLE area_owner_profile (
-  id_user UUID PRIMARY KEY REFERENCES users(id_user) ON DELETE CASCADE,
-  business_name VARCHAR(255)
-);
-
 CREATE TABLE admin_profile (
   id_user UUID PRIMARY KEY REFERENCES users(id_user) ON DELETE CASCADE,
   department VARCHAR(255)
 );
 
--- ============ AREA OWNERS & PROVIDERS ============
-CREATE TABLE area_owners (
-  id_area_owner UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  id_area UUID NOT NULL REFERENCES area(id_area),
-  id_user UUID NOT NULL REFERENCES users(id_user),
-  status VARCHAR(20) DEFAULT 'pending',
-  UNIQUE(id_area, id_user)
-);
-
 CREATE TABLE provider (
   id_provider UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id_user UUID NOT NULL REFERENCES users(id_user),
+  id_area UUID NOT NULL REFERENCES area(id_area),
   name VARCHAR(255) NOT NULL,
-  id_area_owner UUID REFERENCES area_owners(id_area_owner),
-  id_area UUID REFERENCES area(id_area),
-  id_user UUID REFERENCES users(id_user)
+  phone VARCHAR(20),
+  image TEXT,
+  status VARCHAR(20) DEFAULT 'pending' -- pending, active, inactive
 );
 
 -- ============ BOOKABLE ITEMS ============
@@ -109,7 +97,8 @@ CREATE TABLE bookable_items (
   item_type VARCHAR(50) NOT NULL,
   title VARCHAR(255) NOT NULL,
   attribute JSONB,
-  price DECIMAL(15, 2)
+  price DECIMAL(15, 2),
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE item_media (
@@ -169,15 +158,15 @@ CREATE TABLE positions (
   id_vehicle UUID NOT NULL REFERENCES vehicle(id_vehicle) ON DELETE CASCADE
 );
 
--- ============ TRIP PLANS ============
 CREATE TABLE trip_plans (
-  id_plan UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name VARCHAR(255),
-  status VARCHAR(50),
+  id_trip_plan UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id_user UUID REFERENCES users(id_user),
+  destination TEXT,
   start_date DATE,
   end_date DATE,
-  schedule JSONB,
-  id_user UUID REFERENCES users(id_user)
+  budget DECIMAL(15, 2),
+  plan JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============ ORDERS ============
@@ -266,5 +255,5 @@ CREATE INDEX idx_bookable_items_provider ON bookable_items(id_provider);
 CREATE INDEX idx_bookable_items_type ON bookable_items(item_type);
 
 -- ============ SEED ROLES ============
-INSERT INTO roles (code) VALUES ('ADMIN'), ('CUSTOMER'), ('AREA_OWNER')
+INSERT INTO roles (code) VALUES ('ADMIN'), ('CUSTOMER'), ('OWNER')
 ON CONFLICT (code) DO NOTHING;

@@ -67,3 +67,8 @@
      </div>
    );
  };
+
+// Default loading skeleton used by many pages
+const LoadingSkeleton = () => <TableSkeleton rows={5} columns={4} />;
+
+export default LoadingSkeleton;
