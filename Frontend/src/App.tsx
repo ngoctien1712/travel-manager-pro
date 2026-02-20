@@ -31,7 +31,6 @@ import AdminUsers from "@/pages/admin/Users";
 import AdminGeography from "@/pages/admin/Geography";
 import AdminProviders from "@/pages/admin/Providers";
 import OwnerDashboard from "@/pages/owner/Dashboard";
-import OwnerMyAreas from "@/pages/owner/MyAreas";
 import OwnerMyProviders from "@/pages/owner/MyProviders";
 import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
 import Profile from "@/pages/Profile";
