@@ -96,8 +96,10 @@ CREATE TABLE bookable_items (
   id_area UUID REFERENCES area(id_area),
   item_type VARCHAR(50) NOT NULL,
   title VARCHAR(255) NOT NULL,
+  description TEXT,
   attribute JSONB,
   price DECIMAL(15, 2),
+  status VARCHAR(20) DEFAULT 'active',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -121,6 +123,7 @@ CREATE TABLE tours (
   attribute JSONB,
   start_at TIMESTAMPTZ,
   end_at TIMESTAMPTZ,
+  max_slots INTEGER DEFAULT 0,
   price DECIMAL(15, 2)
 );
 
@@ -148,7 +151,8 @@ CREATE TABLE vehicle (
   id_item UUID NOT NULL REFERENCES bookable_items(id_item) ON DELETE CASCADE,
   code_vehicle VARCHAR(100),
   max_guest INTEGER,
-  attribute JSONB
+  attribute JSONB,
+  UNIQUE(id_item)
 );
 
 CREATE TABLE positions (
@@ -255,5 +259,5 @@ CREATE INDEX idx_bookable_items_provider ON bookable_items(id_provider);
 CREATE INDEX idx_bookable_items_type ON bookable_items(item_type);
 
 -- ============ SEED ROLES ============
-INSERT INTO roles (code) VALUES ('ADMIN'), ('CUSTOMER'), ('OWNER')
+INSERT INTO roles (code) VALUES ('ADMIN'), ('CUSTOMER'), ('AREA_OWNER')
 ON CONFLICT (code) DO NOTHING;
