@@ -30,7 +30,6 @@ const sidebarItems = [
   { icon: LayoutDashboard, label: 'Tổng quan', path: '/owner/dashboard' },
   { icon: Building2, label: 'Nhà cung cấp', path: '/owner/providers' },
   { icon: Map, label: 'Dịch vụ của tôi', path: '/owner/services' },
-  { icon: Image, label: 'Quản lý media', path: '/owner/media' },
   { icon: ShoppingBag, label: 'Đơn hàng', path: '/owner/orders' },
   { icon: User, label: 'Hồ sơ', path: '/owner/profile' },
 ];

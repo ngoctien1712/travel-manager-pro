@@ -67,22 +67,10 @@ export const MyProviders = () => {
   const [phone, setPhone] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [areaId, setAreaId] = useState('');
-  const [serviceOpen, setServiceOpen] = useState(false);
-  const [serviceProviderId, setServiceProviderId] = useState('');
-  const [itemType, setItemType] = useState<'tour' | 'accommodation' | 'vehicle' | 'ticket'>('tour');
-  const [serviceTitle, setServiceTitle] = useState('');
-  const [servicePrice, setServicePrice] = useState<string>('');
 
   // Area Selection States
   const [countryId, setCountryId] = useState('');
   const [cityId, setCityId] = useState('');
-
-  // Extra fields for service types
-  const [tourGuideLang, setTourGuideLang] = useState('Tiếng Việt');
-  const [tourStart, setTourStart] = useState('');
-  const [tourEnd, setTourEnd] = useState('');
-  const [accAddress, setAccAddress] = useState('');
-  const [ticketKind, setTicketKind] = useState('');
 
   const { data: providersData } = useQuery({
     queryKey: ['owner', 'providers'],
@@ -136,26 +124,6 @@ export const MyProviders = () => {
     },
   });
 
-  const createServiceMut = useMutation({
-    mutationFn: (d: {
-      providerId: string;
-      itemType: 'tour' | 'accommodation' | 'vehicle' | 'ticket';
-      title: string;
-      price?: number;
-      extraData?: any;
-    }) => ownerGeographyApi.createBookableItem(d),
-    onSuccess: () => {
-      setServiceOpen(false);
-      setServiceProviderId('');
-      setServiceTitle('');
-      setServicePrice('');
-      setTourGuideLang('Tiếng Việt');
-      setTourStart('');
-      setTourEnd('');
-      setAccAddress('');
-      setTicketKind('');
-    },
-  });
 
   return (
     <>
@@ -167,9 +135,6 @@ export const MyProviders = () => {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Danh sách nhà cung cấp</CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setServiceOpen(true)} disabled={providers.length === 0}>
-              Tạo dịch vụ
-            </Button>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" /> Tạo nhà cung cấp
             </Button>
@@ -326,115 +291,6 @@ export const MyProviders = () => {
         </DialogContent>
       </Dialog >
 
-      <Dialog open={serviceOpen} onOpenChange={setServiceOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Tạo dịch vụ</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div>
-              <Label>Nhà cung cấp</Label>
-              <Select value={serviceProviderId} onValueChange={setServiceProviderId}>
-                <SelectTrigger><SelectValue placeholder="Chọn nhà cung cấp" /></SelectTrigger>
-                <SelectContent>
-                  {providers.map((p: OwnerProvider) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name} ({p.areaName})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Loại dịch vụ</Label>
-              <Select value={itemType} onValueChange={(v) => setItemType(v as 'tour' | 'accommodation' | 'vehicle' | 'ticket')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tour">Tour</SelectItem>
-                  <SelectItem value="accommodation">Lưu trú</SelectItem>
-                  <SelectItem value="vehicle">Phương tiện</SelectItem>
-                  <SelectItem value="ticket">Vé</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Tên dịch vụ</Label>
-              <Input value={serviceTitle} onChange={(e) => setServiceTitle(e.target.value)} placeholder="Ví dụ: Tour Hạ Long 1 ngày" />
-            </div>
-            <div>
-              <Label>Giá (VNĐ)</Label>
-              <Input type="number" value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} placeholder="0" />
-            </div>
-
-            {itemType === 'tour' && (
-              <div className="grid gap-4 p-3 border rounded-md bg-muted/50">
-                <p className="text-sm font-semibold">Thông tin Tour</p>
-                <div>
-                  <Label>Ngôn ngữ hướng dẫn</Label>
-                  <Input value={tourGuideLang} onChange={(e) => setTourGuideLang(e.target.value)} />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Bắt đầu</Label>
-                    <Input type="datetime-local" value={tourStart} onChange={(e) => setTourStart(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label>Kết thúc</Label>
-                    <Input type="datetime-local" value={tourEnd} onChange={(e) => setTourEnd(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {itemType === 'accommodation' && (
-              <div className="grid gap-4 p-3 border rounded-md bg-muted/50">
-                <p className="text-sm font-semibold">Thông tin Lưu trú</p>
-                <div>
-                  <Label>Địa chỉ cụ thể</Label>
-                  <Input value={accAddress} onChange={(e) => setAccAddress(e.target.value)} placeholder="Số nhà, tên đường..." />
-                </div>
-              </div>
-            )}
-
-            {itemType === 'ticket' && (
-              <div className="grid gap-4 p-3 border rounded-md bg-muted/50">
-                <p className="text-sm font-semibold">Thông tin Vé</p>
-                <div>
-                  <Label>Loại vé</Label>
-                  <Input value={ticketKind} onChange={(e) => setTicketKind(e.target.value)} placeholder="Vé tham quan, vé tàu..." />
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setServiceOpen(false)}>Hủy</Button>
-            <Button
-              onClick={() => {
-                if (serviceProviderId && serviceTitle) {
-                  let extraData = {};
-                  if (itemType === 'tour') {
-                    extraData = { guideLanguage: tourGuideLang, startAt: tourStart, endAt: tourEnd };
-                  } else if (itemType === 'accommodation') {
-                    extraData = { address: accAddress };
-                  } else if (itemType === 'ticket') {
-                    extraData = { ticketKind };
-                  }
-
-                  createServiceMut.mutate({
-                    providerId: serviceProviderId,
-                    itemType,
-                    title: serviceTitle,
-                    price: servicePrice ? Number(servicePrice) : undefined,
-                    extraData
-                  });
-                }
-              }}
-              disabled={!serviceProviderId || !serviceTitle || createServiceMut.isPending}
-            >
-              {createServiceMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Tạo dịch vụ
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

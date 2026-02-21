@@ -12,6 +12,29 @@ function toCamel(o: Record<string, unknown>): Record<string, unknown> {
   return r;
 }
 
+/** List all bookable items for current owner across all their providers */
+export async function getMyBookableItems(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { rows } = await pool.query(
+      `SELECT bi.id_item, bi.id_provider, bi.id_area, bi.item_type, bi.title, bi.attribute, bi.price, bi.created_at,
+              p.name AS provider_name, a.name AS area_name
+       FROM bookable_items bi
+       JOIN provider p ON p.id_provider = bi.id_provider
+       LEFT JOIN area a ON a.id_area = bi.id_area
+       WHERE p.id_user = $1
+       ORDER BY bi.created_at DESC`,
+      [userId]
+    );
+    res.json({
+      data: rows.map((r: Record<string, unknown>) => toCamel(r as Record<string, unknown>)),
+    });
+  } catch (err) {
+    console.error('Get my bookable items error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
 /** List areas used by current owner's providers */
 export async function getMyAreaOwnerships(req: Request, res: Response) {
   try {
@@ -121,6 +144,282 @@ export async function getProviderBookableItems(req: Request, res: Response) {
   }
 }
 
+/** Get detailed info for a bookable item (owner view) */
+export async function getServiceDetail(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+
+    // Fetch base item and check ownership
+    const { rows: itemRows } = await pool.query(
+      `SELECT bi.*, p.name AS provider_name, a.name AS area_name
+       FROM bookable_items bi
+       JOIN provider p ON p.id_provider = bi.id_provider
+       LEFT JOIN area a ON a.id_area = bi.id_area
+       WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (itemRows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy dịch vụ hoặc bạn không có quyền truy cập' });
+    }
+
+    const item = toCamel(itemRows[0] as Record<string, unknown>);
+    const itemType = item.itemType as string;
+
+    // Fetch type-specific details
+    let details: any = {};
+    if (itemType === 'tour') {
+      const { rows } = await pool.query('SELECT guide_language, start_at, end_at, max_slots, attribute FROM tours WHERE id_item = $1', [idItem]);
+      details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
+    } else if (itemType === 'accommodation') {
+      const { rows } = await pool.query('SELECT address FROM accommodations WHERE id_item = $1', [idItem]);
+      details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
+
+      // Also fetch rooms for accommodation
+      const { rows: rooms } = await pool.query('SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC', [idItem]);
+      details.rooms = rooms.map(r => toCamel(r as Record<string, unknown>));
+    } else if (itemType === 'vehicle') {
+      const { rows } = await pool.query('SELECT id_vehicle, code_vehicle, max_guest, attribute FROM vehicle WHERE id_item = $1', [idItem]);
+      details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
+
+      if (details.idVehicle) {
+        const { rows: positions } = await pool.query(
+          `SELECT p.*, (SELECT COUNT(*) FROM order_pos_vehicle_detail opvd WHERE opvd.id_position = p.id_position) as is_booked
+           FROM positions p WHERE p.id_vehicle = $1 ORDER BY p.code_position`,
+          [details.idVehicle]
+        );
+        details.positions = positions.map(p => ({
+          ...toCamel(p as Record<string, unknown>),
+          isBooked: Number(p.is_booked) > 0
+        }));
+      }
+    } else if (itemType === 'ticket') {
+      const { rows } = await pool.query('SELECT ticket_kind FROM tickets WHERE id_item = $1', [idItem]);
+      details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
+    }
+
+    // Fetch media
+    const { rows: media } = await pool.query('SELECT id_media, url, type FROM item_media WHERE id_item = $1', [idItem]);
+    item.media = media.map(m => toCamel(m as Record<string, unknown>));
+
+    res.json({ data: { ...item, ...details } });
+  } catch (err) {
+    console.error('Get service detail error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Update bookable item and its type-specific details */
+export async function updateServiceDetail(req: Request, res: Response) {
+  const client = await pool.connect();
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+    const { title, price, attribute, extraData } = req.body;
+
+    // Check ownership
+    const { rows: itemRows } = await client.query(
+      `SELECT bi.id_item, bi.item_type FROM bookable_items bi
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (itemRows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy dịch vụ hoặc bạn không có quyền' });
+    }
+
+    const itemType = itemRows[0].item_type;
+
+    await client.query('BEGIN');
+
+    // Update base item
+    await client.query(
+      `UPDATE bookable_items SET title = $1, price = $2, attribute = $3, description = $4 WHERE id_item = $5`,
+      [title, price, attribute ? JSON.stringify(attribute) : null, req.body.description || null, idItem]
+    );
+
+    // Update type-specific details
+    if (itemType === 'tour' && extraData) {
+      await client.query(
+        `UPDATE tours SET guide_language = $1, start_at = $2, end_at = $3, max_slots = $4, attribute = $5 WHERE id_item = $6`,
+        [extraData.guideLanguage, extraData.startAt, extraData.endAt, extraData.maxSlots || 0, extraData.attribute ? JSON.stringify(extraData.attribute) : null, idItem]
+      );
+    } else if (itemType === 'accommodation' && extraData) {
+      await client.query(
+        `UPDATE accommodations SET address = $1 WHERE id_item = $2`,
+        [extraData.address, idItem]
+      );
+    } else if (itemType === 'ticket' && extraData) {
+      await client.query(
+        `UPDATE tickets SET ticket_kind = $1 WHERE id_item = $2`,
+        [extraData.ticketKind, idItem]
+      );
+    } else if (itemType === 'vehicle' && extraData) {
+      await client.query(
+        `UPDATE vehicle SET code_vehicle = $1, max_guest = $2, attribute = $3 WHERE id_item = $4`,
+        [extraData.codeVehicle || '', Number(extraData.maxGuest) || 0, extraData.attribute ? JSON.stringify(extraData.attribute) : null, idItem]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Update service detail error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  } finally {
+    client.release();
+  }
+}
+
+/** Update service status (active/inactive/pending) */
+export async function updateServiceStatus(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+    const { status } = req.body;
+
+    // Check ownership
+    const check = await pool.query(
+      `SELECT bi.id_item FROM bookable_items bi
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền thay đổi trạng thái dịch vụ này' });
+    }
+
+    await pool.query('UPDATE bookable_items SET status = $1 WHERE id_item = $2', [status, idItem]);
+    res.json({ success: true, status });
+  } catch (err) {
+    console.error('Update service status error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Delete service */
+export async function deleteService(req: Request, res: Response) {
+  const client = await pool.connect();
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+
+    // Check ownership
+    const check = await client.query(
+      `SELECT bi.id_item FROM bookable_items bi
+         JOIN provider p ON p.id_provider = bi.id_provider
+         WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa dịch vụ này' });
+    }
+
+    await client.query('BEGIN');
+
+    // Delete from child tables first (tours, accommodations, etc.)
+    // Note: If you have ON DELETE CASCADE in DB, this might be simpler.
+    // Assuming we need to clean up manually for safety or lack of CASCADE.
+    await client.query('DELETE FROM tours WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM accommodations_rooms WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM accommodations WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM vehicle WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM tickets WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM item_media WHERE id_item = $1', [idItem]);
+    await client.query('DELETE FROM bookable_items WHERE id_item = $1', [idItem]);
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Delete service error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  } finally {
+    client.release();
+  }
+}
+
+/** Add position to vehicle */
+export async function addVehiclePosition(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+    const { codePosition, price } = req.body;
+
+    // 1. Check ownership and item type
+    const { rows: itemRows } = await pool.query(
+      `SELECT bi.id_item, bi.item_type FROM bookable_items bi
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (itemRows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền quản lý dịch vụ này' });
+    }
+
+    if (itemRows[0].item_type !== 'vehicle') {
+      return res.status(400).json({ message: 'Dịch vụ này không phải là phương tiện' });
+    }
+
+    // 2. Ensure vehicle record exists
+    const { rows: vRows } = await pool.query(
+      `INSERT INTO vehicle (id_item, code_vehicle, max_guest)
+       VALUES ($1, '', 0)
+       ON CONFLICT (id_item) DO UPDATE SET id_item = EXCLUDED.id_item
+       RETURNING id_vehicle`,
+      [idItem]
+    );
+
+    const idVehicle = vRows[0].id_vehicle;
+
+    // 3. Insert position
+    const { rows } = await pool.query(
+      `INSERT INTO positions (id_vehicle, code_position, price) VALUES ($1, $2, $3)
+       RETURNING id_position, code_position, price`,
+      [idVehicle, codePosition, price]
+    );
+
+    res.status(201).json({ data: toCamel(rows[0] as Record<string, unknown>) });
+  } catch (err) {
+    console.error('Add vehicle position error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Delete position from vehicle */
+export async function deleteVehiclePosition(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idPosition } = req.params;
+
+    // Check ownership via hierarchy
+    const check = await pool.query(
+      `SELECT pos.id_position FROM positions pos
+       JOIN vehicle v ON v.id_vehicle = pos.id_vehicle
+       JOIN bookable_items bi ON bi.id_item = v.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE pos.id_position = $1 AND p.id_user = $2`,
+      [idPosition, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa vị trí này' });
+    }
+
+    await pool.query('DELETE FROM positions WHERE id_position = $1', [idPosition]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete vehicle position error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
 /** Create provider: name + id_area */
 export async function createProvider(req: Request, res: Response) {
   try {
@@ -140,15 +439,15 @@ export async function createProvider(req: Request, res: Response) {
   }
 }
 
-/** Add media for bookable item */
+/** Add multiple media for bookable item */
 export async function addItemMedia(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { idItem } = req.params;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    const files = req.files as Express.Multer.File[];
 
-    if (!imageUrl) {
-      return res.status(400).json({ message: 'Vui lòng upload hình ảnh' });
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'Vui lòng upload ít nhất một hình ảnh' });
     }
 
     // Check if item belongs to user via provider
@@ -163,15 +462,47 @@ export async function addItemMedia(req: Request, res: Response) {
       return res.status(403).json({ message: 'Bạn không có quyền thêm ảnh cho dịch vụ này' });
     }
 
-    const { rows } = await pool.query(
-      `INSERT INTO item_media (id_item, url, type) VALUES ($1, $2, 'image')
-       RETURNING id_media, id_item, url, type`,
-      [idItem, imageUrl]
-    );
+    const insertedMedia = [];
+    for (const file of files) {
+      const imageUrl = `/uploads/${file.filename}`;
+      const { rows } = await pool.query(
+        `INSERT INTO item_media (id_item, url, type) VALUES ($1, $2, 'image')
+         RETURNING id_media, id_item, url, type`,
+        [idItem, imageUrl]
+      );
+      insertedMedia.push(toCamel(rows[0] as Record<string, unknown>));
+    }
 
-    res.status(201).json(toCamel(rows[0] as Record<string, unknown>));
+    res.status(201).json({ data: insertedMedia });
   } catch (err) {
     console.error('Add item media error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Delete media from bookable item */
+export async function deleteItemMedia(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idMedia } = req.params;
+
+    // Check ownership via item and provider
+    const check = await pool.query(
+      `SELECT im.id_media FROM item_media im
+       JOIN bookable_items bi ON bi.id_item = im.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE im.id_media = $1 AND p.id_user = $2`,
+      [idMedia, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa hình ảnh này' });
+    }
+
+    await pool.query('DELETE FROM item_media WHERE id_media = $1', [idMedia]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete item media error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }
@@ -292,6 +623,11 @@ export async function createBookableItem(req: Request, res: Response) {
       await client.query(
         `INSERT INTO tickets (id_item, ticket_kind) VALUES ($1, $2)`,
         [itemId, extraData?.ticketKind]
+      );
+    } else if (itemType === 'vehicle') {
+      await client.query(
+        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, attribute) VALUES ($1, $2, $3, $4)`,
+        [itemId, extraData?.codeVehicle || '', extraData?.maxGuest || 0, extraData?.attribute ? JSON.stringify(extraData.attribute) : null]
       );
     }
 

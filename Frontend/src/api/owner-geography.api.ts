@@ -38,11 +38,35 @@ export const ownerGeographyApi = {
   listMyBookableItems: (providerId: string) =>
     httpClient.get<{ data: any[] }>(`/owner/providers/${providerId}/bookable-items`),
 
+  listAllMyBookableItems: () =>
+    httpClient.get<{ data: any[] }>('/owner/bookable-items'),
+
+  getServiceDetail: (idItem: string) =>
+    httpClient.get<{ data: any }>(`/owner/bookable-items/${idItem}`),
+
+  updateServiceDetail: (idItem: string, data: any) =>
+    httpClient.put<{ success: boolean }>(`/owner/bookable-items/${idItem}`, data),
+
+  updateServiceStatus: (idItem: string, status: string) =>
+    httpClient.put<{ success: boolean; status: string }>(`/owner/bookable-items/${idItem}/status`, { status }),
+
+  deleteService: (idItem: string) =>
+    httpClient.delete<{ success: boolean }>(`/owner/bookable-items/${idItem}`),
+
   createProvider: (data: FormData) =>
     httpClient.post<OwnerProvider>('/owner/providers', data),
 
   addItemMedia: (idItem: string, data: FormData) =>
-    httpClient.post(`/owner/bookable-items/${idItem}/media`, data),
+    httpClient.post<{ data: any[] }>(`/owner/bookable-items/${idItem}/media`, data),
+
+  deleteItemMedia: (idMedia: string) =>
+    httpClient.delete<{ success: boolean }>(`/owner/media/${idMedia}`),
+
+  addVehiclePosition: (idItem: string, data: { codePosition: string; price: number }) =>
+    httpClient.post<{ data: any }>(`/owner/bookable-items/${idItem}/positions`, data),
+
+  deleteVehiclePosition: (idPosition: string) =>
+    httpClient.delete<{ success: boolean }>(`/owner/positions/${idPosition}`),
 
   createBookableItem: (data: {
     providerId: string;

@@ -11,6 +11,7 @@ router.use(requireRole('owner'));
 
 router.get('/area-ownerships', ownerController.getMyAreaOwnerships);
 router.get('/providers', ownerController.getMyProviders);
+router.get('/bookable-items', ownerController.getMyBookableItems);
 router.post(
   '/area-ownerships',
   [body('areaId').isUUID().withMessage('areaId không hợp lệ')],
@@ -29,15 +30,43 @@ router.post(
   ownerController.createProvider
 );
 
+router.get('/bookable-items/:idItem', ownerController.getServiceDetail);
+router.put('/bookable-items/:idItem', ownerController.updateServiceDetail);
 router.post(
   '/bookable-items/:idItem/media',
-  upload.single('image'),
+  upload.array('images', 10),
   ownerController.addItemMedia
+);
+
+router.delete(
+  '/media/:idMedia',
+  ownerController.deleteItemMedia
+);
+
+router.put(
+  '/bookable-items/:idItem/status',
+  [body('status').isIn(['active', 'inactive', 'pending']).withMessage('Trạng thái không hợp lệ')],
+  ownerController.updateServiceStatus
+);
+
+router.delete(
+  '/bookable-items/:idItem',
+  ownerController.deleteService
 );
 
 router.post(
   '/bookable-items/:idItem/rooms',
   ownerController.addAccommodationRoom
+);
+
+router.post(
+  '/bookable-items/:idItem/positions',
+  ownerController.addVehiclePosition
+);
+
+router.delete(
+  '/positions/:idPosition',
+  ownerController.deleteVehiclePosition
 );
 
 router.post(

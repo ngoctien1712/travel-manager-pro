@@ -32,6 +32,7 @@ import AdminGeography from "@/pages/admin/Geography";
 import AdminProviders from "@/pages/admin/Providers";
 import OwnerDashboard from "@/pages/owner/Dashboard";
 import OwnerMyProviders from "@/pages/owner/MyProviders";
+import OwnerMyServices from "@/pages/owner/MyServices";
 import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
 import Profile from "@/pages/Profile";
 
@@ -138,7 +139,7 @@ const App = () => (
               <Route index element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="dashboard" element={<OwnerDashboard />} />
               <Route path="providers" element={<OwnerMyProviders />} />
-              <Route path="services" element={<OwnerDashboard />} />
+              <Route path="services" element={<OwnerMyServices />} />
               <Route path="services/:idItem" element={<OwnerServiceDetail />} />
               <Route path="media" element={<OwnerDashboard />} />
               <Route path="orders" element={<OwnerDashboard />} />
