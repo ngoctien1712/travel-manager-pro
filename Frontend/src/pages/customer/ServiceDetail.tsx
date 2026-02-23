@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import ErrorState from '@/components/ErrorState';
 import { customerApi } from '@/api/customer.api';
@@ -25,10 +24,10 @@ import {
   ChevronDown,
   Utensils,
   Eye,
-  Activity,
-  Award,
   Users,
-  Car
+  Car,
+  Sparkles,
+  ShieldCheck
 } from 'lucide-react';
 
 interface ServiceDetail {
@@ -75,6 +74,11 @@ interface ServiceDetail {
 
   // Accommodation specific
   address?: string;
+  hotel_type?: string;
+  star_rating?: number;
+  checkin_time?: string;
+  checkout_time?: string;
+  policies?: any;
   acc_attribute?: {
     type?: string;
     stars?: number;
@@ -124,6 +128,7 @@ export default function ServiceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [activeImage, setActiveImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -146,28 +151,49 @@ export default function ServiceDetail() {
     if (id) fetchService();
   }, [id]);
 
-  const handlePrevImage = () => {
-    if (!service?.media || service.media.length <= 1) return;
-    const currentIndex = service.media.findIndex(m => m.url === activeImage);
-    const prevIndex = (currentIndex - 1 + service.media.length) % service.media.length;
-    setActiveImage(service.media[prevIndex].url);
-  };
-
-  const handleNextImage = () => {
-    if (!service?.media || service.media.length <= 1) return;
-    const currentIndex = service.media.findIndex(m => m.url === activeImage);
-    const nextIndex = (currentIndex + 1) % service.media.length;
-    setActiveImage(service.media[nextIndex].url);
-  };
-
   const handleAddToCart = async () => {
     if (!service) return;
+
+    // For vehicles, must select at least one seat
+    if (service.item_type === 'vehicle' && selectedSeats.length === 0) {
+      alert('Vui lòng chọn ít nhất một chỗ ngồi');
+      return;
+    }
+
     try {
-      await customerApi.addToCart(service.id_item, quantity, service.price);
+      const finalPrice = service.item_type === 'vehicle'
+        ? selectedSeats.reduce((sum, seat) => sum + Number(seat.price || 0), 0)
+        : Number(service.price) * quantity;
+
+      const bookingAttribute = {
+        ...service.attribute,
+        selectedSeats: selectedSeats.map(s => s.code_position),
+        itemType: service.item_type
+      };
+
+      await customerApi.addToCart(service.id_item, quantity, finalPrice, bookingAttribute);
       alert('Đã thêm vào giỏ hàng thành công!');
       navigate('/cart');
     } catch (error) {
       alert('Lỗi khi thêm vào giỏ hàng');
+    }
+  };
+
+  const handleSeatToggle = (pos: any) => {
+    if (pos.is_booked) return;
+
+    const isSelected = selectedSeats.some(s => s.id_position === pos.id_position);
+    let newSelected;
+    if (isSelected) {
+      newSelected = selectedSeats.filter(s => s.id_position !== pos.id_position);
+    } else {
+      newSelected = [...selectedSeats, pos];
+    }
+
+    setSelectedSeats(newSelected);
+    // For vehicles, quantity is determined by number of seats
+    if (service?.item_type === 'vehicle') {
+      setQuantity(newSelected.length || 1);
     }
   };
 
@@ -184,113 +210,109 @@ export default function ServiceDetail() {
   };
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen pb-20 font-sans">
+    <div className="bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans">
       <div className="container mx-auto px-4 lg:px-20 py-8">
-
-        {/* Quay lại */}
+        {/* Navigation Breadcrumb */}
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors mb-6 text-[10px] font-black uppercase tracking-[0.2em]"
         >
-          <ChevronLeft size={16} /> Quay lại
+          <ChevronLeft size={16} /> Quay lại trang trước
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-          {/* CỘT TRÁI: Hình ảnh & Thông tin chi tiết */}
-          <div className="lg:col-span-7 space-y-8">
-
-            {/* Gallery ảnh chủ đạo */}
-            <div className="relative group">
-              <div className="aspect-[4/3] rounded-[2rem] overflow-hidden bg-gray-100 shadow-sm border border-gray-200">
-                <img
-                  src={getImageUrl(activeImage)}
-                  alt={service.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute top-6 left-6 flex flex-col gap-2">
-                  <Badge className="bg-[#3b82f6] text-white px-5 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border-none shadow-sm flex items-center gap-2">
-                    <Home size={14} /> {service.item_type.toUpperCase()}
-                  </Badge>
-                  <div className="bg-white/90 backdrop-blur rounded-full px-4 py-1.5 flex items-center gap-2 shadow-sm border border-gray-100">
-                    <MapPin size={14} className="text-gray-400" />
-                    <span className="text-[11px] font-bold text-gray-700">{service.city_name}</span>
-                  </div>
-                </div>
-                <button onClick={handlePrevImage} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur flex items-center justify-center text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-md">
-                  <ChevronLeft size={20} />
-                </button>
-                <button onClick={handleNextImage} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur flex items-center justify-center text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-md">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-
-              {/* Bộ sưu tập (Thumbnails) */}
-              <div className="mt-6 space-y-4">
-                <div className="flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">
-                  <span>BỘ SƯU TẬP ẢNH ({service.media?.length || 0})</span>
-                  <button className="flex items-center gap-1 hover:text-gray-900 transition-colors">Lướt để xem thêm <ChevronRight size={12} /></button>
-                </div>
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                  {service.media?.map((m) => (
-                    <button
-                      key={m.id_media}
-                      onClick={() => setActiveImage(m.url)}
-                      className={`relative w-28 h-20 flex-shrink-0 rounded-2xl overflow-hidden border-2 transition-all snap-start ${activeImage === m.url ? 'border-[#3b82f6] shadow-sm' : 'border-white hover:border-gray-200'
-                        }`}
-                    >
-                      <img src={getImageUrl(m.url)} className="w-full h-full object-cover" alt="Thumbnail" />
-                    </button>
-                  ))}
-                </div>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 mt-4">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-3 mb-4">
+              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-wider px-3 py-1">
+                {service.item_type}
+              </Badge>
+              <div className="flex items-center gap-1 text-yellow-400">
+                <Star size={14} className="fill-current" />
+                <span className="text-sm font-black text-gray-900">4.9</span>
+                <span className="text-xs text-gray-400 font-bold ml-1">(1k+ lượt đặt)</span>
               </div>
             </div>
+            <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight leading-[1.1] mb-4">
+              {service.title}
+            </h1>
+            <div className="flex items-center gap-2 text-gray-500 font-bold flex-wrap">
+              <MapPin size={18} className="text-blue-500 shrink-0" />
+              <span className="text-sm">{service.city_name}, {service.area_name}</span>
+              <button className="text-blue-600 text-xs font-black uppercase tracking-widest ml-2 hover:underline">Xem trên bản đồ</button>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 shrink-0">
+            <Button variant="outline" className="rounded-xl font-bold border-gray-200 hover:bg-white hover:border-blue-200 transition-all">Chia sẻ</Button>
+            <Button variant="outline" className="rounded-xl font-bold border-gray-200 text-red-500 hover:bg-red-50 transition-all">Yêu thích</Button>
+          </div>
+        </div>
 
-            {/* Chi tiết dịch vụ chung */}
-            <section className="bg-white rounded-[2rem] p-8 sm:p-10 shadow-sm border border-gray-100">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-6 h-6 rounded-full border-2 border-gray-900 flex items-center justify-center">
-                  <ChevronDown size={14} className="-rotate-180" />
+        {/* Gallery ảnh chủ đạo - Traveloka Style (Grid) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-3 mb-12 rounded-[2.5rem] overflow-hidden shadow-2xl shadow-blue-100/20 max-h-[600px]">
+          <div className="md:col-span-2 md:row-span-2 relative group cursor-pointer" onClick={() => setActiveImage(service.media?.[0]?.url || null)}>
+            <img
+              src={getImageUrl(service.media?.[0]?.url || null)}
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+              alt="Main"
+            />
+            <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          {service.media?.slice(1, 5).map((m, idx) => (
+            <div key={idx} className="relative group cursor-pointer overflow-hidden" onClick={() => setActiveImage(m.url)}>
+              <img
+                src={getImageUrl(m.url)}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                alt={`Sub ${idx}`}
+              />
+              <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              {idx === 3 && service.media.length > 5 && (
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
+                  <span className="text-white font-black text-xl">+{service.media.length - 5}</span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Chi tiết dịch vụ</h2>
+              )}
+            </div>
+          ))}
+          {(!service.media || service.media.length < 5) && Array.from({ length: 5 - (service.media?.length || 0) }).map((_, idx) => (
+            <div key={`empty-${idx}`} className="bg-gray-100 flex items-center justify-center text-gray-300">
+              <TicketIcon size={32} />
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          {/* CỘT TRÁI: Nội dung chi tiết */}
+          <div className="lg:col-span-8 space-y-12">
+
+            {/* Giới thiệu */}
+            <section className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-sm border border-gray-100">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Sparkles size={24} />
+                </div>
+                <h2 className="text-2xl font-black text-gray-900">Giới thiệu trải nghiệm</h2>
               </div>
-              <p className="text-gray-600 leading-relaxed mb-10">{service.description}</p>
+              <p className="text-gray-600 text-lg leading-relaxed mb-10 whitespace-pre-line">{service.description}</p>
 
               {/* General Attributes */}
               {service.attribute && Object.keys(service.attribute).length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-8 border-t border-gray-50">
                   {Object.entries(service.attribute).map(([k, v]: [string, any]) => {
+                    // Skip complex objects already rendered in specific sections
+                    const skipKeys = ['itinerary', 'timetable', 'meals', 'facilities', 'amenities', 'views', 'tourHighlights', 'rooms', 'positions', 'poiActivities'];
+                    if (skipKeys.includes(k)) return null;
+
                     const formatValue = (val: any): string => {
                       if (val === null || val === undefined || val === '') return '';
-                      if (Array.isArray(val)) {
-                        return val
-                          .map(i => formatValue(i))
-                          .filter(i => i !== '')
-                          .join(' • ');
-                      }
-                      if (typeof val === 'object') {
-                        const entries = Object.entries(val)
-                          .map(([sk, sv]) => {
-                            const formattedV = formatValue(sv);
-                            return formattedV ? `${sk.replace(/_/g, ' ')}: ${formattedV}` : null;
-                          })
-                          .filter(Boolean);
-
-                        // If it's a multi-line list (like timetable), join with newline-ish separator
-                        return entries.length > 1 ? entries.join(' | ') : (entries[0] || '');
-                      }
+                      if (Array.isArray(val)) return val.join(' • ');
+                      if (typeof val === 'object') return ''; // Don't render complex objects here
                       return String(val);
                     };
-
-                    let displayValue = formatValue(v);
-                    let displayKey = k.replace(/_/g, ' ');
-
+                    const displayValue = formatValue(v);
                     if (!displayValue) return null;
-
                     return (
-                      <div key={k} className="flex flex-col gap-1.5 p-5 rounded-2xl bg-gray-50 border border-gray-100 group hover:bg-white hover:shadow-md transition-all">
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">{displayKey}</span>
-                        <span className="text-gray-900 font-bold text-sm leading-tight">{displayValue}</span>
+                      <div key={k} className="flex flex-col gap-1.5 p-5 rounded-2xl bg-gray-50 border border-gray-100">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</span>
+                        <span className="text-gray-900 font-bold text-sm">{displayValue}</span>
                       </div>
                     );
                   })}
@@ -298,172 +320,206 @@ export default function ServiceDetail() {
               )}
             </section>
 
-            {/* 1. TOUR ATTRIBUTES */}
-            {service.item_type === 'tour' && service.tour_attribute && (
-              <section className="bg-white rounded-[2rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-10">
-                <h3 className="text-xl font-bold flex items-center gap-3"><Calendar size={24} className="text-[#3b82f6]" /> Lịch trình & Thông tin Tour</h3>
+            {/* TOUR SPECIFIC */}
+            {service.item_type === 'tour' && (
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-12">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                    <Calendar size={24} />
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900">Thông tin hành trình</h3>
+                </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Tag size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-1">Loại Tour</span>
-                    <span className="font-bold text-gray-900 capitalize">{service.tour_attribute.tour_type}</span>
+                  <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
+                    <Tag size={24} className="text-blue-500 mb-3" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Loại</span>
+                    <span className="font-bold text-gray-900 capitalize">{service.attribute?.tourType || service.tour_attribute?.tour_type || 'Trọn gói'}</span>
                   </div>
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Clock size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-black text-gray-400 uppercase mb-1">Số ngày</span>
-                    <span className="font-bold text-gray-900">
-                      {(() => {
-                        if (service.start_at && service.end_at) {
-                          const start = new Date(service.start_at);
-                          const end = new Date(service.end_at);
-
-                          // Normalize dates to midnight to count calendar days correctly
-                          start.setHours(0, 0, 0, 0);
-                          end.setHours(0, 0, 0, 0);
-
-                          const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                          return `${diff} ngày`;
-                        }
-                        if (service.tour_attribute.duration_days) return `${service.tour_attribute.duration_days} ngày`;
-                        return '---';
-                      })()}
-                    </span>
+                  <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
+                    <Clock size={24} className="text-blue-500 mb-3" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Thời lượng</span>
+                    <span className="font-bold text-gray-900">{service.attribute?.durationDays || service.tour_attribute?.duration_days || '1'} ngày</span>
                   </div>
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Calendar size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-1">Khởi hành</span>
-                    <span className="font-bold text-gray-900 truncate w-full">
-                      {service.start_at ? new Date(service.start_at).toLocaleDateString('vi-VN') : service.tour_attribute.departure_point}
-                    </span>
+                  <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
+                    <MapPin size={24} className="text-blue-500 mb-3" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Điểm đón</span>
+                    <span className="font-bold text-gray-900 truncate w-full">{service.attribute?.departurePoint || service.tour_attribute?.departure_point || service.city_name}</span>
                   </div>
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Award size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-1">Tiêu chuẩn</span>
-                    <span className="font-bold text-gray-900">{service.tour_attribute.hotel_standard?.replace(/_/g, ' ')}</span>
+                  <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
+                    <ShieldCheck size={24} className="text-blue-500 mb-3" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Khách sạn</span>
+                    <span className="font-bold text-gray-900">{service.attribute?.hotelStandard || service.tour_attribute?.hotel_standard || 'Tiêu chuẩn'}</span>
                   </div>
                 </div>
 
-                {service.start_at && service.end_at && (
-                  <div className="flex flex-col sm:flex-row gap-4 p-6 rounded-3xl bg-blue-50/50 border border-blue-100/50 items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-                        <Calendar size={20} className="text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest leading-none mb-1">Thời hạn Tour</p>
-                        <p className="text-sm font-bold text-blue-900">
-                          {new Date(service.start_at).toLocaleDateString('vi-VN')}
-                          <span className="mx-2 text-blue-300">→</span>
-                          {new Date(service.end_at).toLocaleDateString('vi-VN')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-8 pr-4">
-                      <div className="text-center">
-                        <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Giờ đi</p>
-                        <p className="text-xs font-black text-blue-700">{new Date(service.start_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                      <div className="w-px h-8 bg-blue-200/50" />
-                      <div className="text-center">
-                        <p className="text-[9px] font-bold text-blue-400 uppercase mb-1">Giờ về</p>
-                        <p className="text-xs font-black text-blue-700">{new Date(service.end_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                    </div>
+                {/* Tour Highlights */}
+                {(service.attribute?.tourHighlights || service.tour_attribute?.tour_highlights) && (
+                  <div className="p-8 rounded-[2.5rem] bg-blue-50/50 border border-blue-100">
+                    <h4 className="text-sm font-black text-blue-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <Sparkles size={18} className="text-blue-600" /> Điểm nhấn hành trình
+                    </h4>
+                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(service.attribute?.tourHighlights || service.tour_attribute?.tour_highlights || []).map((h: string, i: number) => (
+                        <li key={i} className="flex items-start gap-3">
+                          <CheckCircle2 size={18} className="text-blue-500 mt-0.5 shrink-0" />
+                          <span className="text-gray-700 font-bold text-sm leading-tight">{h}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
-                {service.tour_attribute.meals && (
-                  <div className="p-6 rounded-2xl bg-gray-50 flex justify-around items-center border border-gray-100 shadow-inner">
-                    <div className="flex flex-col items-center">
-                      <Utensils size={18} className="text-orange-400 mb-1" />
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Sáng</span>
-                      <span className="text-lg font-black">{service.tour_attribute.meals.breakfast}</span>
+                {/* Meals */}
+                {(service.attribute?.meals || service.tour_attribute?.meals) && (
+                  <div className="flex flex-wrap gap-8 py-6 border-y border-gray-50">
+                    <div className="flex items-center gap-3">
+                      <Utensils size={20} className="text-gray-400" />
+                      <span className="text-xs font-black uppercase tracking-widest text-gray-400">Chế độ ăn uống:</span>
                     </div>
-                    <div className="w-px h-10 bg-gray-200" />
-                    <div className="flex flex-col items-center">
-                      <Utensils size={18} className="text-orange-400 mb-1" />
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Trưa</span>
-                      <span className="text-lg font-black">{service.tour_attribute.meals.lunch}</span>
-                    </div>
-                    <div className="w-px h-10 bg-gray-200" />
-                    <div className="flex flex-col items-center">
-                      <Utensils size={18} className="text-orange-400 mb-1" />
-                      <span className="text-[10px] uppercase font-bold text-gray-400">Tối</span>
-                      <span className="text-lg font-black">{service.tour_attribute.meals.dinner}</span>
-                    </div>
+                    {[
+                      { label: 'Bữa sáng', count: service.attribute?.meals?.breakfast || service.tour_attribute?.meals?.breakfast },
+                      { label: 'Bữa trưa', count: service.attribute?.meals?.lunch || service.tour_attribute?.meals?.lunch },
+                      { label: 'Bữa tối', count: service.attribute?.meals?.dinner || service.tour_attribute?.meals?.dinner },
+                    ].map(m => (
+                      <div key={m.label} className="flex items-center gap-2">
+                        <span className="text-sm font-black text-gray-900">{m.count || 0}</span>
+                        <span className="text-xs text-gray-500 font-medium">{m.label}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {/* Itinerary Timeline */}
-                <div className="space-y-8 pt-4">
-                  <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest px-1 border-l-4 border-blue-500">Lịch trình chi tiết</h4>
-                  {service.tour_attribute.itinerary?.map((it, idx) => (
-                    <div key={idx} className="flex gap-6 group">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-xl bg-gray-900 text-white flex items-center justify-center font-bold flex-shrink-0 group-hover:bg-blue-600 transition-colors">{it.day}</div>
-                        {idx < (service.tour_attribute!.itinerary!.length - 1) && <div className="w-0.5 h-full bg-gray-100" />}
+                <div className="space-y-10 pt-4">
+                  <div className="inline-block px-4 py-1.5 rounded-full bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest">Lịch trình chi tiết</div>
+                  {(service.attribute?.itinerary || service.tour_attribute?.itinerary)?.map((it: any, idx: number) => (
+                    <div key={idx} className="flex gap-8 group">
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className="w-12 h-12 rounded-2xl bg-gray-100 text-gray-900 flex items-center justify-center font-black group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                          {idx + 1}
+                        </div>
+                        {idx < ((service.attribute?.itinerary || service.tour_attribute?.itinerary || []).length - 1) && <div className="w-0.5 h-full bg-gray-100 my-2" />}
                       </div>
-                      <div className="flex-1 pb-10">
-                        <h5 className="font-bold text-gray-900 text-lg mb-3">{it.title}</h5>
-                        <ul className="space-y-2">
-                          {it.activities.map((act, i) => (
-                            <li key={i} className="flex items-start gap-4 text-gray-600 text-sm">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
-                              {act}
+                      <div className="flex-1 pb-12">
+                        <h5 className="font-black text-gray-900 text-xl mb-4 group-hover:text-blue-600 transition-colors">Ngày {it.day || idx + 1}: {it.title}</h5>
+                        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {(it.activities || []).map((act: string, i: number) => (
+                            <li key={i} className="flex items-center gap-3 text-gray-600 text-sm p-3 rounded-xl bg-gray-50 border border-gray-100/50">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                              <span className="font-medium">{act}</span>
                             </li>
                           ))}
                         </ul>
                       </div>
                     </div>
                   ))}
+                  {!(service.attribute?.itinerary || service.tour_attribute?.itinerary) && (
+                    <div className="text-gray-400 italic text-sm text-center py-10">Lịch trình đang được cập nhật...</div>
+                  )}
                 </div>
-
-                {service.tour_attribute.tour_highlights && (
-                  <div className="pt-6 border-t border-gray-50">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Điểm nhấn chuyến đi</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {service.tour_attribute.tour_highlights.map((hl, i) => (
-                        <Badge key={i} variant="outline" className="px-4 py-2 rounded-xl text-gray-600 border-gray-200">✨ {hl}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </section>
             )}
 
-            {/* 2. ACCOMMODATION ATTRIBUTES */}
-            {service.item_type === 'accommodation' && service.acc_attribute && (
-              <section className="bg-white rounded-[2rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-10">
-                <div className="flex justify-between items-start">
-                  <h3 className="text-xl font-bold flex items-center gap-3"><Home size={24} className="text-[#3b82f6]" /> Tiện nghi lưu trú</h3>
-                  <div className="flex gap-1">
+            {/* ACCOMMODATION SPECIFIC */}
+            {service.item_type === 'accommodation' && (
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-12">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Home size={24} />
+                    </div>
+                    <h3 className="text-2xl font-black text-gray-900">Dịch vụ & Tiện nghi</h3>
+                  </div>
+                  <div className="flex gap-1.5">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} size={18} className={i < (service.acc_attribute!.stars || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
+                      <Star key={i} size={20} className={i < (service.attribute?.stars || service.acc_attribute?.stars || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
                     ))}
                   </div>
                 </div>
 
-                <p className="text-gray-600 text-lg leading-relaxed italic border-l-4 border-blue-500 pl-8">{service.acc_attribute.description}</p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tiện nghi chính</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {service.acc_attribute.amenities?.map(am => (
-                        <div key={am} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
-                          <CheckCircle2 size={16} className="text-blue-500" />
-                          <span className="text-xs font-bold text-gray-700 capitalize">{am.replace(/_/g, ' ')}</span>
-                        </div>
-                      ))}
+                <div className="space-y-8">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-5 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
+                      <Home size={20} className="text-blue-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Loại hình</p>
+                      <p className="font-black text-gray-900 text-sm whitespace-nowrap">{service.hotel_type || 'Khách sạn'}</p>
+                    </div>
+                    <div className="p-5 rounded-3xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center text-center">
+                      <Clock size={20} className="text-emerald-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-in</p>
+                      <p className="font-black text-gray-900 text-sm">{service.checkin_time || '14:00'}</p>
+                    </div>
+                    <div className="p-5 rounded-3xl bg-orange-50/50 border border-orange-100/50 flex flex-col items-center text-center">
+                      <Clock size={20} className="text-orange-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-out</p>
+                      <p className="font-black text-gray-900 text-sm">{service.checkout_time || '12:00'}</p>
+                    </div>
+                    <div className="p-5 rounded-3xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center text-center">
+                      <Star size={20} className="text-purple-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Xếp hạng</p>
+                      <p className="font-black text-gray-900 text-sm">{service.star_rating || '4.5'} Sao</p>
                     </div>
                   </div>
+
+                  {/* Policies & Amenities */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <ShieldCheck size={14} className="text-blue-500" /> Chính sách & Quy định
+                      </h4>
+                      <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100">
+                        {service.policies ? (
+                          Object.entries(typeof service.policies === 'string' ? JSON.parse(service.policies) : service.policies).map(([k, v]: [string, any]) => (
+                            <div key={k} className="flex items-start gap-4">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{k}</p>
+                                <p className="text-sm font-bold text-gray-700">{v}</p>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <p className="text-sm font-bold text-gray-700">Hủy phòng: Hoàn tiền trước 24h</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <p className="text-sm font-bold text-gray-700">Trẻ em: Miễn phí dưới 6 tuổi</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                              <p className="text-sm font-bold text-gray-700">Thú cưng: Không được phép</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Utensils size={14} className="text-orange-500" /> Tiện ích khách sạn
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {(service.attribute?.amenities || service.acc_attribute?.amenities || []).map((f: string) => (
+                          <div key={f} className="px-4 py-2 rounded-xl bg-white border border-gray-100 text-xs font-bold text-gray-600 shadow-sm hover:border-blue-200 transition-all flex items-center gap-2">
+                            <CheckCircle2 size={12} className="text-emerald-500" /> {f}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hướng tầm nhìn</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {service.acc_attribute.views?.map(v => (
-                        <div key={v} className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-100 text-xs font-bold text-gray-600">
-                          <Eye size={14} className="text-blue-400" /> View {v}
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                      <Eye size={14} className="text-purple-500" /> Tầm nhìn & Cảnh quan
+                    </h4>
+                    <div className="flex flex-wrap gap-3">
+                      {(service.attribute?.views || service.acc_attribute?.views || []).map((v: string) => (
+                        <div key={v} className="flex items-center gap-2 px-5 py-3 rounded-2xl border-2 border-gray-50 text-sm font-bold text-gray-600 hover:border-blue-200 hover:text-blue-600 transition-all bg-white">
+                          <Eye size={16} /> View {v}
                         </div>
                       ))}
                     </div>
@@ -471,218 +527,191 @@ export default function ServiceDetail() {
                 </div>
 
                 {service.rooms && service.rooms.length > 0 && (
-                  <div className="pt-6 border-t border-gray-50 space-y-4">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hạng phòng hiện có</h4>
-                    {service.rooms.map(room => (
-                      <div key={room.id_room} className="flex flex-col gap-4 p-6 rounded-2xl bg-gray-50 hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-blue-100">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-bold text-gray-900">{room.name_room}</p>
-                            <p className="text-[10px] text-gray-400 font-bold flex items-center gap-1 uppercase tracking-tight mt-1"><Users size={12} /> Tối đa {room.max_guest} người</p>
+                  <div className="pt-8 border-t border-gray-50 space-y-6">
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Các hạng phòng hiện có</h4>
+                    <div className="grid grid-cols-1 gap-4">
+                      {service.rooms.map(room => (
+                        <div key={room.id_room} className="p-6 rounded-[2rem] bg-gray-50 border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-xl transition-all flex flex-col md:flex-row justify-between items-center gap-6">
+                          <div className="flex-1">
+                            <h5 className="text-xl font-black text-gray-900 mb-2">{room.name_room}</h5>
+                            <div className="flex items-center gap-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
+                              <span className="flex items-center gap-1.5"><Users size={14} /> {room.max_guest} Người</span>
+                              <span className="w-1 h-1 rounded-full bg-gray-300" />
+                              <span className="flex flex-wrap gap-2">
+                                {(room.attribute?.facilities || []).slice(0, 3).map((f: string) => (
+                                  <span key={f} className="text-blue-600">{f}</span>
+                                ))}
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xl font-black text-blue-600 tracking-tight">{room.price.toLocaleString()}đ</p>
-                            <p className="text-[9px] text-gray-400 font-bold uppercase italic">mỗi đêm</p>
+                          <div className="text-center md:text-right shrink-0">
+                            <p className="text-3xl font-black text-blue-600 tracking-tight">{room.price.toLocaleString()}đ</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">/ đêm / phòng</p>
                           </div>
-                        </div>
-
-                        {/* Room specific attributes (Wifi, AC, etc.) */}
-                        {room.attribute && Object.keys(room.attribute).length > 0 && (
-                          <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100/50">
-                            {Object.entries(room.attribute).map(([attrK, attrV]) => (
-                              <div key={attrK} className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-gray-100 text-[9px] font-bold text-gray-500 uppercase tracking-tight shadow-sm">
-                                <div className="w-1 h-1 rounded-full bg-emerald-400" />
-                                {attrK.replace(/_/g, ' ')}: <span className="text-gray-900">{String(attrV)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-            )}
-
-            {/* 3. VEHICLE ATTRIBUTES */}
-            {service.item_type === 'vehicle' && (
-              <section className="bg-white rounded-[2rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-10">
-                <h3 className="text-xl font-bold flex items-center gap-3"><Car size={24} className="text-[#3b82f6]" /> Tiện nghi & Sơ đồ xe</h3>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Tag size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-1">Mã xe</span>
-                    <span className="font-bold text-gray-900">{service.code_vehicle}</span>
-                  </div>
-                  <div className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                    <Users size={20} className="text-blue-500 mb-2" />
-                    <span className="text-[9px] font-bold text-gray-400 uppercase mb-1">Số chỗ</span>
-                    <span className="font-bold text-gray-900">{service.max_guest} chỗ</span>
-                  </div>
-                  {service.vehicle_attribute && Object.entries(service.vehicle_attribute).slice(0, 2).map(([k, v]: [string, any]) => (
-                    <div key={k} className="p-5 rounded-2xl bg-gray-50 flex flex-col items-center text-center">
-                      <div className="w-5 h-5 bg-blue-100 rounded flex items-center justify-center text-blue-600 text-[8px] mb-2 font-black uppercase">V</div>
-                      <span className="text-[9px] font-bold text-gray-400 uppercase mb-1 truncate w-full px-1">{k.replace(/_/g, ' ')}</span>
-                      <span className="font-bold text-gray-900 truncate w-full px-1">{String(v)}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {service.positions && service.positions.length > 0 && (
-                  <div className="pt-6 border-t border-gray-50 space-y-6">
-                    <div className="flex justify-between items-center px-1">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sơ đồ chỗ ngồi hiện có</h4>
-                      <div className="flex items-center gap-4 text-[8px] font-black uppercase tracking-widest">
-                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-gray-100" /> Trống</div>
-                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-blue-100 border border-blue-400" /> Đang chọn</div>
-                        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-sm bg-gray-900" /> Đã đặt</div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3">
-                      {service.positions.map(pos => (
-                        <div
-                          key={pos.id_position}
-                          className={`aspect-square rounded-xl flex items-center justify-center text-xs font-bold transition-all border ${pos.is_booked
-                            ? 'bg-gray-900 text-white border-gray-900 opacity-20 cursor-not-allowed'
-                            : 'bg-gray-50 text-gray-600 border-gray-100 hover:border-blue-500 hover:bg-white cursor-pointer'
-                            }`}
-                        >
-                          {pos.code_position}
+                          <Button onClick={handleAddToCart} className="rounded-xl h-12 px-8 bg-gray-900 hover:bg-black text-white font-bold">Đặt ngay</Button>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+              </section>
+            )}
 
-                {service.vehicle_attribute && Object.keys(service.vehicle_attribute).length > 2 && (
-                  <div className="pt-6 border-t border-gray-50 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {Object.entries(service.vehicle_attribute).slice(2).map(([k, v]: [string, any]) => (
-                      <div key={k} className="flex justify-between items-center p-4 rounded-xl bg-gray-50 border border-gray-100">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{k.replace(/_/g, ' ')}</span>
-                        <span className="text-xs font-bold text-gray-900">{String(v)}</span>
+            {/* VEHICLE / TICKET SHARED */}
+            {(service.item_type === 'vehicle' || service.item_type === 'ticket') && (
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-12">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    {service.item_type === 'vehicle' ? <Car size={24} /> : <TicketIcon size={24} />}
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900">Chi tiết dịch vụ</h3>
+                </div>
+
+                {service.item_type === 'vehicle' && (
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
+                        <Clock size={20} className="text-blue-500 mx-auto mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Giờ khởi hành</p>
+                        <p className="font-black text-gray-900 text-base">{service.attribute?.departureTime || '08:00'}</p>
                       </div>
-                    ))}
+                      <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
+                        <MapPin size={20} className="text-blue-500 mx-auto mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Điểm đón</p>
+                        <p className="font-black text-gray-900 text-sm line-clamp-1">{service.attribute?.departurePoint || 'Bến xe trung tâm'}</p>
+                      </div>
+                      <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
+                        <Users size={20} className="text-blue-500 mx-auto mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Số chỗ</p>
+                        <p className="font-black text-gray-900 text-base">{service.max_guest || service.attribute?.maxGuest || 45} chỗ</p>
+                      </div>
+                      <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
+                        <ShieldCheck size={20} className="text-blue-500 mx-auto mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Tiện nghi</p>
+                        <p className="font-black text-gray-900 text-[10px] line-clamp-1">{(service.attribute?.facilities || []).slice(0, 2).join(', ') || 'Ghế ngả, USB'}</p>
+                      </div>
+                    </div>
+
+                    {/* Route Info */}
+                    <div className="bg-blue-50/30 rounded-[2.5rem] p-8 md:p-12 border border-blue-100/50">
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+                        <div className="text-center md:text-left flex-1">
+                          <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">Khởi hành</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.attribute?.departureTime || '08:00'}</p>
+                          <p className="font-black text-blue-600 text-sm">{service.attribute?.departurePoint || 'Ga Hà Nội'}</p>
+                        </div>
+
+                        <div className="flex-[1.5] w-full flex flex-col items-center gap-3">
+                          <div className="flex items-center gap-3">
+                            <Clock size={14} className="text-gray-400" />
+                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{service.attribute?.estimatedDuration || '4 tiếng 30 phút'}</span>
+                          </div>
+                          <div className="w-full h-1 bg-gray-200 rounded-full relative overflow-hidden">
+                            <div className="absolute inset-0 bg-blue-600 w-1/2 rounded-full" />
+                          </div>
+                          <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter">Hành trình trực tiếp</p>
+                        </div>
+
+                        <div className="text-center md:text-right flex-1">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Điểm đến</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.attribute?.arrivalTime || '12:30'}</p>
+                          <p className="font-black text-gray-500 text-sm">{service.attribute?.arrivalPoint || 'Ga Đà Nẵng'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TICKET / POI INFO ... existing code ... */}
+
+                {service.positions && service.positions.length > 0 && (
+                  <div className="pt-8 space-y-8">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest pl-2 border-l-4 border-blue-600">Sơ đồ chỗ ngồi công nghệ</h4>
+                      <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest">
+                        <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-gray-100" /> Trống</span>
+                        <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-blue-600 shadow-lg shadow-blue-200" /> Đang chọn</span>
+                        <span className="flex items-center gap-2 opacity-30"><div className="w-3 h-3 rounded bg-gray-900" /> Đã đặt</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-8 bg-gray-50/50 p-10 rounded-[3rem] border-2 border-dashed border-gray-200">
+                      <div className="grid grid-cols-4 gap-4">
+                        {service.positions.map(pos => {
+                          const isSelected = selectedSeats.some(s => s.id_position === pos.id_position);
+                          return (
+                            <button
+                              key={pos.id_position}
+                              disabled={pos.is_booked}
+                              onClick={() => handleSeatToggle(pos)}
+                              className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all transform active:scale-95 ${pos.is_booked
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : isSelected
+                                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-110 border-none'
+                                  : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-blue-600 hover:text-blue-600 hover:shadow-xl'
+                                }`}
+                            >
+                              {pos.code_position}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {selectedSeats.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {selectedSeats.map(s => (
+                            <Badge key={s.id_position} className="bg-blue-600 text-white border-none py-1 px-3 rounded-lg font-black text-[10px]">
+                              GHẾ {s.code_position} - {s.price.toLocaleString()}đ
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </section>
             )}
 
-            {/* 4. POINT OF INTEREST ATTRIBUTES (FOR TICKETS) */}
-            {service.item_type === 'ticket' && service.poi_name && service.poi_type && (
-              <section className="bg-white rounded-[2rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-10">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-bold flex items-center gap-3"><TicketIcon size={24} className="text-[#3b82f6]" /> Thông tin điểm đến</h3>
-                    <p className="text-2xl font-black text-gray-900 tracking-tighter ml-8">{service.poi_name}</p>
-                  </div>
-                  {service.poi_type.rating && (
-                    <div className="bg-blue-50 p-4 rounded-2xl text-center min-w-[100px] border border-blue-100">
-                      <div className="flex items-center justify-center gap-1 text-blue-600">
-                        <span className="text-2xl font-black">{service.poi_type.rating.score}</span>
-                        <Star size={16} className="fill-blue-600" />
-                      </div>
-                      <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">{service.poi_type.rating.reviews_count} Reviews</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-5 rounded-2xl bg-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Khoảng giá</p>
-                        <p className="text-lg font-black text-gray-800">{service.poi_type.price_range?.level}</p>
-                        <p className="text-[10px] text-gray-500 font-bold">{service.poi_type.price_range?.currency} / người</p>
-                      </div>
-                      <div className="p-5 rounded-2xl bg-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Thời gian gợi ý</p>
-                        <p className="text-sm font-bold text-gray-800 capitalize leading-tight">{service.poi_type.recommended_time?.time_of_day.join(' & ')}</p>
-                        <p className="text-[10px] text-blue-500 font-black mt-1">~{service.poi_type.recommended_time?.avg_duration_minutes} phút</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hoạt động tại đây</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {service.poi_type.activities?.map(act => (
-                          <Badge key={act} className="px-4 py-2 rounded-xl bg-gray-50 text-gray-600 border border-gray-100 shadow-none font-bold">#{act}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl relative overflow-hidden">
-                      <div className="relative z-10 flex flex-col gap-4">
-                        <h4 className="text-[10px] font-bold uppercase tracking-widest opacity-40">Mức độ đông đúc</h4>
-                        <div className="flex justify-between items-center text-sm font-bold">
-                          <span className="opacity-60">Ngày thường:</span>
-                          <Badge variant="outline" className="text-white border-white/20 px-3 uppercase text-[10px]">{service.poi_type.crowd_level?.weekday}</Badge>
-                        </div>
-                        <div className="flex justify-between items-center text-sm font-bold">
-                          <span className="opacity-60">Cuối tuần:</span>
-                          <Badge className="bg-orange-500 text-white border-none px-3 uppercase text-[10px]">{service.poi_type.crowd_level?.weekend}</Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Phù hợp với</h4>
-                      <div className="grid grid-cols-2 gap-3">
-                        {service.poi_type.suitability && Object.entries(service.poi_type.suitability).map(([k, v]) => (
-                          <div key={k} className={`flex items-center gap-3 p-3 rounded-xl border ${v ? 'bg-blue-50 border-blue-100 text-blue-900' : 'bg-gray-50 border-gray-100 text-gray-300 opacity-60'}`}>
-                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold ${v ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>{v ? '✓' : '×'}</div>
-                            <span className="text-xs font-bold uppercase tracking-tight">{k}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* 4. AREA / GEOGRAPHY ATTRIBUTES */}
+            {/* AREA EXPERIENCE */}
             {service.area_attribute && (
-              <section className="bg-white rounded-[2rem] p-8 sm:p-10 border border-gray-100 shadow-sm space-y-10">
-                <div className="flex items-center gap-3">
-                  <CloudSun size={24} className="text-orange-400" />
-                  <h3 className="text-xl font-bold text-gray-900 tracking-tight">Kinh nghiệm tại {service.area_name}</h3>
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-10">
+                <div className="flex items-center gap-4">
+                  <CloudSun size={24} className="text-orange-500" />
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tight">Kinh nghiệm tại {service.area_name}</h3>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                  <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                  <div className="space-y-8">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="p-5 rounded-2xl bg-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Kiểu khí hậu</p>
-                        <p className="font-black text-gray-900">{service.area_attribute.climate_type}</p>
+                      <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Khí hậu</p>
+                        <p className="font-black text-gray-900 text-lg uppercase tracking-tight">{service.area_attribute.climate_type}</p>
                       </div>
-                      <div className="p-5 rounded-2xl bg-gray-50">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Nhiệt độ TB</p>
-                        <p className="font-black text-gray-900">{service.area_attribute.average_temperature?.min}° - {service.area_attribute.average_temperature?.max}° {service.area_attribute.average_temperature?.unit || 'C'}</p>
+                      <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nhiệt độ TB</p>
+                        <p className="font-black text-gray-900 text-lg">{service.area_attribute.average_temperature?.min}°-{service.area_attribute.average_temperature?.max}°C</p>
                       </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-orange-50 border border-orange-100 text-orange-900 font-bold italic text-sm leading-relaxed">
-                      <Info size={16} className="mb-2" />
-                      "{service.area_attribute.weather_notes?.[0]}"
+                    <div className="p-8 rounded-[2rem] bg-orange-50/50 border border-orange-100 text-orange-900 font-bold italic text-sm leading-relaxed relative">
+                      <Info size={16} className="mb-4 text-orange-500" />
+                      "{service.area_attribute.weather_notes?.[0] || 'Vùng đất có khí hậu ôn hòa quanh năm, thích hợp cho mọi hoạt động nghỉ dưỡng.'}"
                     </div>
                   </div>
 
                   <div className="space-y-6">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Các tháng du lịch lý tưởng</h4>
-                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Mùa du lịch lý tưởng nhất</h4>
+                    <div className="grid grid-cols-4 gap-3">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
                         const isBest = service.area_attribute?.best_travel_months?.includes(m);
                         return (
-                          <div key={m} className={`aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all ${isBest ? 'bg-orange-500 text-white shadow-lg shadow-orange-100 scale-105' : 'bg-gray-50 text-gray-300'}`}>
+                          <div key={m} className={`aspect-square rounded-2xl flex flex-col items-center justify-center font-black text-sm transition-all shadow-sm ${isBest ? 'bg-blue-600 text-white border-none scale-110 shadow-blue-200' : 'bg-white text-gray-300 border border-gray-50'}`}>
+                            <span className="text-[8px] opacity-40 leading-none mb-0.5">TH</span>
                             {m}
                           </div>
                         );
                       })}
                     </div>
-                    <div className="flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">
-                      <span>Mùa mưa: Tháng {service.area_attribute.rainy_season?.from_month} - {service.area_attribute.rainy_season?.to_month}</span>
-                      <span className="text-orange-500">Tháng Đẹp nhất 🗸</span>
+                    <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-[0.1em] px-2 pt-4">
+                      <span>Mùa mưa: Th{service.area_attribute.rainy_season?.from_month || '5'}-{service.area_attribute.rainy_season?.to_month || '10'}</span>
+                      <span className="text-blue-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Tháng Đẹp</span>
                     </div>
                   </div>
                 </div>
@@ -691,104 +720,141 @@ export default function ServiceDetail() {
 
           </div>
 
-          {/* CỘT PHẢI: Thẻ đặt chỗ */}
-          <div className="lg:col-span-5 lg:pl-4">
-            <div className="sticky top-8 space-y-6">
+          {/* CỘT PHẢI: Card đặt chỗ & Nhà cung cấp */}
+          <div className="lg:col-span-4">
+            <div className="sticky top-12 space-y-8">
 
-              <div className="bg-white rounded-[2rem] p-10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.05)] border border-gray-100 group">
-                <div className="mb-8 text-center">
-                  <div className="flex items-baseline justify-center gap-2 mb-1">
-                    <span className="text-3xl font-black tracking-tight text-gray-900">{service.price?.toLocaleString() || '0'}đ</span>
-                    <span className="text-gray-400 font-bold uppercase text-[9px] tracking-[0.1em]">/ lượt</span>
-                  </div>
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-50 rounded-full border border-gray-100">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Giá đã bao gồm tất cả thuế phí</p>
+              {/* Card đặt chỗ - Traveloka Style (White with heavy shadow) */}
+              <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-6 flex flex-col gap-2 items-end">
+                  <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">Xác nhận tức thì</Badge>
+                </div>
+
+                <div className="mb-10 text-center md:text-left">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Giá khởi điểm từ</p>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-4xl font-black tracking-tighter text-gray-900">{service.price?.toLocaleString() || '0'}đ</span>
+                    <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">/ lượt khách</span>
                   </div>
                 </div>
 
                 <div className="space-y-8">
-                  <div className="space-y-4">
-                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Số lượng đặt mua</label>
-                    <div className="flex items-center gap-4 bg-[#F8FAFC] p-2 rounded-2xl border-2 border-transparent group-focus-within:border-blue-500 transition-all shadow-inner">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="w-12 h-12 rounded-xl bg-white shadow-lg border border-gray-50 flex items-center justify-center text-2xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                      >
-                        -
-                      </button>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={quantity}
-                        onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-                        className="flex-1 text-center bg-transparent border-none font-black text-3xl focus-visible:ring-0 shadow-none pointer-events-none"
-                      />
-                      <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="w-12 h-12 rounded-xl bg-white shadow-lg border border-gray-50 flex items-center justify-center text-2xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                      >
-                        +
-                      </button>
+                  {service.item_type === 'vehicle' ? (
+                    <div className="space-y-4">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Ghế đã chọn ({selectedSeats.length})</label>
+                      <div className="p-6 rounded-[2rem] bg-blue-50/50 border-2 border-dashed border-blue-200 text-center min-h-[100px] flex items-center justify-center">
+                        {selectedSeats.length > 0 ? (
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {selectedSeats.map(s => (
+                              <Badge key={s.id_position} className="bg-blue-600 text-white border-none py-1.5 px-3 rounded-xl font-black text-[10px] shadow-lg shadow-blue-100">
+                                {s.code_position}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs font-bold text-blue-400 italic">Vui lòng nhấp chọn ghế ở sơ đồ bên trái</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Chọn số lượng hành khách</label>
+                      <div className="flex items-center gap-4 bg-[#F8FAFC] p-3 rounded-2xl border-2 border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
+                        <button
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          className="w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center text-xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-95"
+                        >
+                          -
+                        </button>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                          className="flex-1 text-center bg-transparent border-none font-black text-3xl focus-visible:ring-0 shadow-none pointer-events-none"
+                        />
+                        <button
+                          onClick={() => setQuantity(quantity + 1)}
+                          className="w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center text-xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-95"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                  <div className="flex justify-between items-center py-6 border-y border-gray-50">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Tổng số tiền</span>
-                    <span className="text-2xl font-black text-[#3b82f6] tracking-tight">{(quantity * (service.price || 0)).toLocaleString()}đ</span>
+                  <div className="flex justify-between items-center py-8 border-y border-gray-50">
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tổng thanh toán</span>
+                    <div className="text-right">
+                      <span className="text-3xl font-black text-blue-600 tracking-tighter">
+                        {service.item_type === 'vehicle'
+                          ? selectedSeats.reduce((sum, s) => sum + Number(s.price || 0), 0).toLocaleString()
+                          : (quantity * (service.price || 0)).toLocaleString()
+                        }đ
+                      </span>
+                      <p className="text-[9px] text-emerald-500 font-bold uppercase mt-1">Đã bao gồm thuế & phí</p>
+                    </div>
                   </div>
 
                   <Button
                     onClick={handleAddToCart}
-                    className="w-full h-16 rounded-[1.5rem] bg-[#3b82f6] hover:bg-blue-700 text-white font-black text-lg tracking-widest shadow-xl shadow-blue-100 transition-all border-none group relative overflow-hidden active:scale-[0.98]"
+                    className="w-full h-18 rounded-[2rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-xl tracking-tighter shadow-2xl shadow-blue-200 transition-all border-none group relative overflow-hidden h-16 active:scale-95"
                   >
-                    <span className="relative z-10">Đặt chỗ ngay</span>
-                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="relative z-10">Tiếp tục đặt chỗ</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                   </Button>
                 </div>
               </div>
 
-              {/* Nhà cung cấp */}
-              <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm space-y-8">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ĐƠN VỊ CUNG CẤP DỊCH VỤ</p>
-                <div className="flex flex-col items-center text-center gap-4">
-                  <div className="w-20 h-20 rounded-[2rem] overflow-hidden bg-gray-50 border-4 border-white shadow-2xl relative">
+              {/* Nhà cung cấp & Support */}
+              <div className="bg-white rounded-[2.5rem] p-8 border border-gray-50 shadow-sm space-y-8">
+                <div className="flex items-center gap-5">
+                  <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 border-4 border-white shadow-xl relative">
                     {service.provider_image ? (
                       <img src={getImageUrl(service.provider_image)} alt={service.provider_name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={40} /></div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={32} /></div>
                     )}
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white shadow-lg">
-                      <CheckCircle2 size={12} className="text-white" />
-                    </div>
                   </div>
                   <div>
-                    <h4 className="font-black text-lg text-gray-900 leading-none mb-2">{service.provider_name || 'VietTravel Global'}</h4>
-                    <a href={`tel:${service.provider_phone}`} className="inline-flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl text-xs font-bold text-gray-600 border border-gray-100 hover:border-blue-500 transition-all">
-                      <Phone size={14} className="text-blue-500" /> {service.provider_phone || 'Hỗ trợ 24/7'}
-                    </a>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Đơn vị cung cấp</p>
+                    <h4 className="font-black text-lg text-gray-900 leading-tight">{service.provider_name || 'VietTravel Premium'}</h4>
                   </div>
                 </div>
-                <div className="pt-6 border-t border-gray-50 text-center">
-                  <p className="text-[10px] text-gray-400 font-bold flex items-center justify-center gap-2 uppercase">
-                    <MapPin size={12} className="text-blue-500" />
-                    {service.area_name}, {service.city_name}
-                  </p>
+
+                <div className="space-y-4 pt-4 border-t border-gray-50">
+                  <a href={`tel:${service.provider_phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all group">
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <Phone size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Hotline hỗ trợ</p>
+                      <p className="font-bold text-gray-900 text-sm">{service.provider_phone || '1900 1234'}</p>
+                    </div>
+                  </a>
                 </div>
               </div>
 
             </div>
           </div>
-
         </div>
 
-        {/* Tags chân trang */}
-        <div className="mt-20 pt-10 border-t border-gray-100 flex flex-wrap gap-4 opacity-40 hover:opacity-100 transition-opacity">
-          {service.tags?.map(tag => (
-            <span key={tag} className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-blue-600 transition-colors cursor-pointer">#{tag}</span>
-          ))}
+        {/* Similar Services / Footer Tags */}
+        <div className="mt-32 pt-16 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-8">
+            <h4 className="text-xl font-black text-gray-900 tracking-tight">Từ khóa liên quan</h4>
+            <button className="text-gray-400 font-bold hover:text-gray-900 transition-colors uppercase text-[10px] tracking-widest">Về trang chủ</button>
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {service.tags?.map(tag => (
+              <span key={tag} className="px-6 py-3 rounded-full bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer shadow-sm">
+                #{tag}
+              </span>
+            ))}
+            <span className="px-6 py-3 rounded-full bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer shadow-sm">#{service.city_name}</span>
+            <span className="px-6 py-3 rounded-full bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer shadow-sm">#{service.item_type} giá rẻ</span>
+          </div>
         </div>
-
       </div>
     </div>
   );

@@ -46,6 +46,11 @@ export const listServices = async (req: Request, res: Response) => {
         a.name AS area_name,
         c.id_city,
         c.name AS city_name,
+        acc.hotel_type,
+        acc.star_rating,
+        v.max_guest,
+        v.departure_time,
+        v.arrival_time,
         (
           SELECT url
           FROM item_media im
@@ -56,6 +61,8 @@ export const listServices = async (req: Request, res: Response) => {
       FROM bookable_items bi
       LEFT JOIN area a ON bi.id_area = a.id_area
       LEFT JOIN cities c ON a.id_city = c.id_city
+      LEFT JOIN accommodations acc ON acc.id_item = bi.id_item
+      LEFT JOIN vehicle v ON v.id_item = bi.id_item
       ${where}
       ORDER BY bi.created_at DESC NULLS LAST, bi.title
       LIMIT 200
@@ -210,7 +217,7 @@ export const getService = async (req: Request, res: Response) => {
       details = tourRows[0] || {};
     } else if (itemType === 'accommodation') {
       const { rows: accDetails } = await query(
-        'SELECT address FROM accommodations WHERE id_item = $1',
+        'SELECT address, hotel_type, star_rating, checkin_time, checkout_time, policies FROM accommodations WHERE id_item = $1',
         [id]
       );
       details = accDetails[0] || {};
@@ -224,7 +231,7 @@ export const getService = async (req: Request, res: Response) => {
       details.rooms = rooms;
     } else if (itemType === 'vehicle') {
       const { rows: vehRows } = await query(
-        'SELECT id_vehicle, code_vehicle, max_guest, attribute as vehicle_attribute FROM vehicle WHERE id_item = $1',
+        'SELECT id_vehicle, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute as vehicle_attribute FROM vehicle WHERE id_item = $1',
         [id]
       );
       details = vehRows[0] || {};

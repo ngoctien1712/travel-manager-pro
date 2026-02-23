@@ -19,7 +19,9 @@ import ResetPassword from "@/pages/ResetPassword";
 import VerifyAccount from "@/pages/VerifyAccount";
 import NotFound from "@/pages/NotFound";
 import Home from "@/pages/customer/Home";
-import Services from "@/pages/customer/Services";
+import HotelLanding from "@/pages/customer/HotelLanding";
+import VehicleLanding from "@/pages/customer/VehicleLanding";
+import ActivityLanding from "@/pages/customer/ActivityLanding";
 import ServiceDetail from "@/pages/customer/ServiceDetail";
 import Cart from "@/pages/customer/Cart";
 import Checkout from "@/pages/customer/Checkout";
@@ -56,7 +58,10 @@ const App = () => (
             {/* Customer Routes */}
             <Route element={<CustomerLayout />}>
               <Route path="/" element={<Home />} />
-              <Route path="/services" element={<Services />} />
+              <Route path="/hotels" element={<HotelLanding />} />
+              <Route path="/bus-shuttle" element={<VehicleLanding />} />
+              <Route path="/activities" element={<ActivityLanding />} />
+              <Route path="/services" element={<Navigate to="/" replace />} />
               <Route path="/services/:id" element={<ServiceDetail />} />
               <Route
                 path="/cart"

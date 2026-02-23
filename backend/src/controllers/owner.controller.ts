@@ -173,14 +173,13 @@ export async function getServiceDetail(req: Request, res: Response) {
       const { rows } = await pool.query('SELECT guide_language, start_at, end_at, max_slots, attribute FROM tours WHERE id_item = $1', [idItem]);
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
     } else if (itemType === 'accommodation') {
-      const { rows } = await pool.query('SELECT address FROM accommodations WHERE id_item = $1', [idItem]);
+      const { rows } = await pool.query('SELECT id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute FROM accommodations WHERE id_item = $1', [idItem]);
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
-
       // Also fetch rooms for accommodation
       const { rows: rooms } = await pool.query('SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC', [idItem]);
       details.rooms = rooms.map(r => toCamel(r as Record<string, unknown>));
     } else if (itemType === 'vehicle') {
-      const { rows } = await pool.query('SELECT id_vehicle, code_vehicle, max_guest, attribute FROM vehicle WHERE id_item = $1', [idItem]);
+      const { rows } = await pool.query('SELECT id_vehicle, id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute FROM vehicle WHERE id_item = $1', [idItem]);
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
 
       if (details.idVehicle) {
@@ -203,7 +202,11 @@ export async function getServiceDetail(req: Request, res: Response) {
     const { rows: media } = await pool.query('SELECT id_media, url, type FROM item_media WHERE id_item = $1', [idItem]);
     item.media = media.map(m => toCamel(m as Record<string, unknown>));
 
-    res.json({ data: { ...item, ...details } });
+    // Intelligently merge attributes: prioritize specific item type's attribute if it's not null, 
+    // otherwise fallback to base item's attribute.
+    const finalAttribute = details.attribute || item.attribute || {};
+
+    res.json({ data: { ...item, ...details, attribute: finalAttribute } });
   } catch (err) {
     console.error('Get service detail error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });
@@ -242,24 +245,74 @@ export async function updateServiceDetail(req: Request, res: Response) {
 
     // Update type-specific details
     if (itemType === 'tour' && extraData) {
+      const startAt = extraData.startAt && extraData.startAt !== '' ? extraData.startAt : null;
+      const endAt = extraData.endAt && extraData.endAt !== '' ? extraData.endAt : null;
+
       await client.query(
-        `UPDATE tours SET guide_language = $1, start_at = $2, end_at = $3, max_slots = $4, attribute = $5 WHERE id_item = $6`,
-        [extraData.guideLanguage, extraData.startAt, extraData.endAt, extraData.maxSlots || 0, attribute ? JSON.stringify(attribute) : null, idItem]
+        `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id_item) DO UPDATE 
+         SET guide_language = EXCLUDED.guide_language, 
+             start_at = EXCLUDED.start_at, 
+             end_at = EXCLUDED.end_at, 
+             max_slots = EXCLUDED.max_slots,
+             attribute = EXCLUDED.attribute`,
+        [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null]
       );
     } else if (itemType === 'accommodation' && extraData) {
       await client.query(
-        `UPDATE accommodations SET address = $1 WHERE id_item = $2`,
-        [extraData.address, idItem]
+        `INSERT INTO accommodations (id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (id_item) DO UPDATE 
+         SET address = EXCLUDED.address,
+             hotel_type = EXCLUDED.hotel_type,
+             star_rating = EXCLUDED.star_rating,
+             checkin_time = EXCLUDED.checkin_time,
+             checkout_time = EXCLUDED.checkout_time,
+             policies = EXCLUDED.policies,
+             attribute = EXCLUDED.attribute`,
+        [
+          idItem,
+          extraData.address || '',
+          extraData.hotelType || 'Khách sạn',
+          Number(extraData.starRating || extraData.stars) || 3,
+          extraData.checkinTime || '14:00',
+          extraData.checkoutTime || '12:00',
+          extraData.policies ? JSON.stringify(extraData.policies) : JSON.stringify({ cancellation: 'Linh hoạt', children: 'Cho phép', pets: 'Không cho phép' }),
+          attribute ? JSON.stringify(attribute) : null
+        ]
       );
     } else if (itemType === 'ticket' && extraData) {
       await client.query(
-        `UPDATE tickets SET ticket_kind = $1 WHERE id_item = $2`,
-        [extraData.ticketKind, idItem]
+        `INSERT INTO tickets (id_item, ticket_kind)
+         VALUES ($1, $2)
+         ON CONFLICT (id_item) DO UPDATE SET ticket_kind = EXCLUDED.ticket_kind`,
+        [idItem, extraData.ticketKind]
       );
     } else if (itemType === 'vehicle' && extraData) {
       await client.query(
-        `UPDATE vehicle SET code_vehicle = $1, max_guest = $2, attribute = $3 WHERE id_item = $4`,
-        [extraData.codeVehicle || '', Number(extraData.maxGuest) || 0, attribute ? JSON.stringify(attribute) : null, idItem]
+        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (id_item) DO UPDATE 
+         SET code_vehicle = EXCLUDED.code_vehicle, 
+             max_guest = EXCLUDED.max_guest,
+             departure_time = EXCLUDED.departure_time,
+             departure_point = EXCLUDED.departure_point,
+             arrival_time = EXCLUDED.arrival_time,
+             arrival_point = EXCLUDED.arrival_point,
+             estimated_duration = EXCLUDED.estimated_duration,
+             attribute = EXCLUDED.attribute`,
+        [
+          idItem,
+          extraData.codeVehicle || '',
+          Number(extraData.maxGuest) || 45,
+          attribute?.departureTime || null,
+          attribute?.departurePoint || null,
+          attribute?.arrivalTime || null,
+          attribute?.arrivalPoint || null,
+          attribute?.estimatedDuration || null,
+          attribute ? JSON.stringify(attribute) : null
+        ]
       );
     }
 
@@ -609,15 +662,28 @@ export async function createBookableItem(req: Request, res: Response) {
     const itemId = itemRows[0].id_item;
 
     if (itemType === 'tour') {
+      const startAt = extraData?.startAt && extraData.startAt !== '' ? extraData.startAt : null;
+      const endAt = extraData?.endAt && extraData.endAt !== '' ? extraData.endAt : null;
+
       await client.query(
         `INSERT INTO tours (id_item, guide_language, attribute, start_at, end_at, price)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [itemId, extraData?.guideLanguage, extraData?.attribute ? JSON.stringify(extraData.attribute) : null, extraData?.startAt, extraData?.endAt, price]
+        [itemId, extraData?.guideLanguage, attribute ? JSON.stringify(attribute) : null, startAt, endAt, price]
       );
     } else if (itemType === 'accommodation') {
       await client.query(
-        `INSERT INTO accommodations (id_item, address) VALUES ($1, $2)`,
-        [itemId, extraData?.address]
+        `INSERT INTO accommodations (id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          itemId,
+          extraData?.address || '',
+          extraData?.hotelType || 'Khách sạn',
+          Number(extraData?.starRating || extraData?.stars) || 3,
+          extraData?.checkinTime || '14:00',
+          extraData?.checkoutTime || '12:00',
+          extraData?.policies ? JSON.stringify(extraData.policies) : JSON.stringify({ cancellation: 'Linh hoạt', children: 'Cho phép', pets: 'Không cho phép' }),
+          attribute ? JSON.stringify(attribute) : null
+        ]
       );
     } else if (itemType === 'ticket') {
       await client.query(
@@ -626,8 +692,19 @@ export async function createBookableItem(req: Request, res: Response) {
       );
     } else if (itemType === 'vehicle') {
       await client.query(
-        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, attribute) VALUES ($1, $2, $3, $4)`,
-        [itemId, extraData?.codeVehicle || '', extraData?.maxGuest || 0, extraData?.attribute ? JSON.stringify(extraData.attribute) : null]
+        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          itemId,
+          extraData?.codeVehicle || '',
+          Number(extraData?.maxGuest) || 45,
+          attribute?.departureTime || null,
+          attribute?.departurePoint || null,
+          attribute?.arrivalTime || null,
+          attribute?.arrivalPoint || null,
+          attribute?.estimatedDuration || null,
+          attribute ? JSON.stringify(attribute) : null
+        ]
       );
     }
 
