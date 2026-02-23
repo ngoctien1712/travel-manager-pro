@@ -244,7 +244,7 @@ export async function updateServiceDetail(req: Request, res: Response) {
     if (itemType === 'tour' && extraData) {
       await client.query(
         `UPDATE tours SET guide_language = $1, start_at = $2, end_at = $3, max_slots = $4, attribute = $5 WHERE id_item = $6`,
-        [extraData.guideLanguage, extraData.startAt, extraData.endAt, extraData.maxSlots || 0, extraData.attribute ? JSON.stringify(extraData.attribute) : null, idItem]
+        [extraData.guideLanguage, extraData.startAt, extraData.endAt, extraData.maxSlots || 0, attribute ? JSON.stringify(attribute) : null, idItem]
       );
     } else if (itemType === 'accommodation' && extraData) {
       await client.query(
@@ -259,7 +259,7 @@ export async function updateServiceDetail(req: Request, res: Response) {
     } else if (itemType === 'vehicle' && extraData) {
       await client.query(
         `UPDATE vehicle SET code_vehicle = $1, max_guest = $2, attribute = $3 WHERE id_item = $4`,
-        [extraData.codeVehicle || '', Number(extraData.maxGuest) || 0, extraData.attribute ? JSON.stringify(extraData.attribute) : null, idItem]
+        [extraData.codeVehicle || '', Number(extraData.maxGuest) || 0, attribute ? JSON.stringify(attribute) : null, idItem]
       );
     }
 
