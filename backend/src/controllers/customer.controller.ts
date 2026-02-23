@@ -174,11 +174,111 @@ export const getHomeData = async (_req: Request, res: Response) => {
 export const getService = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const sql = `SELECT * FROM bookable_items WHERE id_item = $1`;
+
+    // 1. Fetch base item with provider and location info
+    const sql = `
+      SELECT 
+        bi.*, 
+        p.name AS provider_name, 
+        p.phone AS provider_phone,
+        p.image AS provider_image,
+        a.name AS area_name, 
+        a.attribute AS area_attribute,
+        c.name AS city_name,
+        co.name AS country_name
+      FROM bookable_items bi
+      JOIN provider p ON p.id_provider = bi.id_provider
+      LEFT JOIN area a ON a.id_area = bi.id_area
+      LEFT JOIN cities c ON c.id_city = a.id_city
+      LEFT JOIN countries co ON co.id_country = c.id_country
+      WHERE bi.id_item = $1
+    `;
     const { rows } = await query(sql, [id]);
     if (!rows[0]) return res.status(404).json({ message: 'Không tìm thấy dịch vụ' });
-    const media = await query(`SELECT id_media, type, url FROM item_media WHERE id_item = $1`, [id]);
-    res.json({ ...rows[0], media: media.rows });
+
+    const item = rows[0];
+    const itemType = item.item_type;
+    const areaId = item.id_area;
+
+    // 2. Fetch type-specific details
+    let details: any = {};
+    if (itemType === 'tour') {
+      const { rows: tourRows } = await query(
+        'SELECT guide_language, start_at, end_at, max_slots, attribute as tour_attribute FROM tours WHERE id_item = $1',
+        [id]
+      );
+      details = tourRows[0] || {};
+    } else if (itemType === 'accommodation') {
+      const { rows: accDetails } = await query(
+        'SELECT address FROM accommodations WHERE id_item = $1',
+        [id]
+      );
+      details = accDetails[0] || {};
+      details.acc_attribute = item.attribute; // Map base attribute to acc_attribute for consistency
+
+      // Fetch rooms
+      const { rows: rooms } = await query(
+        'SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC',
+        [id]
+      );
+      details.rooms = rooms;
+    } else if (itemType === 'vehicle') {
+      const { rows: vehRows } = await query(
+        'SELECT id_vehicle, code_vehicle, max_guest, attribute as vehicle_attribute FROM vehicle WHERE id_item = $1',
+        [id]
+      );
+      details = vehRows[0] || {};
+
+      if (details.id_vehicle) {
+        const { rows: positions } = await query(
+          `SELECT p.*, 
+            (SELECT COUNT(*) FROM order_pos_vehicle_detail opvd WHERE opvd.id_position = p.id_position) as is_booked
+           FROM positions p WHERE p.id_vehicle = $1 ORDER BY p.code_position`,
+          [details.id_vehicle]
+        );
+        details.positions = positions.map((p: any) => ({
+          ...p,
+          is_booked: Number(p.is_booked) > 0
+        }));
+      }
+    } else if (itemType === 'ticket') {
+      const { rows: tickRows } = await query(
+        'SELECT ticket_kind FROM tickets WHERE id_item = $1',
+        [id]
+      );
+      details = tickRows[0] || {};
+
+      // Also fetch POI for this area if it's a ticket
+      if (areaId) {
+        const { rows: poiRows } = await query(
+          'SELECT name as poi_name, poi_type FROM point_of_interest WHERE id_area = $1 LIMIT 1',
+          [areaId]
+        );
+        if (poiRows[0]) {
+          details.poi_name = poiRows[0].poi_name;
+          details.poi_type = poiRows[0].poi_type;
+        }
+      }
+    }
+
+    // 3. Fetch media
+    const media = await query(
+      `SELECT id_media, type, url FROM item_media WHERE id_item = $1 ORDER BY id_media ASC`,
+      [id]
+    );
+
+    // 4. Fetch tags
+    const tags = await query(
+      `SELECT tag FROM item_tag WHERE id_item = $1`,
+      [id]
+    );
+
+    res.json({
+      ...item,
+      ...details,
+      media: media.rows,
+      tags: tags.rows.map((t: any) => t.tag)
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy chi tiết dịch vụ' });
