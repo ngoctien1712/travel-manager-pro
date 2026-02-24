@@ -97,7 +97,6 @@ export const MyServices = () => {
             case 'tour': return <Badge variant="default">Tour</Badge>;
             case 'accommodation': return <Badge variant="secondary">Lưu trú</Badge>;
             case 'vehicle': return <Badge variant="outline">Phương tiện</Badge>;
-            case 'ticket': return <Badge variant="secondary">Vé</Badge>;
             default: return <Badge>{type}</Badge>;
         }
     };
@@ -136,7 +135,6 @@ export const MyServices = () => {
                                     <SelectItem value="tour">Tour</SelectItem>
                                     <SelectItem value="accommodation">Lưu trú</SelectItem>
                                     <SelectItem value="vehicle">Phương tiện</SelectItem>
-                                    <SelectItem value="ticket">Vé</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -228,7 +226,6 @@ export const MyServices = () => {
                                         <SelectItem value="tour">Tour du lịch</SelectItem>
                                         <SelectItem value="accommodation">Chỗ ở (Khách sạn, Homestay...)</SelectItem>
                                         <SelectItem value="vehicle">Phương tiện đi lại</SelectItem>
-                                        <SelectItem value="ticket">Vé tham quan/Sự kiện</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
