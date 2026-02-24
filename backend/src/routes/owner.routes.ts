@@ -59,9 +59,24 @@ router.post(
   ownerController.addAccommodationRoom
 );
 
+router.put(
+  '/rooms/:idRoom',
+  ownerController.updateAccommodationRoom
+);
+
+router.delete(
+  '/rooms/:idRoom',
+  ownerController.deleteAccommodationRoom
+);
+
 router.post(
   '/bookable-items/:idItem/positions',
   ownerController.addVehiclePosition
+);
+
+router.put(
+  '/positions/:idPosition',
+  ownerController.updateVehiclePosition
 );
 
 router.delete(

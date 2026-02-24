@@ -81,6 +81,15 @@ export const ownerGeographyApi = {
   addAccommodationRoom: (idItem: string, data: { nameRoom: string; maxGuest: number; attribute?: any; price: number }) =>
     httpClient.post(`/owner/bookable-items/${idItem}/rooms`, data),
 
+  updateAccommodationRoom: (idRoom: string, data: { nameRoom: string; maxGuest: number; attribute?: any; price: number }) =>
+    httpClient.put(`/owner/rooms/${idRoom}`, data),
+
+  deleteAccommodationRoom: (idRoom: string) =>
+    httpClient.delete(`/owner/rooms/${idRoom}`),
+
+  updateVehiclePosition: (idPosition: string, data: { codePosition: string; price: number }) =>
+    httpClient.put(`/owner/positions/${idPosition}`, data),
+
   manageVehicle: (idItem: string, data: { codeVehicle: string; maxGuest: number; attribute?: any }) =>
     httpClient.post(`/owner/bookable-items/${idItem}/vehicle`, data),
 };

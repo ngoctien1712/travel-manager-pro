@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
+import { geographyApi } from '@/api/geography.api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,12 +31,61 @@ const iconMap: Record<string, React.ReactNode> = {
   experience: <Sparkles className="h-5 w-5" />,
 };
 
+const ServiceCard = ({ service, getImageUrl }: { service: any; getImageUrl: (url: string | null) => string }) => (
+  <Link to={`/services/${service.id}`} className="group h-full">
+    <Card className="h-full border-none shadow-sm hover:shadow-2xl transition-all duration-500 rounded-[2.5rem] overflow-hidden bg-white group-hover:-translate-y-2">
+      <div className="relative h-60 overflow-hidden">
+        <img
+          src={getImageUrl(service.thumbnail)}
+          alt={service.name}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+        <div className="absolute top-4 left-4 flex flex-col gap-2">
+          <Badge className="bg-white/90 backdrop-blur text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border-none shadow-sm">
+            {service.type === 'accommodation' ? 'Khách sạn' : service.type === 'tour' ? 'Tour' : service.type === 'vehicle' ? 'Vận chuyển' : 'Vé'}
+          </Badge>
+          <div className="bg-black/50 backdrop-blur text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm text-[10px] font-bold">
+            <MapPin size={10} className="text-blue-400" />
+            {service.location || service.city}
+          </div>
+        </div>
+      </div>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-1 text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">
+          {iconMap[service.type] || <Sparkles size={12} />}
+          <span>{service.type}</span>
+        </div>
+        <h3 className="text-lg font-black text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors h-12 mb-4">
+          {service.name}
+        </h3>
+
+        <div className="flex items-center gap-1 mb-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} size={12} className={i < (service.rating || 5) ? "fill-yellow-400 text-yellow-400" : "fill-gray-100 text-gray-200"} />
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-gray-50 pt-4">
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Giá chỉ từ</p>
+            <span className="text-xl font-black text-blue-600">{formatCurrency(service.price)}</span>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:rotate-45">
+            <ArrowRight size={20} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  </Link>
+);
+
 interface ServiceFilters {
   q: string;
   type: string;
-  city: string;
+  provinceId: string;
   minPrice?: number;
   maxPrice?: number;
+  date?: string;
 }
 
 export const Home = () => {
@@ -45,9 +95,10 @@ export const Home = () => {
   const [filters, setFilters] = useState<ServiceFilters>({
     q: searchParams.get('q') || '',
     type: searchParams.get('type') || '',
-    city: searchParams.get('city') || '',
+    provinceId: searchParams.get('provinceId') || '',
     minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
     maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
+    date: searchParams.get('date') || '',
   });
 
   const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
@@ -63,6 +114,20 @@ export const Home = () => {
     queryFn: () => customerApi.getHome(),
   });
 
+  const [provinces, setProvinces] = useState<any[]>([]);
+
+  useEffect(() => {
+    geographyApi.listCountries().then((res) => {
+      const vn = res.data.find((c: any) => c.code === 'VN' || c.name === 'Vietnam');
+      const countryId = vn?.id || res.data[0]?.id;
+      if (countryId) {
+        geographyApi.listCities(countryId).then((cityRes) => {
+          setProvinces(cityRes.data);
+        });
+      }
+    });
+  }, []);
+
   // Service listing data based on filters
   const { data: servicesData, isLoading: isServicesLoading, refetch } = useQuery({
     queryKey: ['listServices', filters],
@@ -74,9 +139,10 @@ export const Home = () => {
     const nextParams: Record<string, string> = {};
     if (filters.q) nextParams.q = filters.q;
     if (filters.type && filters.type !== 'all') nextParams.type = filters.type;
-    if (filters.city) nextParams.city = filters.city;
+    if (filters.provinceId) nextParams.provinceId = filters.provinceId;
     if (filters.minPrice != null) nextParams.minPrice = String(filters.minPrice);
     if (filters.maxPrice != null) nextParams.maxPrice = String(filters.maxPrice);
+    if (filters.date) nextParams.date = filters.date;
     setSearchParams(nextParams);
   }, [filters]);
 
@@ -88,7 +154,7 @@ export const Home = () => {
   };
 
   const clearFilters = () => {
-    setFilters({ q: '', type: '', city: '' });
+    setFilters({ q: '', type: '', provinceId: '', date: '' });
   };
 
   return (
@@ -114,49 +180,72 @@ export const Home = () => {
           <Card className="shadow-2xl border-none rounded-3xl overflow-hidden bg-white">
             <CardContent className="p-4 md:p-6">
               <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div className="md:col-span-4 relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                    <Search className="h-5 w-5" />
-                  </div>
+                <div className="md:col-span-3 relative group">
                   <Input
                     placeholder="Bạn muốn đi đâu?"
-                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-lg font-medium"
+                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-sm md:text-md font-medium"
                     value={filters.q}
                     onChange={(e) => setFilters({ ...filters, q: e.target.value })}
                   />
-                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Địa điểm / Tên dịch vụ</div>
-                </div>
-
-                <div className="md:col-span-3 relative group">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
-                    <MapPin className="h-5 w-5" />
+                    <Search className="h-5 w-5" />
                   </div>
-                  <Input
-                    placeholder="Thành phố"
-                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-lg font-medium"
-                    value={filters.city}
-                    onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-                  />
-                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Thành phố</div>
+                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Địa điểm / Tên</div>
                 </div>
 
-                <div className="md:col-span-3 relative">
+                <div className="md:col-span-2 relative">
+                  <Select
+                    value={filters.provinceId}
+                    onValueChange={(val) => setFilters({ ...filters, provinceId: val === 'all' ? '' : val })}
+                  >
+                    <SelectTrigger className="h-14 bg-gray-50 border-gray-100 rounded-2xl focus:ring-blue-500 text-sm md:text-md font-medium px-4 pl-12 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-gray-400" />
+                        <SelectValue placeholder="Toàn quốc" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl border-none shadow-xl max-h-[300px]">
+                      <SelectItem value="all" className="font-medium">Tất cả khu vực</SelectItem>
+                      {provinces.map((p) => (
+                        <SelectItem key={p.id} value={p.id} className="font-medium">
+                          {p.nameVi || p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest z-10">Khu vực</div>
+                </div>
+
+                <div className="md:col-span-2 relative">
                   <Select value={filters.type} onValueChange={(val) => setFilters({ ...filters, type: val })}>
-                    <SelectTrigger className="h-14 bg-gray-50 border-gray-100 rounded-2xl focus:ring-blue-500 text-lg font-medium px-4">
+                    <SelectTrigger className="h-14 bg-gray-50 border-gray-100 rounded-2xl focus:ring-blue-500 text-sm md:text-md font-medium px-4">
                       <div className="flex items-center gap-2">
                         {filters.type && filters.type !== 'all' ? iconMap[filters.type] : <Sparkles className="h-5 w-5 text-gray-400" />}
                         <SelectValue placeholder="Loại hình" />
                       </div>
                     </SelectTrigger>
                     <SelectContent className="rounded-2xl border-none shadow-xl">
-                      <SelectItem value="all" className="font-medium">Tất cả dịch vụ</SelectItem>
-                      <SelectItem value="tour" className="font-medium">Tour du lịch</SelectItem>
-                      <SelectItem value="accommodation" className="font-medium">Khách sạn & Chỗ ở</SelectItem>
-                      <SelectItem value="vehicle" className="font-medium">Phương tiện di chuyển</SelectItem>
-                      <SelectItem value="ticket" className="font-medium">Vé tham quan</SelectItem>
+                      <SelectItem value="all" className="font-medium">Tất cả</SelectItem>
+                      <SelectItem value="tour" className="font-medium">Tour</SelectItem>
+                      <SelectItem value="accommodation" className="font-medium">Khách sạn</SelectItem>
+                      <SelectItem value="vehicle" className="font-medium">Xe</SelectItem>
+                      <SelectItem value="ticket" className="font-medium">Vé</SelectItem>
                     </SelectContent>
                   </Select>
                   <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest z-10">Danh mục</div>
+                </div>
+
+                <div className="md:col-span-3 relative group">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                    <Calendar className="h-5 w-5" />
+                  </div>
+                  <Input
+                    type="date"
+                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-sm md:text-md font-medium"
+                    value={filters.date || ''}
+                    onChange={(e) => setFilters({ ...filters, date: e.target.value })}
+                  />
+                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Thời gian</div>
                 </div>
 
                 <div className="md:col-span-2">
@@ -217,7 +306,7 @@ export const Home = () => {
         <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-black text-gray-900 tracking-tight">
-              {(filters.q || (filters.type && filters.type !== 'all') || filters.city) ? 'Kết quả tìm kiếm' : 'Dịch vụ nổi bật'}
+              {(filters.q || (filters.type && filters.type !== 'all') || filters.provinceId) ? 'Kết quả tìm kiếm' : 'Dịch vụ nổi bật'}
             </h2>
             <p className="text-gray-400 font-medium mt-1">
               Khám phá {servicesData?.items.length || 0} trải nghiệm tốt nhất cho chuyến đi của bạn
@@ -234,7 +323,7 @@ export const Home = () => {
               Bộ lọc nâng cao
               {(filters.minPrice || filters.maxPrice) && <Badge className="ml-2 bg-blue-500 h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">!</Badge>}
             </Button>
-            {(filters.q || (filters.type && filters.type !== 'all') || filters.city || filters.minPrice) && (
+            {(filters.q || (filters.type && filters.type !== 'all') || filters.provinceId || filters.minPrice) && (
               <Button variant="ghost" className="text-gray-400 hover:text-red-500 font-bold" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" /> Xóa lọc
               </Button>
@@ -287,58 +376,126 @@ export const Home = () => {
           </Card>
         )}
 
-        {/* Services Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {isServicesLoading ? (
-            Array.from({ length: 8 }).map((_, i) => <ServiceCardSkeleton key={i} />)
-          ) : servicesData?.items.length === 0 ? (
-            <div className="col-span-full py-20">
-              <EmptyState title="Không tìm thấy dịch vụ nào" description="Hãy thử thay đổi từ khóa hoặc bộ lọc của bạn." />
+        {/* Categorized Featured Sections */}
+        {isHomeLoading ? (
+          <section className="container max-w-7xl py-12 px-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {Array.from({ length: 4 }).map((_, i) => <ServiceCardSkeleton key={i} />)}
             </div>
-          ) : (
-            servicesData?.items.map((service) => (
-              <Link key={service.id_item} to={`/services/${service.id_item}`} className="group">
-                <Card className="h-full border-none shadow-sm hover:shadow-2xl transition-all duration-500 rounded-[2.5rem] overflow-hidden bg-white group-hover:-translate-y-2">
-                  <div className="relative h-60 overflow-hidden">
-                    <img
-                      src={getImageUrl(service.thumbnail)}
-                      alt={service.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    />
-                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                      <Badge className="bg-white/90 backdrop-blur text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border-none shadow-sm">
-                        {service.item_type}
-                      </Badge>
-                      <div className="bg-black/50 backdrop-blur text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm text-[10px] font-bold">
-                        <MapPin size={10} className="text-blue-400" />
-                        {service.city_name}
-                      </div>
-                    </div>
+          </section>
+        ) : (
+          <div className="space-y-20 pb-20">
+            {/* Top Accommodations */}
+            {homeData?.topAccommodations && homeData.topAccommodations.length > 0 && (
+              <section className="container max-w-7xl px-4">
+                <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-2">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      <Building2 className="text-blue-600" /> Khách sạn nổi bật
+                    </h2>
+                    <p className="text-gray-400 font-medium">Top chỗ ở được đánh giá cao nhất bởi khách hàng</p>
                   </div>
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-1 text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">
-                      {iconMap[service.item_type] || <Sparkles size={12} />}
-                      <span>{service.item_type}</span>
-                    </div>
-                    <h3 className="text-lg font-black text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors h-12 mb-4">
-                      {service.title}
-                    </h3>
+                  <Link to="/hotels" className="text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2 group/btn">
+                    Xem tất cả <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {homeData.topAccommodations.map((service) => (
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                  ))}
+                </div>
+              </section>
+            )}
 
-                    <div className="flex items-center justify-between border-t border-gray-50 pt-4">
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Giá chỉ từ</p>
-                        <span className="text-xl font-black text-blue-600">{formatCurrency(service.price)}</span>
-                      </div>
-                      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:rotate-45">
-                        <ArrowRight size={20} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))
-          )}
-        </div>
+            {/* Top Tours */}
+            {homeData?.topTours && homeData.topTours.length > 0 && (
+              <section className="container max-w-7xl px-4">
+                <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-2">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      <Map className="text-orange-500" /> Tour du lịch hấp dẫn
+                    </h2>
+                    <p className="text-gray-400 font-medium">Khám phá những vùng đất mới với lịch trình chuyên nghiệp</p>
+                  </div>
+                  <Link to="/activities" className="text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2 group/btn">
+                    Xem tất cả <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {homeData.topTours.map((service) => (
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Top Vehicles */}
+            {homeData?.topVehicles && homeData.topVehicles.length > 0 && (
+              <section className="container max-w-7xl px-4">
+                <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-2">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      <Sparkles className="text-emerald-500" /> Phương tiện di chuyển
+                    </h2>
+                    <p className="text-gray-400 font-medium">Dịch vụ xe khách, xe đưa đón chất lượng cao</p>
+                  </div>
+                  <Link to="/bus-shuttle" className="text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2 group/btn">
+                    Xem tất cả <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {homeData.topVehicles.map((service) => (
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Top Tickets */}
+            {homeData?.topTickets && homeData.topTickets.length > 0 && (
+              <section className="container max-w-7xl px-4">
+                <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-2">
+                  <div>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                      <Ticket className="text-purple-500" /> Vé tham quan
+                    </h2>
+                    <p className="text-gray-400 font-medium">Tiết kiệm thời gian, không cần xếp hàng mua vé</p>
+                  </div>
+                  <Link to="/activities" className="text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-xl transition-all flex items-center gap-2 group/btn">
+                    Xem tất cả <ArrowRight className="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                  {homeData.topTickets.map((service) => (
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* Legacy Search Results Section (Keep for functionality) */}
+        {(filters.q || (filters.type && filters.type !== 'all') || filters.provinceId) && (
+          <section id="services-list" className="container max-w-7xl py-12 px-4 border-t border-gray-100">
+            <h2 className="text-2xl font-black text-gray-900 mb-8">Kết quả tìm kiếm phù hợp</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+              {isServicesLoading ? (
+                Array.from({ length: 4 }).map((_, i) => <ServiceCardSkeleton key={i} />)
+              ) : servicesData?.items.length === 0 ? (
+                <div className="col-span-full py-10">
+                  <EmptyState title="Không tìm thấy dịch vụ nào" description="Hãy thử thay đổi từ khóa hoặc bộ lọc của bạn." />
+                </div>
+              ) : (
+                servicesData?.items.map((service) => (
+                  <Link key={service.id_item} to={`/services/${service.id_item}`} className="group">
+                    <ServiceCard service={{ ...service, id: service.id_item, name: service.title, type: service.item_type, rating: service.rating || service.star_rating, location: service.city_name }} getImageUrl={getImageUrl} />
+                  </Link>
+                ))
+              )}
+            </div>
+          </section>
+        )}
       </section>
 
       {/* Popular Destinations - Static from Traveloka */}
@@ -359,7 +516,7 @@ export const Home = () => {
               <button
                 key={dest.id}
                 className="relative h-80 rounded-[2.5rem] overflow-hidden group shadow-md"
-                onClick={() => setFilters({ ...filters, city: dest.name })}
+                onClick={() => setFilters({ ...filters, provinceId: dest.id })}
               >
                 <img
                   src={getImageUrl(dest.image)}

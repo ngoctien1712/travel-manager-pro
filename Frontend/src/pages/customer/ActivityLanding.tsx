@@ -9,9 +9,11 @@ import { Compass, Search, MapPin, Star, ArrowRight, Sparkles, Camera, Utensils, 
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/utils/format';
 import { ServiceCardSkeleton } from '@/components/LoadingSkeleton';
+import { Calendar } from 'lucide-react';
 
 export const ActivityLanding = () => {
     const [search, setSearch] = useState('');
+    const [selectedDate, setSelectedDate] = useState('');
 
     const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
     const getImageUrl = (url: string | null) => {
@@ -21,8 +23,8 @@ export const ActivityLanding = () => {
     };
 
     const { data, isLoading } = useQuery({
-        queryKey: ['listActivities', search],
-        queryFn: () => customerApi.listServices({ type: 'tour', q: search }),
+        queryKey: ['listActivities', search, selectedDate],
+        queryFn: () => customerApi.listServices({ type: 'tour', q: search, date: selectedDate }),
     });
 
     const categories = [
@@ -53,17 +55,30 @@ export const ActivityLanding = () => {
                         Tìm kiếm tour, hoạt động giải trí và vé tham quan trên toàn quốc
                     </p>
 
-                    <div className="max-w-2xl mx-auto relative group">
-                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-blue-500 group-focus-within:scale-110 transition-transform" />
-                        <Input
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Bạn muốn đi đâu hoặc làm gì?..."
-                            className="w-full h-16 pl-16 pr-8 bg-white/95 backdrop-blur-md border-none rounded-[2rem] text-gray-900 font-bold text-lg shadow-2xl focus-visible:ring-blue-500 placeholder:text-gray-400"
-                        />
-                        <Button className="absolute right-3 top-1/2 -translate-y-1/2 h-11 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-[1.5rem] font-black shadow-lg shadow-blue-200">
-                            Tìm kiếm
-                        </Button>
+                    <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-4">
+                        <div className="md:col-span-7 relative group">
+                            <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-blue-500 group-focus-within:scale-110 transition-transform" />
+                            <Input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Bạn muốn đi đâu hoặc làm gì?..."
+                                className="w-full h-16 pl-16 pr-8 bg-white/95 backdrop-blur-md border-none rounded-[2rem] text-gray-900 font-bold text-lg shadow-2xl focus-visible:ring-blue-500 placeholder:text-gray-400"
+                            />
+                        </div>
+                        <div className="md:col-span-3 relative group">
+                            <Calendar className="absolute left-6 top-1/2 -translate-y-1/2 h-6 w-6 text-blue-500 group-focus-within:scale-110 transition-transform" />
+                            <Input
+                                type="date"
+                                value={selectedDate}
+                                onChange={(e) => setSelectedDate(e.target.value)}
+                                className="w-full h-16 pl-16 pr-8 bg-white/95 backdrop-blur-md border-none rounded-[2rem] text-gray-900 font-bold text-lg shadow-2xl focus-visible:ring-blue-500"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <Button className="w-full h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-[2rem] font-black shadow-lg shadow-blue-200">
+                                Tìm
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </section>

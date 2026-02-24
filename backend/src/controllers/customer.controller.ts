@@ -5,33 +5,82 @@ const toIso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null
 
 export const listServices = async (req: Request, res: Response) => {
   try {
-    const { area, type, minPrice, maxPrice, q, city } = req.query as Record<string, string>;
+    const {
+      area, type, minPrice, maxPrice, q, city, provinceId, districtId, wardId, arrivalProvinceId,
+      date, checkIn, checkOut, departureDate, returnDate
+    } = req.query as Record<string, string>;
     const conditions: string[] = [];
     const params: any[] = [];
     let idx = 1;
-    if (area) {
-      conditions.push(`bi.id_area = $${idx++}`);
-      params.push(area);
-    }
-    if (type) {
-      conditions.push(`bi.item_type = $${idx++}`);
-      params.push(type);
-    }
-    if (minPrice) {
-      conditions.push(`bi.price >= $${idx++}`);
-      params.push(minPrice);
-    }
-    if (maxPrice) {
-      conditions.push(`bi.price <= $${idx++}`);
-      params.push(maxPrice);
-    }
+
+    // ... (existing conditions for area, type, minPrice, maxPrice, q, city) ...
+    if (area) { conditions.push(`bi.id_area = $${idx++}`); params.push(area); }
+    if (type) { conditions.push(`bi.item_type = $${idx++}`); params.push(type); }
+    if (minPrice) { conditions.push(`bi.price >= $${idx++}`); params.push(minPrice); }
+    if (maxPrice) { conditions.push(`bi.price <= $${idx++}`); params.push(maxPrice); }
     if (q) {
-      conditions.push(`(bi.title ILIKE $${idx++} OR bi.attribute::text ILIKE $${idx - 1})`);
+      conditions.push(`(bi.title ILIKE $${idx++} OR bi.attribute::text ILIKE $${idx - 1} OR bi.description ILIKE $${idx - 1})`);
       params.push(`%${q}%`);
     }
     if (city) {
       conditions.push(`(c.name ILIKE $${idx} OR c.name_vi ILIKE $${idx})`);
       params.push(`%${city}%`);
+      idx++;
+    }
+
+    // New Date Filters
+    if (date) {
+      // For tours, check if date is within range
+      conditions.push(`(
+        (bi.item_type = 'tour' AND EXISTS (SELECT 1 FROM tours t WHERE t.id_item = bi.id_item AND t.start_at <= $${idx} AND t.end_at >= $${idx}))
+        OR bi.item_type != 'tour'
+      )`);
+      params.push(date);
+      idx++;
+    }
+
+    if (departureDate && type === 'vehicle') {
+      conditions.push(`v.departure_time::date = $${idx++}`);
+      params.push(departureDate);
+    }
+
+    if (provinceId) {
+      if (type === 'accommodation') {
+        conditions.push(`acc.province_id = $${idx}`);
+      } else if (type === 'vehicle') {
+        conditions.push(`v.departure_province_id = $${idx}`);
+      } else {
+        conditions.push(`(acc.province_id = $${idx} OR v.departure_province_id = $${idx} OR v.arrival_province_id = $${idx})`);
+      }
+      params.push(provinceId);
+      idx++;
+    }
+    if (districtId) {
+      if (type === 'accommodation') {
+        conditions.push(`acc.district_id = $${idx}`);
+      } else if (type === 'vehicle') {
+        conditions.push(`v.departure_district_id = $${idx}`);
+      } else {
+        conditions.push(`(acc.district_id = $${idx} OR v.departure_district_id = $${idx} OR v.arrival_district_id = $${idx})`);
+      }
+      params.push(districtId);
+      idx++;
+    }
+    if (wardId) {
+      if (type === 'accommodation') {
+        conditions.push(`acc.ward_id = $${idx}`);
+      } else if (type === 'vehicle') {
+        conditions.push(`v.departure_ward_id = $${idx}`);
+      } else {
+        conditions.push(`(acc.ward_id = $${idx} OR v.departure_ward_id = $${idx} OR v.arrival_ward_id = $${idx})`);
+      }
+      params.push(wardId);
+      idx++;
+    }
+    if (arrivalProvinceId) {
+      conditions.push(`(v.arrival_province_id = $${idx})`);
+      params.push(arrivalProvinceId);
+      idx++;
     }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sql = `
@@ -109,43 +158,61 @@ export const getHomeData = async (_req: Request, res: Response) => {
       };
     });
 
-    // Featured services: latest services with thumbnail and city
-    const featSql = `
-      SELECT
-        bi.id_item,
-        bi.title,
-        bi.price,
-        bi.item_type,
-        a.name AS area_name,
-        c.name AS city_name,
-        (
-          SELECT url
-          FROM item_media im
-          WHERE im.id_item = bi.id_item
-          ORDER BY im.id_media ASC
-          LIMIT 1
-        ) AS thumbnail
-      FROM bookable_items bi
-      LEFT JOIN area a ON bi.id_area = a.id_area
-      LEFT JOIN cities c ON a.id_city = c.id_city
-      ORDER BY bi.created_at DESC NULLS LAST, bi.title
-      LIMIT 12
-    `;
-    const featRes = await query(featSql, []);
-    const featuredServices = featRes.rows.map((r: any) => ({
-      id: r.id_item,
-      name: r.title,
-      price: Number(r.price) || 0,
-      originalPrice: null,
-      city: r.city_name || r.area_name || '',
-      thumbnail:
-        r.thumbnail ||
-        'https://images.unsplash.com/photo-1528127269322-539801943592?w=800',
-      rating: 4.8,
-      type: r.item_type,
-    }));
+    // Top services by type, limited and sorted by rating
+    const getTopServices = async (type: string, limit: number = 10) => {
+      // Check if star_rating column exists to avoid crash if migration not run
+      const checkCol = await query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name='bookable_items' AND column_name='star_rating'
+      `, []);
+      const hasStarRating = checkCol.rows.length > 0;
+      const orderBy = hasStarRating ? 'bi.star_rating DESC, bi.created_at DESC' : 'bi.created_at DESC';
+      const selectRating = hasStarRating ? 'bi.star_rating' : '0 AS star_rating';
 
-    // Popular destinations by number of services in a city
+      const sql = `
+        SELECT
+          bi.id_item,
+          bi.title,
+          bi.price,
+          bi.item_type,
+          ${selectRating},
+          a.name AS area_name,
+          c.name AS city_name,
+          (
+            SELECT url
+            FROM item_media im
+            WHERE im.id_item = bi.id_item
+            ORDER BY im.id_media ASC
+            LIMIT 1
+          ) AS thumbnail
+        FROM bookable_items bi
+        LEFT JOIN area a ON bi.id_area = a.id_area
+        LEFT JOIN cities c ON a.id_city = c.id_city
+        WHERE bi.item_type = $1 AND bi.status = 'active'
+        ORDER BY ${orderBy}
+        LIMIT $2
+      `;
+      const res = await query(sql, [type, limit]);
+      return res.rows.map((r: any) => ({
+        id: r.id_item,
+        name: r.title,
+        price: Number(r.price) || 0,
+        city: r.city_name || r.area_name || '',
+        thumbnail: r.thumbnail || 'https://images.unsplash.com/photo-1528127269322-539801943592?w=800',
+        rating: Number(r.star_rating) || 0,
+        type: r.item_type,
+      }));
+    };
+
+    const [topTours, topAccommodations, topVehicles, topTickets] = await Promise.all([
+      getTopServices('tour'),
+      getTopServices('accommodation'),
+      getTopServices('vehicle'),
+      getTopServices('ticket')
+    ]);
+
+    // Popular destinations
     const destSql = `
       SELECT
         c.id_city,
@@ -156,7 +223,7 @@ export const getHomeData = async (_req: Request, res: Response) => {
       LEFT JOIN area a ON bi.id_area = a.id_area
       LEFT JOIN cities c ON a.id_city = c.id_city
       LEFT JOIN item_media im ON im.id_item = bi.id_item
-      WHERE c.id_city IS NOT NULL
+      WHERE c.id_city IS NOT NULL AND bi.status = 'active'
       GROUP BY c.id_city, c.name
       ORDER BY service_count DESC
       LIMIT 12
@@ -166,12 +233,10 @@ export const getHomeData = async (_req: Request, res: Response) => {
       id: r.id_city,
       name: r.name,
       serviceCount: Number(r.service_count) || 0,
-      image:
-        r.image ||
-        'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800',
+      image: r.image || 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800',
     }));
 
-    res.json({ categories, featuredServices, popularDestinations });
+    res.json({ categories, topTours, topAccommodations, topVehicles, topTickets, popularDestinations });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy dữ liệu trang chủ' });
@@ -231,7 +296,15 @@ export const getService = async (req: Request, res: Response) => {
       details.rooms = rooms;
     } else if (itemType === 'vehicle') {
       const { rows: vehRows } = await query(
-        'SELECT id_vehicle, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute as vehicle_attribute FROM vehicle WHERE id_item = $1',
+        `SELECT 
+          id_vehicle, code_vehicle, max_guest, 
+          departure_time as "departureTime", 
+          departure_point as "departurePoint", 
+          arrival_time as "arrivalTime", 
+          arrival_point as "arrivalPoint", 
+          estimated_duration as "estimatedDuration", 
+          attribute as vehicle_attribute 
+         FROM vehicle WHERE id_item = $1`,
         [id]
       );
       details = vehRows[0] || {};

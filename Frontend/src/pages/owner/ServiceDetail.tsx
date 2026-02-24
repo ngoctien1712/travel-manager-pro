@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ownerGeographyApi } from '@/api/owner-geography.api';
+import { geographyApi } from '@/api/geography.api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,16 @@ export const ServiceDetail = () => {
     const [extraData, setExtraData] = useState<any>({});
     const [attribute, setAttribute] = useState<any>({});
 
+    // Address Selection Lists
+    const [provinces, setProvinces] = useState<any[]>([]);
+    const [districts, setDistricts] = useState<any[]>([]);
+    const [wards, setWards] = useState<any[]>([]);
+
+    const [departureDistricts, setDepartureDistricts] = useState<any[]>([]);
+    const [departureWards, setDepartureWards] = useState<any[]>([]);
+    const [arrivalDistricts, setArrivalDistricts] = useState<any[]>([]);
+    const [arrivalWards, setArrivalWards] = useState<any[]>([]);
+
     // Queries
     const { data: detailData, isLoading, error } = useQuery({
         queryKey: ['owner', 'service-detail', idItem],
@@ -46,8 +57,10 @@ export const ServiceDetail = () => {
     });
     const service = detailData?.data;
 
+    const [hasInitialized, setHasInitialized] = useState(false);
+
     useEffect(() => {
-        if (service) {
+        if (service && !hasInitialized) {
             setTitle(service.title || '');
             setPrice(service.price?.toString() || '');
             setDescription(service.description || '');
@@ -60,22 +73,121 @@ export const ServiceDetail = () => {
                 codeVehicle: service.codeVehicle || '',
                 maxGuest: service.maxGuest || '',
                 maxSlots: service.maxSlots || 0,
-                attribute: service.attribute || {} // Store sub-item attributes if needed
+                hotelType: service.hotelType || 'Khách sạn',
+                starRating: service.starRating || 3,
+                checkinTime: service.checkinTime || '14:00',
+                checkoutTime: service.checkoutTime || '12:00',
+                policies: service.policies || { cancellation: 'Linh hoạt', children: 'Cho phép', pets: 'Không cho phép' },
+                phoneNumber: service.phoneNumber || '',
+                provinceId: service.provinceId || '',
+                districtId: service.districtId || '',
+                wardId: service.wardId || '',
+                specificAddress: service.specificAddress || '',
+                departureProvinceId: service.departureProvinceId || '',
+                departureDistrictId: service.departureDistrictId || '',
+                departureWardId: service.departureWardId || '',
+                arrivalProvinceId: service.arrivalProvinceId || '',
+                arrivalDistrictId: service.arrivalDistrictId || '',
+                arrivalWardId: service.arrivalWardId || '',
+                attribute: service.attribute || {}
             });
             setAttribute(service.attribute || {});
+            setHasInitialized(true);
         }
-    }, [service]);
+    }, [service, hasInitialized]);
+
+    // Fetch Provinces (Cities in this system)
+    useEffect(() => {
+        geographyApi.listCountries().then(res => {
+            const vn = res.data.find((c: any) => c.code === 'VN' || c.name === 'Vietnam');
+            const countryId = vn?.id || res.data[0]?.id;
+            if (countryId) {
+                geographyApi.listCities(countryId).then(cityRes => {
+                    setProvinces(cityRes.data);
+                });
+            }
+        });
+    }, []);
+
+    // Fetch Districts (Areas in this system)
+    useEffect(() => {
+        if (extraData.provinceId) {
+            geographyApi.listAreas(extraData.provinceId).then(res => {
+                setDistricts(res.data);
+            });
+        } else {
+            setDistricts([]);
+        }
+    }, [extraData.provinceId]);
+
+    // Fetch Wards
+    useEffect(() => {
+        if (extraData.districtId) {
+            geographyApi.listWards(extraData.districtId).then(res => {
+                setWards(res.data);
+            });
+        } else {
+            setWards([]);
+        }
+    }, [extraData.districtId]);
+
+    // Fetch Departure Districts
+    useEffect(() => {
+        if (extraData.departureProvinceId) {
+            geographyApi.listAreas(extraData.departureProvinceId).then(res => {
+                setDepartureDistricts(res.data);
+            });
+        } else {
+            setDepartureDistricts([]);
+        }
+    }, [extraData.departureProvinceId]);
+
+    // Fetch Departure Wards
+    useEffect(() => {
+        if (extraData.departureDistrictId) {
+            geographyApi.listWards(extraData.departureDistrictId).then(res => {
+                setDepartureWards(res.data);
+            });
+        } else {
+            setDepartureWards([]);
+        }
+    }, [extraData.departureDistrictId]);
+
+    // Fetch Arrival Districts
+    useEffect(() => {
+        if (extraData.arrivalProvinceId) {
+            geographyApi.listAreas(extraData.arrivalProvinceId).then(res => {
+                setArrivalDistricts(res.data);
+            });
+        } else {
+            setArrivalDistricts([]);
+        }
+    }, [extraData.arrivalProvinceId]);
+
+    // Fetch Arrival Wards
+    useEffect(() => {
+        if (extraData.arrivalDistrictId) {
+            geographyApi.listWards(extraData.arrivalDistrictId).then(res => {
+                setArrivalWards(res.data);
+            });
+        } else {
+            setArrivalWards([]);
+        }
+    }, [extraData.arrivalDistrictId]);
 
     // UI States
     const [posCode, setPosCode] = useState('');
     const [posPrice, setPosPrice] = useState('');
     const [imageFiles, setImageFiles] = useState<FileList | null>(null);
 
-    // Room Dialog States
+    // Room/Position Dialog States
     const [roomName, setRoomName] = useState('');
     const [roomMaxGuest, setRoomMaxGuest] = useState('2');
     const [roomPrice, setRoomPrice] = useState('');
     const [roomFacilities, setRoomFacilities] = useState<string[]>([]);
+    const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+    const [editingPosId, setEditingPosId] = useState<string | null>(null);
+
     const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
     const [isAddPosOpen, setIsAddPosOpen] = useState(false);
 
@@ -150,6 +262,21 @@ export const ServiceDetail = () => {
         }
     });
 
+    const updatePosMut = useMutation({
+        mutationFn: (d: { id: string; codePosition: string; price: number }) => ownerGeographyApi.updateVehiclePosition(d.id, { codePosition: d.codePosition, price: d.price }),
+        onSuccess: () => {
+            toast({ title: 'Thành công', description: 'Đã cập nhật vị trí ghế' });
+            setPosCode('');
+            setPosPrice('');
+            setEditingPosId(null);
+            setIsAddPosOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Lỗi', description: err.response?.data?.message || 'Không thể cập nhật vị trí ghế', variant: 'destructive' });
+        }
+    });
+
     const deletePosMut = useMutation({
         mutationFn: (id: string) => ownerGeographyApi.deleteVehiclePosition(id),
         onSuccess: () => {
@@ -176,6 +303,33 @@ export const ServiceDetail = () => {
         }
     });
 
+    const updateRoomMut = useMutation({
+        mutationFn: (d: any) => ownerGeographyApi.updateAccommodationRoom(editingRoomId!, d),
+        onSuccess: () => {
+            toast({ title: 'Thành công', description: 'Đã cập nhật hạng phòng' });
+            setRoomName('');
+            setRoomPrice('');
+            setRoomFacilities([]);
+            setEditingRoomId(null);
+            setIsAddRoomOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Lỗi', description: err.response?.data?.message || 'Không thể cập nhật hạng phòng', variant: 'destructive' });
+        }
+    });
+
+    const deleteRoomMut = useMutation({
+        mutationFn: (idRoom: string) => ownerGeographyApi.deleteAccommodationRoom(idRoom),
+        onSuccess: () => {
+            toast({ title: 'Thành công', description: 'Đã xóa hạng phòng' });
+            queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Lỗi', description: err.response?.data?.message || 'Không thể xóa phòng', variant: 'destructive' });
+        }
+    });
+
     const handleSave = () => {
         const sanitizedExtraData = { ...extraData };
         if (sanitizedExtraData.maxSlots === '' || sanitizedExtraData.maxSlots === undefined) {
@@ -195,7 +349,21 @@ export const ServiceDetail = () => {
             price: (price === '' || price === null) ? null : Number(price),
             description,
             attribute,
-            extraData: sanitizedExtraData
+            extraData: {
+                ...sanitizedExtraData,
+                phoneNumber: extraData.phoneNumber,
+                provinceId: extraData.provinceId,
+                districtId: extraData.districtId,
+                wardId: extraData.wardId,
+                specificAddress: extraData.specificAddress,
+                departureProvinceId: extraData.departureProvinceId,
+                departureDistrictId: extraData.departureDistrictId,
+                departureWardId: extraData.departureWardId,
+                arrivalProvinceId: extraData.arrivalProvinceId,
+                arrivalDistrictId: extraData.arrivalDistrictId,
+                arrivalWardId: extraData.arrivalWardId,
+                starRating: extraData.starRating,
+            }
         });
     };
 
@@ -559,18 +727,100 @@ export const ServiceDetail = () => {
                                     </Card>
 
                                     <Card>
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <MapPin className="h-5 w-5" /> Địa chỉ & Liên hệ
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Số điện thoại liên hệ</Label>
+                                                    <Input
+                                                        value={extraData.phoneNumber || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, phoneNumber: e.target.value })}
+                                                        placeholder="VD: 0912345678"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Tỉnh / Thành phố</Label>
+                                                    <select
+                                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                        value={extraData.provinceId || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, provinceId: e.target.value, districtId: '', wardId: '' })}
+                                                    >
+                                                        <option value="">Chọn Tỉnh / Thành phố</option>
+                                                        {provinces.map(p => <option key={p.id} value={p.id}>{p.nameVi || p.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Quận / Huyện</Label>
+                                                    <select
+                                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                        value={extraData.districtId || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, districtId: e.target.value, wardId: '' })}
+                                                        disabled={!extraData.provinceId}
+                                                    >
+                                                        <option value="">Chọn Quận / Huyện</option>
+                                                        {districts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Phường / Xã</Label>
+                                                    <select
+                                                        className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                        value={extraData.wardId || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, wardId: e.target.value })}
+                                                        disabled={!extraData.districtId}
+                                                    >
+                                                        <option value="">Chọn Phường / Xã</option>
+                                                        {wards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Địa chỉ cụ thể (Số nhà, tên đường...)</Label>
+                                                <Input
+                                                    value={extraData.specificAddress || ''}
+                                                    onChange={(e) => setExtraData({ ...extraData, specificAddress: e.target.value })}
+                                                    placeholder="VD: số 123, đường Hùng Vương"
+                                                />
+                                            </div>
+                                            <div className="p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground flex gap-2">
+                                                <Info className="h-4 w-4 shrink-0 text-blue-500" />
+                                                <p>Địa chỉ này sẽ được sử dụng để khách hàng tìm kiếm chính xác vị trí khách sạn của bạn.</p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
                                         <CardHeader className="flex flex-row items-center justify-between">
                                             <div><CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> Quản lý loại phòng</CardTitle></div>
-                                            <Dialog open={isAddRoomOpen} onOpenChange={setIsAddRoomOpen}>
-                                                <DialogTrigger asChild><Button size="sm" className="gradient-sunset border-none"><Plus className="h-4 w-4 mr-2" /> Thêm loại phòng</Button></DialogTrigger>
+                                            <Dialog open={isAddRoomOpen} onOpenChange={(open) => {
+                                                setIsAddRoomOpen(open);
+                                                if (!open) {
+                                                    setEditingRoomId(null);
+                                                    setRoomName('');
+                                                    setRoomMaxGuest('2');
+                                                    setRoomPrice('');
+                                                    setRoomFacilities([]);
+                                                }
+                                            }}>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" className="gradient-sunset border-none">
+                                                        <Plus className="h-4 w-4 mr-2" /> Thêm loại phòng
+                                                    </Button>
+                                                </DialogTrigger>
                                                 <DialogContent className="max-w-2xl">
-                                                    <DialogHeader><DialogTitle>Thêm phòng mới</DialogTitle></DialogHeader>
+                                                    <DialogHeader>
+                                                        <DialogTitle>{editingRoomId ? 'Chỉnh sửa hạng phòng' : 'Thêm phòng mới'}</DialogTitle>
+                                                    </DialogHeader>
                                                     <div className="grid gap-6 py-4">
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div className="space-y-2"><Label>Tên loại phòng</Label><Input value={roomName} onChange={(e) => setRoomName(e.target.value)} placeholder="VD: Deluxe Suite" /></div>
                                                             <div className="space-y-2"><Label>Số khách tối đa</Label><Input type="number" value={roomMaxGuest} onChange={(e) => setRoomMaxGuest(e.target.value)} /></div>
                                                         </div>
-                                                        <div className="space-y-2"><Label>Giá phòng / đêm</Label><Input type="number" value={roomPrice} onChange={(e) => setRoomPrice(e.target.value)} /></div>
+                                                        <div className="space-y-2"><Label>Giá phòng / đêm (Mặc định: {price || 0})</Label><Input type="number" value={roomPrice} onChange={(e) => setRoomPrice(e.target.value)} /></div>
 
                                                         <div className="space-y-3">
                                                             <Label>Tiện ích phòng</Label>
@@ -593,20 +843,58 @@ export const ServiceDetail = () => {
                                                     </div>
                                                     <DialogFooter>
                                                         <Button variant="outline" onClick={() => setIsAddRoomOpen(false)}>Hủy</Button>
-                                                        <Button className="gradient-sunset border-none" onClick={() => addRoomMut.mutate({ nameRoom: roomName, maxGuest: Number(roomMaxGuest), price: Number(roomPrice), attribute: { facilities: roomFacilities } })}>Tạo phòng</Button>
+                                                        <Button
+                                                            className="gradient-sunset border-none"
+                                                            onClick={() => {
+                                                                const data = { nameRoom: roomName, maxGuest: Number(roomMaxGuest), price: Number(roomPrice) || Number(price), attribute: { facilities: roomFacilities } };
+                                                                if (editingRoomId) updateRoomMut.mutate(data);
+                                                                else addRoomMut.mutate(data);
+                                                            }}
+                                                        >
+                                                            {editingRoomId ? 'Cập nhật' : 'Tạo phòng'}
+                                                        </Button>
                                                     </DialogFooter>
                                                 </DialogContent>
                                             </Dialog>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
                                             {service.rooms?.map((room: any) => (
-                                                <div key={room.idRoom} className="p-4 border rounded-xl hover:border-primary/50 transition-colors bg-card">
+                                                <div key={room.idRoom} className="p-4 border rounded-xl hover:border-primary/50 transition-colors bg-card group/room">
                                                     <div className="flex justify-between items-start mb-3">
                                                         <div>
                                                             <h4 className="font-bold text-lg">{room.nameRoom}</h4>
                                                             <p className="text-xs text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Tối đa {room.maxGuest} người</p>
                                                         </div>
-                                                        <div className="text-right">
+                                                        <div className="flex flex-col items-end">
+                                                            <div className="flex gap-2 mb-1 opacity-0 group-hover/room:opacity-100 transition-opacity">
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
+                                                                    onClick={() => {
+                                                                        setEditingRoomId(room.idRoom);
+                                                                        setRoomName(room.nameRoom);
+                                                                        setRoomMaxGuest(room.maxGuest.toString());
+                                                                        setRoomPrice(room.price.toString());
+                                                                        setRoomFacilities(room.attribute?.facilities || []);
+                                                                        setIsAddRoomOpen(true);
+                                                                    }}
+                                                                >
+                                                                    <Settings className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    size="icon"
+                                                                    variant="ghost"
+                                                                    className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                                                    onClick={() => {
+                                                                        if (confirm('Bạn có chắc chắn muốn xóa hạng phòng này?')) {
+                                                                            deleteRoomMut.mutate(room.idRoom);
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                            </div>
                                                             <p className="text-primary font-bold">{room.price?.toLocaleString()} VNĐ</p>
                                                             <p className="text-[10px] text-muted-foreground uppercase">mỗi đêm</p>
                                                         </div>
@@ -745,58 +1033,159 @@ export const ServiceDetail = () => {
                                                 <MapPin className="h-5 w-5" /> Lộ trình & Thời gian
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardContent className="grid md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>Điểm khởi hành (Pickup Point)</Label>
-                                                <Input
-                                                    value={attribute.departurePoint || ''}
-                                                    onChange={(e) => setAttribute({ ...attribute, departurePoint: e.target.value })}
-                                                    placeholder="VD: Bến xe Miền Đông, Văn phòng Quận 1..."
-                                                />
+                                        <CardContent className="space-y-6">
+                                            <div className="space-y-4 border-b pb-6">
+                                                <h4 className="font-bold flex items-center gap-2 text-blue-600"><div className="w-2 h-2 rounded-full bg-blue-600" /> Điểm khởi hành (Pickup)</h4>
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label>Tỉnh / Thành phố đi</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.departureProvinceId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, departureProvinceId: e.target.value, departureDistrictId: '', departureWardId: '' })}
+                                                        >
+                                                            <option value="">Chọn Tỉnh / Thành phố</option>
+                                                            {provinces.map(p => <option key={p.id} value={p.id}>{p.nameVi || p.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Quận / Huyện đi</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.departureDistrictId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, departureDistrictId: e.target.value, departureWardId: '' })}
+                                                            disabled={!extraData.departureProvinceId}
+                                                        >
+                                                            <option value="">Chọn Quận / Huyện</option>
+                                                            {departureDistricts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Phường / Xã đi</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.departureWardId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, departureWardId: e.target.value })}
+                                                            disabled={!extraData.departureDistrictId}
+                                                        >
+                                                            <option value="">Chọn Phường / Xã</option>
+                                                            {departureWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Địa chỉ đón cụ thể (Bến xe, Văn phòng...)</Label>
+                                                        <Input
+                                                            value={attribute.departurePoint || ''}
+                                                            onChange={(e) => setAttribute({ ...attribute, departurePoint: e.target.value })}
+                                                            placeholder="VD: Bến xe Miền Đông"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Giờ khởi hành</Label>
+                                                        <Input
+                                                            type="time"
+                                                            value={attribute.departureTime || ''}
+                                                            onChange={(e) => setAttribute({ ...attribute, departureTime: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Giờ khởi hành (Departure Time)</Label>
-                                                <Input
-                                                    type="time"
-                                                    value={attribute.departureTime || ''}
-                                                    onChange={(e) => setAttribute({ ...attribute, departureTime: e.target.value })}
-                                                />
+
+                                            <div className="space-y-4 border-b pb-6">
+                                                <h4 className="font-bold flex items-center gap-2 text-red-600"><div className="w-2 h-2 rounded-full bg-red-600" /> Điểm đến (Drop-off)</h4>
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label>Tỉnh / Thành phố đến</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.arrivalProvinceId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, arrivalProvinceId: e.target.value, arrivalDistrictId: '', arrivalWardId: '' })}
+                                                        >
+                                                            <option value="">Chọn Tỉnh / Thành phố</option>
+                                                            {provinces.map(p => <option key={p.id} value={p.id}>{p.nameVi || p.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Quận / Huyện đến</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.arrivalDistrictId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, arrivalDistrictId: e.target.value, arrivalWardId: '' })}
+                                                            disabled={!extraData.arrivalProvinceId}
+                                                        >
+                                                            <option value="">Chọn Quận / Huyện</option>
+                                                            {arrivalDistricts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Phường / Xã đến</Label>
+                                                        <select
+                                                            className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                            value={extraData.arrivalWardId || ''}
+                                                            onChange={(e) => setExtraData({ ...extraData, arrivalWardId: e.target.value })}
+                                                            disabled={!extraData.arrivalDistrictId}
+                                                        >
+                                                            <option value="">Chọn Phường / Xã</option>
+                                                            {arrivalWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Địa chỉ trả cụ thể (Bến xe, Văn phòng...)</Label>
+                                                        <Input
+                                                            value={attribute.arrivalPoint || ''}
+                                                            onChange={(e) => setAttribute({ ...attribute, arrivalPoint: e.target.value })}
+                                                            placeholder="VD: Bến xe Đà Lạt"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Giờ đến dự kiến</Label>
+                                                        <Input
+                                                            type="time"
+                                                            value={attribute.arrivalTime || ''}
+                                                            onChange={(e) => setAttribute({ ...attribute, arrivalTime: e.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Điểm đến (Drop-off Point)</Label>
-                                                <Input
-                                                    value={attribute.arrivalPoint || ''}
-                                                    onChange={(e) => setAttribute({ ...attribute, arrivalPoint: e.target.value })}
-                                                    placeholder="VD: Bến xe Đà Lạt, Văn phòng trung tâm..."
-                                                />
+
+                                            <div className="grid md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label>Thời gian di chuyển dự kiến</Label>
+                                                    <Input
+                                                        value={attribute.estimatedDuration || ''}
+                                                        onChange={(e) => setAttribute({ ...attribute, estimatedDuration: e.target.value })}
+                                                        placeholder="VD: 6 tiếng 30 phút"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Số lượng chỗ ngồi (Max Seats)</Label>
+                                                    <Input
+                                                        type="number"
+                                                        value={extraData.maxGuest || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, maxGuest: e.target.value })}
+                                                        placeholder="VD: 40"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Số điện thoại nhà xe</Label>
+                                                    <Input
+                                                        value={extraData.phoneNumber || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, phoneNumber: e.target.value })}
+                                                        placeholder="VD: 0912345678"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Mã số phương tiện (Biển số...)</Label>
+                                                    <Input
+                                                        value={extraData.codeVehicle || ''}
+                                                        onChange={(e) => setExtraData({ ...extraData, codeVehicle: e.target.value })}
+                                                        placeholder="VD: 29B-123.45"
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Giờ đến dự kiến (Arrival Time)</Label>
-                                                <Input
-                                                    type="time"
-                                                    value={attribute.arrivalTime || ''}
-                                                    onChange={(e) => setAttribute({ ...attribute, arrivalTime: e.target.value })}
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Thời gian di chuyển dự kiến (VD: 6 tiếng)</Label>
-                                                <Input
-                                                    value={attribute.estimatedDuration || ''}
-                                                    onChange={(e) => setAttribute({ ...attribute, estimatedDuration: e.target.value })}
-                                                    placeholder="VD: 6 tiếng 30 phút"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Số lượng chỗ ngồi (Max Seats)</Label>
-                                                <Input
-                                                    type="number"
-                                                    value={extraData.maxGuest || ''}
-                                                    onChange={(e) => setExtraData({ ...extraData, maxGuest: e.target.value })}
-                                                    placeholder="VD: 40"
-                                                />
-                                            </div>
-                                            <div className="space-y-2 text-xs text-muted-foreground pt-8 italic">
-                                                * Thông tin này sẽ hiển thị trực tiếp trên vé và trang tìm kiếm của khách hàng.
+                                            <div className="p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground flex gap-2 mt-4">
+                                                <Info className="h-4 w-4 shrink-0 text-blue-500" />
+                                                <p>Thông tin hành trình chính xác giúp khách hàng dễ dàng tìm thấy tuyến xe phù hợp trong bộ lọc địa lý.</p>
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -810,12 +1199,19 @@ export const ServiceDetail = () => {
                                             <CardTitle className="flex items-center gap-2"><Armchair className="h-5 w-5" /> Sơ đồ ghế ngồi</CardTitle>
                                             <CardDescription>Mô phỏng vị trí các ghế trên phương tiện.</CardDescription>
                                         </div>
-                                        <Dialog open={isAddPosOpen} onOpenChange={setIsAddPosOpen}>
+                                        <Dialog open={isAddPosOpen} onOpenChange={(open) => {
+                                            setIsAddPosOpen(open);
+                                            if (!open) {
+                                                setEditingPosId(null);
+                                                setPosCode('');
+                                                setPosPrice('');
+                                            }
+                                        }}>
                                             <DialogTrigger asChild>
                                                 <Button size="sm" className="gradient-sunset border-none"><Plus className="h-4 w-4 mr-2" /> Thêm ghế</Button>
                                             </DialogTrigger>
                                             <DialogContent>
-                                                <DialogHeader><DialogTitle>Thêm vị trí mới</DialogTitle></DialogHeader>
+                                                <DialogHeader><DialogTitle>{editingPosId ? 'Chỉnh sửa vị trí ghế' : 'Thêm vị trí mới'}</DialogTitle></DialogHeader>
                                                 <div className="space-y-4 py-4">
                                                     <div className="space-y-2">
                                                         <Label>Mã ghế (VD: A1, VIP-01)</Label>
@@ -828,7 +1224,16 @@ export const ServiceDetail = () => {
                                                 </div>
                                                 <DialogFooter>
                                                     <Button variant="outline" onClick={() => setIsAddPosOpen(false)}>Hủy</Button>
-                                                    <Button className="gradient-sunset border-none" onClick={() => addPosMut.mutate({ codePosition: posCode, price: Number(posPrice) || Number(price) })}>Lưu vị trí</Button>
+                                                    <Button
+                                                        className="gradient-sunset border-none"
+                                                        onClick={() => {
+                                                            const data = { codePosition: posCode, price: Number(posPrice) || Number(price) };
+                                                            if (editingPosId) updatePosMut.mutate({ id: editingPosId, ...data });
+                                                            else addPosMut.mutate(data);
+                                                        }}
+                                                    >
+                                                        {editingPosId ? 'Cập nhật' : 'Lưu vị trí'}
+                                                    </Button>
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
@@ -870,9 +1275,22 @@ export const ServiceDetail = () => {
                                                                                 <span className="text-[9px] font-bold">{p.codePosition}</span>
                                                                             </div>
                                                                             {!p.isBooked && (
-                                                                                <button onClick={() => deletePosMut.mutate(p.idPosition)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                                                                    <X className="h-2.5 w-2.5" />
-                                                                                </button>
+                                                                                <div className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex gap-0.5">
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setEditingPosId(p.idPosition);
+                                                                                            setPosCode(p.codePosition);
+                                                                                            setPosPrice(p.price.toString());
+                                                                                            setIsAddPosOpen(true);
+                                                                                        }}
+                                                                                        className="bg-blue-500 text-white rounded-full p-0.5 hover:bg-blue-600 shadow-sm"
+                                                                                    >
+                                                                                        <Settings className="h-2.5 w-2.5" />
+                                                                                    </button>
+                                                                                    <button onClick={() => deletePosMut.mutate(p.idPosition)} className="bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 shadow-sm">
+                                                                                        <X className="h-2.5 w-2.5" />
+                                                                                    </button>
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     ) : <div key={`empty-l-${idx}`} className="w-12 h-12 border-2 border-dashed border-muted rounded-lg opacity-20"></div>;
@@ -895,9 +1313,22 @@ export const ServiceDetail = () => {
                                                                                 <span className="text-[9px] font-bold">{p.codePosition}</span>
                                                                             </div>
                                                                             {!p.isBooked && (
-                                                                                <button onClick={() => deletePosMut.mutate(p.idPosition)} className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                                                                    <X className="h-2.5 w-2.5" />
-                                                                                </button>
+                                                                                <div className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex gap-0.5">
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            setEditingPosId(p.idPosition);
+                                                                                            setPosCode(p.codePosition);
+                                                                                            setPosPrice(p.price.toString());
+                                                                                            setIsAddPosOpen(true);
+                                                                                        }}
+                                                                                        className="bg-blue-500 text-white rounded-full p-0.5 hover:bg-blue-600 shadow-sm"
+                                                                                    >
+                                                                                        <Settings className="h-2.5 w-2.5" />
+                                                                                    </button>
+                                                                                    <button onClick={() => deletePosMut.mutate(p.idPosition)} className="bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 shadow-sm">
+                                                                                        <X className="h-2.5 w-2.5" />
+                                                                                    </button>
+                                                                                </div>
                                                                             )}
                                                                         </div>
                                                                     ) : <div key={`empty-r-${idx}`} className="w-12 h-12 border-2 border-dashed border-muted rounded-lg opacity-20"></div>;

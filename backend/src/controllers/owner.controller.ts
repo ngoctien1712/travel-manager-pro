@@ -173,13 +173,25 @@ export async function getServiceDetail(req: Request, res: Response) {
       const { rows } = await pool.query('SELECT guide_language, start_at, end_at, max_slots, attribute FROM tours WHERE id_item = $1', [idItem]);
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
     } else if (itemType === 'accommodation') {
-      const { rows } = await pool.query('SELECT id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute FROM accommodations WHERE id_item = $1', [idItem]);
+      const { rows } = await pool.query(
+        `SELECT id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute,
+                phone_number, province_id, district_id, ward_id, specific_address
+         FROM accommodations WHERE id_item = $1`,
+        [idItem]
+      );
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
       // Also fetch rooms for accommodation
       const { rows: rooms } = await pool.query('SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC', [idItem]);
       details.rooms = rooms.map(r => toCamel(r as Record<string, unknown>));
     } else if (itemType === 'vehicle') {
-      const { rows } = await pool.query('SELECT id_vehicle, id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute FROM vehicle WHERE id_item = $1', [idItem]);
+      const { rows } = await pool.query(
+        `SELECT id_vehicle, id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, 
+                arrival_point, estimated_duration, attribute, phone_number,
+                departure_province_id, departure_district_id, departure_ward_id,
+                arrival_province_id, arrival_district_id, arrival_ward_id
+         FROM vehicle WHERE id_item = $1`,
+        [idItem]
+      );
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
 
       if (details.idVehicle) {
@@ -239,8 +251,17 @@ export async function updateServiceDetail(req: Request, res: Response) {
 
     // Update base item
     await client.query(
-      `UPDATE bookable_items SET title = $1, price = $2, attribute = $3, description = $4 WHERE id_item = $5`,
-      [title, price, attribute ? JSON.stringify(attribute) : null, req.body.description || null, idItem]
+      `UPDATE bookable_items 
+       SET title = $1, price = $2, attribute = $3, description = $4, star_rating = $5 
+       WHERE id_item = $6`,
+      [
+        title,
+        price,
+        attribute ? JSON.stringify(attribute) : null,
+        req.body.description || null,
+        extraData?.starRating || 0,
+        idItem
+      ]
     );
 
     // Update type-specific details
@@ -261,8 +282,11 @@ export async function updateServiceDetail(req: Request, res: Response) {
       );
     } else if (itemType === 'accommodation' && extraData) {
       await client.query(
-        `INSERT INTO accommodations (id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO accommodations (
+          id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, 
+          attribute, phone_number, province_id, district_id, ward_id, specific_address
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (id_item) DO UPDATE 
          SET address = EXCLUDED.address,
              hotel_type = EXCLUDED.hotel_type,
@@ -270,16 +294,26 @@ export async function updateServiceDetail(req: Request, res: Response) {
              checkin_time = EXCLUDED.checkin_time,
              checkout_time = EXCLUDED.checkout_time,
              policies = EXCLUDED.policies,
-             attribute = EXCLUDED.attribute`,
+             attribute = EXCLUDED.attribute,
+             phone_number = EXCLUDED.phone_number,
+             province_id = EXCLUDED.province_id,
+             district_id = EXCLUDED.district_id,
+             ward_id = EXCLUDED.ward_id,
+             specific_address = EXCLUDED.specific_address`,
         [
           idItem,
           extraData.address || '',
           extraData.hotelType || 'Khách sạn',
-          Number(extraData.starRating || extraData.stars) || 3,
+          Number(extraData.starRating) || 3,
           extraData.checkinTime || '14:00',
           extraData.checkoutTime || '12:00',
           extraData.policies ? JSON.stringify(extraData.policies) : JSON.stringify({ cancellation: 'Linh hoạt', children: 'Cho phép', pets: 'Không cho phép' }),
-          attribute ? JSON.stringify(attribute) : null
+          attribute ? JSON.stringify(attribute) : null,
+          extraData.phoneNumber || null,
+          extraData.provinceId || null,
+          extraData.districtId || null,
+          extraData.wardId || null,
+          extraData.specificAddress || null
         ]
       );
     } else if (itemType === 'ticket' && extraData) {
@@ -291,8 +325,13 @@ export async function updateServiceDetail(req: Request, res: Response) {
       );
     } else if (itemType === 'vehicle' && extraData) {
       await client.query(
-        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO vehicle (
+          id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, 
+          arrival_point, estimated_duration, attribute, phone_number,
+          departure_province_id, departure_district_id, departure_ward_id,
+          arrival_province_id, arrival_district_id, arrival_ward_id
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          ON CONFLICT (id_item) DO UPDATE 
          SET code_vehicle = EXCLUDED.code_vehicle, 
              max_guest = EXCLUDED.max_guest,
@@ -301,7 +340,14 @@ export async function updateServiceDetail(req: Request, res: Response) {
              arrival_time = EXCLUDED.arrival_time,
              arrival_point = EXCLUDED.arrival_point,
              estimated_duration = EXCLUDED.estimated_duration,
-             attribute = EXCLUDED.attribute`,
+             attribute = EXCLUDED.attribute,
+             phone_number = EXCLUDED.phone_number,
+             departure_province_id = EXCLUDED.departure_province_id,
+             departure_district_id = EXCLUDED.departure_district_id,
+             departure_ward_id = EXCLUDED.departure_ward_id,
+             arrival_province_id = EXCLUDED.arrival_province_id,
+             arrival_district_id = EXCLUDED.arrival_district_id,
+             arrival_ward_id = EXCLUDED.arrival_ward_id`,
         [
           idItem,
           extraData.codeVehicle || '',
@@ -311,7 +357,14 @@ export async function updateServiceDetail(req: Request, res: Response) {
           attribute?.arrivalTime || null,
           attribute?.arrivalPoint || null,
           attribute?.estimatedDuration || null,
-          attribute ? JSON.stringify(attribute) : null
+          attribute ? JSON.stringify(attribute) : null,
+          extraData.phoneNumber || null,
+          extraData.departureProvinceId || null,
+          extraData.departureDistrictId || null,
+          extraData.departureWardId || null,
+          extraData.arrivalProvinceId || null,
+          extraData.arrivalDistrictId || null,
+          extraData.arrivalWardId || null
         ]
       );
     }
@@ -594,6 +647,100 @@ export async function addAccommodationRoom(req: Request, res: Response) {
   }
 }
 
+/** Update room in accommodation */
+export async function updateAccommodationRoom(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idRoom } = req.params;
+    const { nameRoom, maxGuest, attribute, price } = req.body;
+
+    const check = await pool.query(
+      `SELECT r.id_room FROM accommodations_rooms r
+       JOIN bookable_items bi ON bi.id_item = r.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE r.id_room = $1 AND p.id_user = $2`,
+      [idRoom, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa phòng này' });
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE accommodations_rooms 
+       SET name_room = $1, max_guest = $2, attribute = $3, price = $4
+       WHERE id_room = $5
+       RETURNING *`,
+      [nameRoom, maxGuest, attribute ? JSON.stringify(attribute) : null, price, idRoom]
+    );
+
+    res.json(toCamel(rows[0] as Record<string, unknown>));
+  } catch (err) {
+    console.error('Update room error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Delete room from accommodation */
+export async function deleteAccommodationRoom(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idRoom } = req.params;
+
+    const check = await pool.query(
+      `SELECT r.id_room FROM accommodations_rooms r
+       JOIN bookable_items bi ON bi.id_item = r.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE r.id_room = $1 AND p.id_user = $2`,
+      [idRoom, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa phòng này' });
+    }
+
+    await pool.query('DELETE FROM accommodations_rooms WHERE id_room = $1', [idRoom]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete room error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Update position in vehicle */
+export async function updateVehiclePosition(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idPosition } = req.params;
+    const { codePosition, price } = req.body;
+
+    const check = await pool.query(
+      `SELECT pos.id_position FROM positions pos
+       JOIN vehicle v ON v.id_vehicle = pos.id_vehicle
+       JOIN bookable_items bi ON bi.id_item = v.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE pos.id_position = $1 AND p.id_user = $2`,
+      [idPosition, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền chỉnh sửa vị trí này' });
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE positions SET code_position = $1, price = $2
+       WHERE id_position = $3
+       RETURNING *`,
+      [codePosition, price, idPosition]
+    );
+
+    res.json(toCamel(rows[0] as Record<string, unknown>));
+  } catch (err) {
+    console.error('Update position error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
 /** Manage vehicle info */
 export async function manageVehicle(req: Request, res: Response) {
   try {
@@ -672,8 +819,11 @@ export async function createBookableItem(req: Request, res: Response) {
       );
     } else if (itemType === 'accommodation') {
       await client.query(
-        `INSERT INTO accommodations (id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO accommodations (
+          id_item, address, hotel_type, star_rating, checkin_time, checkout_time, policies, attribute,
+          phone_number, province_id, district_id, ward_id, specific_address
+        ) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           itemId,
           extraData?.address || '',
@@ -682,7 +832,12 @@ export async function createBookableItem(req: Request, res: Response) {
           extraData?.checkinTime || '14:00',
           extraData?.checkoutTime || '12:00',
           extraData?.policies ? JSON.stringify(extraData.policies) : JSON.stringify({ cancellation: 'Linh hoạt', children: 'Cho phép', pets: 'Không cho phép' }),
-          attribute ? JSON.stringify(attribute) : null
+          attribute ? JSON.stringify(attribute) : null,
+          extraData?.phoneNumber || null,
+          extraData?.provinceId || null,
+          extraData?.districtId || null,
+          extraData?.wardId || null,
+          extraData?.specificAddress || null
         ]
       );
     } else if (itemType === 'ticket') {
@@ -692,8 +847,13 @@ export async function createBookableItem(req: Request, res: Response) {
       );
     } else if (itemType === 'vehicle') {
       await client.query(
-        `INSERT INTO vehicle (id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, estimated_duration, attribute) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        `INSERT INTO vehicle (
+          id_item, code_vehicle, max_guest, departure_time, departure_point, arrival_time, arrival_point, 
+          estimated_duration, attribute, phone_number,
+          departure_province_id, departure_district_id, departure_ward_id,
+          arrival_province_id, arrival_district_id, arrival_ward_id
+        ) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
         [
           itemId,
           extraData?.codeVehicle || '',
@@ -703,7 +863,14 @@ export async function createBookableItem(req: Request, res: Response) {
           attribute?.arrivalTime || null,
           attribute?.arrivalPoint || null,
           attribute?.estimatedDuration || null,
-          attribute ? JSON.stringify(attribute) : null
+          attribute ? JSON.stringify(attribute) : null,
+          extraData?.phoneNumber || null,
+          extraData?.departureProvinceId || null,
+          extraData?.departureDistrictId || null,
+          extraData?.departureWardId || null,
+          extraData?.arrivalProvinceId || null,
+          extraData?.arrivalDistrictId || null,
+          extraData?.arrivalWardId || null
         ]
       );
     }

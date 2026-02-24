@@ -10,5 +10,6 @@ router.get('/countries', geo.listCountries);
 router.get('/cities', geo.listCities);
 router.get('/areas', geo.listAreas);
 router.get('/pois', geo.listPois);
+router.get('/wards', geo.listWards);
 
 export default router;

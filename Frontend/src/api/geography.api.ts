@@ -18,6 +18,9 @@ export const geographyApi = {
   listPois(areaId: string): Promise<GeographyListResponse<PointOfInterest>> {
     return httpClient.get(`/geography/pois?areaId=${encodeURIComponent(areaId)}`);
   },
+  listWards(areaId: string): Promise<GeographyListResponse<{ id: string; name: string }>> {
+    return httpClient.get(`/geography/wards?areaId=${encodeURIComponent(areaId)}`);
+  },
 };
 
 interface AdminCountryBody {

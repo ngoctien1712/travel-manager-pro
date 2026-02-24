@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { geographyApi } from '@/api/geography.api';
 import { ownerGeographyApi, type OwnerProvider } from '@/api/owner-geography.api';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,50 @@ export const MyServices = () => {
     const [tourStart, setTourStart] = useState('');
     const [tourEnd, setTourEnd] = useState('');
     const [accAddress, setAccAddress] = useState('');
+    const [provinceId, setProvinceId] = useState('');
+    const [districtId, setDistrictId] = useState('');
+    const [wardId, setWardId] = useState('');
+    const [specificAddress, setSpecificAddress] = useState('');
     const [ticketKind, setTicketKind] = useState('');
+
+    const [provinces, setProvinces] = useState<any[]>([]);
+    const [districts, setDistricts] = useState<any[]>([]);
+    const [wards, setWards] = useState<any[]>([]);
+
+    // Fetch Provinces (Cities) for Vietnam
+    useEffect(() => {
+        if (serviceOpen) {
+            geographyApi.listCountries().then(res => {
+                const vn = res.data.find((c: any) => c.code === 'VN' || c.name === 'Vietnam');
+                const countryId = vn?.id || res.data[0]?.id;
+                if (countryId) {
+                    geographyApi.listCities(countryId).then(cityRes => {
+                        setProvinces(cityRes.data);
+                    });
+                }
+            });
+        }
+    }, [serviceOpen]);
+
+    // Fetch Districts (Areas)
+    useEffect(() => {
+        if (provinceId) {
+            geographyApi.listAreas(provinceId).then(res => setDistricts(res.data));
+        } else {
+            setDistricts([]);
+            setDistrictId('');
+        }
+    }, [provinceId]);
+
+    // Fetch Wards
+    useEffect(() => {
+        if (districtId) {
+            geographyApi.listWards(districtId).then(res => setWards(res.data));
+        } else {
+            setWards([]);
+            setWardId('');
+        }
+    }, [districtId]);
 
     const { data: providersData } = useQuery({
         queryKey: ['owner', 'providers'],
@@ -81,6 +125,10 @@ export const MyServices = () => {
             setTourStart('');
             setTourEnd('');
             setAccAddress('');
+            setProvinceId('');
+            setDistrictId('');
+            setWardId('');
+            setSpecificAddress('');
             setTicketKind('');
         },
     });
@@ -273,9 +321,40 @@ export const MyServices = () => {
                             )}
 
                             {itemType === 'accommodation' && (
-                                <div className="space-y-2">
-                                    <Label>Địa chỉ chi tiết</Label>
-                                    <Input value={accAddress} onChange={(e) => setAccAddress(e.target.value)} placeholder="Số nhà, tên đường, phường/xã..." />
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Tỉnh / Thành phố</Label>
+                                            <Select value={provinceId} onValueChange={(v) => { setProvinceId(v); setDistrictId(''); setWardId(''); }}>
+                                                <SelectTrigger><SelectValue placeholder="Chọn Tỉnh/Thành" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {provinces.map(p => <SelectItem key={p.id} value={p.id}>{p.nameVi || p.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Quận / Huyện</Label>
+                                            <Select value={districtId} onValueChange={(v) => { setDistrictId(v); setWardId(''); }} disabled={!provinceId}>
+                                                <SelectTrigger><SelectValue placeholder="Chọn Quận/Huyện" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {districts.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Phường / Xã</Label>
+                                        <Select value={wardId} onValueChange={setWardId} disabled={!districtId}>
+                                            <SelectTrigger><SelectValue placeholder="Chọn Phường/Xã" /></SelectTrigger>
+                                            <SelectContent>
+                                                {wards.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Số nhà, tên đường</Label>
+                                        <Input value={specificAddress} onChange={(e) => setSpecificAddress(e.target.value)} placeholder="Ví dụ: 123 đường Hùng Vương" />
+                                    </div>
                                 </div>
                             )}
 
@@ -301,7 +380,13 @@ export const MyServices = () => {
                                     if (itemType === 'tour') {
                                         extraData = { guideLanguage: tourGuideLang, startAt: tourStart, endAt: tourEnd };
                                     } else if (itemType === 'accommodation') {
-                                        extraData = { address: accAddress };
+                                        extraData = {
+                                            address: specificAddress,
+                                            provinceId,
+                                            districtId,
+                                            wardId,
+                                            specificAddress
+                                        };
                                     } else if (itemType === 'ticket') {
                                         extraData = { ticketKind };
                                     }

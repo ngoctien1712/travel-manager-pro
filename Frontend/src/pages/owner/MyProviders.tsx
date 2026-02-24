@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { geographyApi } from '@/api/geography.api';
 import { ownerGeographyApi, type OwnerProvider } from '@/api/owner-geography.api';
@@ -89,6 +89,22 @@ export const MyProviders = () => {
     queryFn: () => geographyApi.listCountries(),
   });
   const countries = countriesData?.data ?? [];
+
+  // Default to Vietnam when countries loaded
+  useState(() => {
+    if (countries.length > 0 && !countryId) {
+      const vn = countries.find(c => c.code === 'VN');
+      if (vn) setCountryId(vn.id);
+    }
+  });
+
+  // Effect to set default VN when countries data changes
+  useEffect(() => {
+    if (countries.length > 0 && !countryId) {
+      const vn = countries.find(c => c.code === 'VN');
+      if (vn) setCountryId(vn.id);
+    }
+  }, [countries, countryId]);
 
   const { data: citiesData } = useQuery({
     queryKey: ['geography', 'cities', countryId],

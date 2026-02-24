@@ -112,6 +112,11 @@ interface ServiceDetail {
   id_vehicle?: string;
   code_vehicle?: string;
   max_guest?: number;
+  departureTime?: string;
+  departurePoint?: string;
+  arrivalTime?: string;
+  arrivalPoint?: string;
+  estimatedDuration?: string;
   vehicle_attribute?: any;
   positions?: Array<{
     id_position: string;
@@ -573,12 +578,12 @@ export default function ServiceDetail() {
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <Clock size={20} className="text-blue-500 mx-auto mb-2" />
                         <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Giờ khởi hành</p>
-                        <p className="font-black text-gray-900 text-base">{service.attribute?.departureTime || '08:00'}</p>
+                        <p className="font-black text-gray-900 text-base">{service.departureTime || service.attribute?.departureTime || '08:00'}</p>
                       </div>
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <MapPin size={20} className="text-blue-500 mx-auto mb-2" />
                         <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Điểm đón</p>
-                        <p className="font-black text-gray-900 text-sm line-clamp-1">{service.attribute?.departurePoint || 'Bến xe trung tâm'}</p>
+                        <p className="font-black text-gray-900 text-sm line-clamp-1">{service.departurePoint || service.attribute?.departurePoint || 'Bến xe trung tâm'}</p>
                       </div>
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <Users size={20} className="text-blue-500 mx-auto mb-2" />
@@ -597,14 +602,14 @@ export default function ServiceDetail() {
                       <div className="flex flex-col md:flex-row items-center justify-between gap-12">
                         <div className="text-center md:text-left flex-1">
                           <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">Khởi hành</p>
-                          <p className="text-4xl font-black text-gray-900 mb-2">{service.attribute?.departureTime || '08:00'}</p>
-                          <p className="font-black text-blue-600 text-sm">{service.attribute?.departurePoint || 'Ga Hà Nội'}</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.departureTime || service.attribute?.departureTime || '08:00'}</p>
+                          <p className="font-black text-blue-600 text-sm">{service.departurePoint || service.attribute?.departurePoint || 'Ga Hà Nội'}</p>
                         </div>
 
                         <div className="flex-[1.5] w-full flex flex-col items-center gap-3">
                           <div className="flex items-center gap-3">
                             <Clock size={14} className="text-gray-400" />
-                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{service.attribute?.estimatedDuration || '4 tiếng 30 phút'}</span>
+                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-widest">{service.estimatedDuration || service.attribute?.estimatedDuration || '4 tiếng 30 phút'}</span>
                           </div>
                           <div className="w-full h-1 bg-gray-200 rounded-full relative overflow-hidden">
                             <div className="absolute inset-0 bg-blue-600 w-1/2 rounded-full" />
@@ -614,8 +619,8 @@ export default function ServiceDetail() {
 
                         <div className="text-center md:text-right flex-1">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Điểm đến</p>
-                          <p className="text-4xl font-black text-gray-900 mb-2">{service.attribute?.arrivalTime || '12:30'}</p>
-                          <p className="font-black text-gray-500 text-sm">{service.attribute?.arrivalPoint || 'Ga Đà Nẵng'}</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.arrivalTime || service.attribute?.arrivalTime || '12:30'}</p>
+                          <p className="font-black text-gray-500 text-sm">{service.arrivalPoint || service.attribute?.arrivalPoint || 'Ga Đà Nẵng'}</p>
                         </div>
                       </div>
                     </div>
@@ -636,7 +641,7 @@ export default function ServiceDetail() {
                     </div>
                     <div className="flex flex-col items-center gap-8 bg-gray-50/50 p-10 rounded-[3rem] border-2 border-dashed border-gray-200">
                       <div className="grid grid-cols-4 gap-4">
-                        {service.positions.map(pos => {
+                        {service.positions?.map(pos => {
                           const isSelected = selectedSeats.some(s => s.id_position === pos.id_position);
                           return (
                             <button

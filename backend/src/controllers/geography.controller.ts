@@ -11,6 +11,9 @@ function toCamel(o: Record<string, unknown>): Record<string, unknown> {
   if ('idPoi' in r) {
     r.id = r.idPoi;
     if ('idArea' in r) r.areaId = r.idArea;
+  } else if ('idWard' in r) {
+    r.id = r.idWard;
+    if ('idArea' in r) r.areaId = r.idArea;
   } else if ('idArea' in r) {
     r.id = r.idArea;
     if ('idCity' in r) r.cityId = r.idCity;
@@ -86,6 +89,23 @@ export async function listPois(req: Request, res: Response) {
     res.json({ data: rows.map((r) => toCamel(r as Record<string, unknown>)) });
   } catch (err) {
     console.error('List POIs error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+export async function listWards(req: Request, res: Response) {
+  try {
+    const areaId = req.query.areaId as string | undefined;
+    if (!areaId) {
+      return res.status(400).json({ message: 'Thiếu areaId' });
+    }
+    const { rows } = await pool.query(
+      'SELECT id_ward, id_area, name, attribute FROM wards WHERE id_area = $1 ORDER BY name',
+      [areaId]
+    );
+    res.json({ data: rows.map((r) => toCamel(r as Record<string, unknown>)) });
+  } catch (err) {
+    console.error('List wards error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }

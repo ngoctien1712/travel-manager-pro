@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
@@ -12,11 +12,20 @@ import { ServiceCardSkeleton } from '@/components/LoadingSkeleton';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 
+import { geographyApi } from '@/api/geography.api';
+
 export const VehicleLanding = () => {
     const navigate = useNavigate();
-    const [from, setFrom] = useState('');
-    const [to, setTo] = useState('');
+    const [fromProvinceId, setFromProvinceId] = useState('');
+    const [toProvinceId, setToProvinceId] = useState('');
+    const [provinces, setProvinces] = useState<any[]>([]);
     const [isRoundTrip, setIsRoundTrip] = useState(false);
+
+    // Search Filters
+    const [departureDate, setDepartureDate] = useState('');
+    const [returnDate, setReturnDate] = useState('');
+    const [departureTime, setDepartureTime] = useState('08:00');
+    const [returnTime, setReturnTime] = useState('18:00');
 
     const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
     const getImageUrl = (url: string | null) => {
@@ -25,14 +34,53 @@ export const VehicleLanding = () => {
         return `${backendUrl}${url}`;
     };
 
+    // Fetch Provinces
+    useEffect(() => {
+        geographyApi.listCountries().then(res => {
+            const vn = res.data.find((c: any) => c.code === 'VN' || c.name === 'Vietnam');
+            const countryId = vn?.id || res.data[0]?.id;
+            if (countryId) {
+                geographyApi.listCities(countryId).then(cityRes => {
+                    setProvinces(cityRes.data);
+                });
+            }
+        });
+    }, []);
+
     const { data, isLoading } = useQuery({
-        queryKey: ['listVehicles', from, to],
-        queryFn: () => customerApi.listServices({ type: 'vehicle', city: to, q: from }),
+        queryKey: ['listVehicles', fromProvinceId, toProvinceId, departureDate, returnDate, departureTime, returnTime, isRoundTrip],
+        queryFn: () => customerApi.listServices({
+            type: 'vehicle',
+            provinceId: fromProvinceId,
+            arrivalProvinceId: toProvinceId,
+            departureDate,
+            returnDate: isRoundTrip ? returnDate : undefined,
+            // Assuming the API can handle these or we'll update it later
+        }),
     });
 
     const handleSearch = () => {
-        // Navigate to a specific search results page if needed, for now just shows below
-        console.log('Searching for vehicles...', { from, to, isRoundTrip });
+        if (!fromProvinceId || !toProvinceId) {
+            alert('Vui lòng chọn điểm đi và điểm đến');
+            return;
+        }
+        if (!departureDate) {
+            alert('Vui lòng chọn ngày đi');
+            return;
+        }
+        if (isRoundTrip && !returnDate) {
+            alert('Vui lòng chọn ngày về cho chuyến khứ hồi');
+            return;
+        }
+
+        console.log('Searching for vehicles...', {
+            fromProvinceId,
+            toProvinceId,
+            departureDate,
+            returnDate: isRoundTrip ? returnDate : null,
+            departureTime,
+            isRoundTrip
+        });
     };
 
     return (
@@ -58,79 +106,140 @@ export const VehicleLanding = () => {
             <div className="container max-w-6xl relative z-20 -mt-24 px-4">
                 <Card className="shadow-2xl border-none rounded-[2rem] overflow-hidden bg-white">
                     <CardContent className="p-8">
-                        <div className="flex items-center gap-6 mb-8 pb-6 border-b border-gray-50">
-                            <div className="flex items-center gap-2">
-                                <Switch id="round-trip" checked={isRoundTrip} onCheckedChange={setIsRoundTrip} className="data-[state=checked]:bg-blue-600" />
-                                <Label htmlFor="round-trip" className="font-black text-gray-500 uppercase text-[10px] tracking-widest cursor-pointer">Khứ hồi</Label>
-                            </div>
-                            <div className="flex items-center gap-2 opacity-30">
-                                <Switch id="booking-for-others" disabled className="data-[state=checked]:bg-blue-600" />
-                                <Label htmlFor="booking-for-others" className="font-black text-gray-500 uppercase text-[10px] tracking-widest">Đặt cho người khác</Label>
-                            </div>
+                        {/* Type Selection */}
+                        <div className="flex items-center gap-4 mb-8">
+                            <button
+                                onClick={() => setIsRoundTrip(false)}
+                                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${!isRoundTrip ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                            >
+                                Một chiều
+                            </button>
+                            <button
+                                onClick={() => setIsRoundTrip(true)}
+                                className={`px-6 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all ${isRoundTrip ? 'bg-blue-600 text-white shadow-lg shadow-blue-100' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                            >
+                                Khứ hồi
+                            </button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-11 gap-6 items-end">
-                            <div className="lg:col-span-3 space-y-2 relative">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Từ (Điểm đón)</label>
-                                <div className="relative group">
-                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
-                                    <Input
-                                        value={from}
-                                        onChange={(e) => setFrom(e.target.value)}
-                                        placeholder="Tỉnh, thành phố, bến xe..."
-                                        className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
-                                    />
+                        <div className="space-y-8">
+                            {/* Row 1: Origins & Destinations */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-9 gap-4 items-center">
+                                <div className="lg:col-span-4 space-y-2 relative">
+                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Điểm đi</label>
+                                    <div className="relative group">
+                                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
+                                        <select
+                                            className="w-full h-14 pl-12 bg-gray-50 border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 font-bold appearance-none cursor-pointer"
+                                            value={fromProvinceId}
+                                            onChange={(e) => setFromProvinceId(e.target.value)}
+                                        >
+                                            <option value="">Thành phố đi</option>
+                                            {provinces.map(p => <option key={p.id} value={p.id}>{p.nameVi || p.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="hidden lg:flex lg:col-span-1 justify-center items-center">
+                                    <div
+                                        className="w-12 h-12 rounded-full bg-white border-2 border-gray-50 flex items-center justify-center text-blue-600 hover:text-white hover:bg-blue-600 transition-all cursor-pointer shadow-sm hover:shadow-lg"
+                                        onClick={() => {
+                                            const temp = fromProvinceId;
+                                            setFromProvinceId(toProvinceId);
+                                            setToProvinceId(temp);
+                                        }}
+                                    >
+                                        <Repeat size={20} />
+                                    </div>
+                                </div>
+
+                                <div className="lg:col-span-4 space-y-2">
+                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Điểm đến</label>
+                                    <div className="relative group">
+                                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
+                                        <select
+                                            className="w-full h-14 pl-12 bg-gray-50 border-gray-100 rounded-2xl focus:ring-2 focus:ring-blue-600 font-bold appearance-none cursor-pointer"
+                                            value={toProvinceId}
+                                            onChange={(e) => setToProvinceId(e.target.value)}
+                                        >
+                                            <option value="">Thành phố đến</option>
+                                            {provinces.map(p => <option key={p.id} value={p.id}>{p.nameVi || p.name}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="hidden lg:flex lg:col-span-1 justify-center items-center pb-2">
-                                <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer rotate-90 lg:rotate-0">
-                                    <Repeat size={16} />
+                            {/* Row 2: Dates & Times */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+                                {/* Departure Leg */}
+                                <div className={`${isRoundTrip ? 'lg:col-span-5' : 'lg:col-span-10'} grid grid-cols-2 gap-4`}>
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Ngày đi</label>
+                                        <div className="relative group">
+                                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
+                                            <Input
+                                                type="date"
+                                                value={departureDate}
+                                                onChange={(e) => setDepartureDate(e.target.value)}
+                                                className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Giờ đi</label>
+                                        <div className="relative group">
+                                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
+                                            <Input
+                                                type="time"
+                                                value={departureTime}
+                                                onChange={(e) => setDepartureTime(e.target.value)}
+                                                className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="lg:col-span-3 space-y-2">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Đến (Điểm trả)</label>
-                                <div className="relative group">
-                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
-                                    <Input
-                                        value={to}
-                                        onChange={(e) => setTo(e.target.value)}
-                                        placeholder="Tỉnh, thành phố, bến xe..."
-                                        className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
-                                    />
+                                {/* Return Leg (Optional) */}
+                                {isRoundTrip && (
+                                    <div className="lg:col-span-5 grid grid-cols-2 gap-4 animate-in slide-in-from-left-4 duration-500">
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1 text-orange-500">Ngày về</label>
+                                            <div className="relative group">
+                                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-orange-500" />
+                                                <Input
+                                                    type="date"
+                                                    value={returnDate}
+                                                    onChange={(e) => setReturnDate(e.target.value)}
+                                                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
+                                                    min={departureDate}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1 text-orange-500">Giờ về</label>
+                                            <div className="relative group">
+                                                <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-orange-500" />
+                                                <Input
+                                                    type="time"
+                                                    value={returnTime}
+                                                    onChange={(e) => setReturnTime(e.target.value)}
+                                                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Search Button */}
+                                <div className="lg:col-span-2">
+                                    <Button
+                                        onClick={handleSearch}
+                                        className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black text-lg rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                    >
+                                        <Search className="h-6 w-6" />
+                                        <span>Tìm kiếm</span>
+                                    </Button>
                                 </div>
-                            </div>
-
-                            <div className="lg:col-span-2 space-y-2">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Ngày đi</label>
-                                <div className="relative group">
-                                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-blue-500" />
-                                    <Input
-                                        type="text"
-                                        placeholder="27 Th02"
-                                        className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-600 font-bold"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="lg:col-span-1 space-y-2">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Giờ</label>
-                                <div className="relative group">
-                                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-blue-500" />
-                                    <select className="pl-9 h-14 w-full bg-gray-50 border-gray-100 rounded-2xl focus:ring-blue-600 font-bold text-xs appearance-none cursor-pointer">
-                                        <option>08:00</option>
-                                        <option>12:00</option>
-                                        <option>18:00</option>
-                                        <option>22:00</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="lg:col-span-1">
-                                <Button onClick={handleSearch} className="w-full h-14 bg-orange-500 hover:bg-orange-600 text-white font-black text-lg rounded-2xl shadow-xl shadow-orange-100 transition-all active:scale-[0.98]">
-                                    <Search className="h-5 w-5" />
-                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -209,7 +318,7 @@ export const VehicleLanding = () => {
                                         <div className="p-8 flex-1 flex items-center justify-between gap-8 px-12">
                                             <div className="text-left w-24">
                                                 <p className="text-2xl font-black text-gray-900">{vehicle.departure_time || vehicle.attribute?.departureTime || '08:00'}</p>
-                                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-1 line-clamp-1">{vehicle.attribute?.departurePoint || from || 'Hà Nội'}</p>
+                                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-tighter mt-1 line-clamp-1">{vehicle.attribute?.departurePoint || 'Hà Nội'}</p>
                                             </div>
 
                                             <div className="flex-1 flex flex-col items-center gap-2 relative">

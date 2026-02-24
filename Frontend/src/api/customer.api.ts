@@ -14,8 +14,18 @@ interface ServiceListParams {
   q?: string;
   type?: string;
   city?: string;
+  provinceId?: string;
+  districtId?: string;
+  wardId?: string;
+  arrivalProvinceId?: string; // For vehicle routes
   minPrice?: number;
   maxPrice?: number;
+  date?: string;
+  checkIn?: string;
+  checkOut?: string;
+  departureDate?: string;
+  returnDate?: string;
+  guestCount?: number | string;
 }
 
 interface OrderListParams extends ListParams {
@@ -24,16 +34,10 @@ interface OrderListParams extends ListParams {
 
 interface BackendHomeData {
   categories: { id: string; name: string; icon: string; count: number }[];
-  featuredServices: {
-    id: string;
-    name: string;
-    price: number;
-    originalPrice: number | null;
-    city: string;
-    thumbnail: string;
-    rating: number;
-    type: string;
-  }[];
+  topTours: any[];
+  topAccommodations: any[];
+  topVehicles: any[];
+  topTickets: any[];
   popularDestinations: {
     id: string;
     name: string;
@@ -47,43 +51,46 @@ export const customerApi = {
   async getHome(): Promise<HomePageData> {
     const data = await httpClient.get<BackendHomeData>('/customer/home');
 
+    const mapBackendServiceToService = (s: any): any => ({
+      id: s.id,
+      providerId: '',
+      providerName: '',
+      name: s.name,
+      slug: s.id,
+      type: s.type,
+      description: '',
+      shortDescription: '',
+      images: [],
+      thumbnail: s.thumbnail,
+      location: s.city,
+      city: s.city,
+      address: '',
+      duration: undefined,
+      price: s.price,
+      originalPrice: undefined,
+      currency: 'VND',
+      rating: s.rating,
+      reviewCount: 0,
+      maxGuests: undefined,
+      amenities: [],
+      highlights: [],
+      inclusions: [],
+      exclusions: [],
+      cancellationPolicy: '',
+      status: 'published',
+      featured: true,
+      createdAt: '',
+      updatedAt: '',
+    });
+
     return {
-      // Hiện UI home dùng hero section tĩnh, nên cho mảng rỗng là được
       heroBanners: [],
       categories: data.categories,
-      // Ở đây chỉ dùng cho card hiển thị nên không cần đủ thông tin Service chi tiết
-      featuredServices: data.featuredServices.map((s) => ({
-        id: s.id,
-        providerId: '',
-        providerName: '',
-        name: s.name,
-        slug: s.id,
-        type: 'experience',
-        description: '',
-        shortDescription: '',
-        images: [],
-        thumbnail: s.thumbnail,
-        location: s.city,
-        city: s.city,
-        address: '',
-        duration: undefined,
-        price: s.price,
-        originalPrice: s.originalPrice ?? undefined,
-        currency: 'VND',
-        rating: s.rating,
-        reviewCount: 0,
-        maxGuests: undefined,
-        amenities: [],
-        highlights: [],
-        inclusions: [],
-        exclusions: [],
-        cancellationPolicy: '',
-        status: 'published',
-        featured: true,
-        createdAt: '',
-        updatedAt: '',
-      })),
-      // Chưa dùng trên UI nên để rỗng
+      featuredServices: [], // No longer used as primary
+      topTours: data.topTours?.map(mapBackendServiceToService) || [],
+      topAccommodations: data.topAccommodations?.map(mapBackendServiceToService) || [],
+      topVehicles: data.topVehicles?.map(mapBackendServiceToService) || [],
+      topTickets: data.topTickets?.map(mapBackendServiceToService) || [],
       topRatedServices: [],
       featuredVouchers: [],
       popularDestinations: data.popularDestinations.map((d) => ({
@@ -101,8 +108,18 @@ export const customerApi = {
     if (params.q) searchParams.set('q', params.q);
     if (params.type) searchParams.set('type', params.type);
     if (params.city) searchParams.set('city', params.city);
+    if (params.provinceId) searchParams.set('provinceId', params.provinceId);
+    if (params.districtId) searchParams.set('districtId', params.districtId);
+    if (params.wardId) searchParams.set('wardId', params.wardId);
+    if (params.arrivalProvinceId) searchParams.set('arrivalProvinceId', params.arrivalProvinceId);
     if (params.minPrice != null) searchParams.set('minPrice', String(params.minPrice));
     if (params.maxPrice != null) searchParams.set('maxPrice', String(params.maxPrice));
+    if (params.date) searchParams.set('date', params.date);
+    if (params.checkIn) searchParams.set('checkIn', params.checkIn);
+    if (params.checkOut) searchParams.set('checkOut', params.checkOut);
+    if (params.departureDate) searchParams.set('departureDate', params.departureDate);
+    if (params.returnDate) searchParams.set('returnDate', params.returnDate);
+    if (params.guestCount) searchParams.set('guestCount', String(params.guestCount));
 
     const query = searchParams.toString();
     const items = await httpClient.get<any[]>(`/customer/services${query ? `?${query}` : ''}`);
