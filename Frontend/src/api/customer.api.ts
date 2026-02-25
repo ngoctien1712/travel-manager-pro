@@ -131,47 +131,14 @@ export const customerApi = {
     return httpClient.get<any>(`/customer/services/${id}`);
   },
 
-  // ---- Cart ----
-  async getCart(): Promise<Cart> {
-    const res = await httpClient.get<{ items: any[] }>('/customer/cart');
-
-    const items: CartItem[] = res.items.map((row) => ({
-      id: row.id_cart_item,
-      serviceId: row.id_item,
-      serviceName: row.title ?? 'Dịch vụ',
-      serviceThumbnail: '',
-      serviceType: 'experience',
-      price: Number(row.price ?? row.base_price ?? 0),
-      quantity: row.quantity ?? 1,
-      travelDate: '',
-      guestCount: 1,
-    }));
-
-    const subtotal = items.reduce((sum, it) => sum + it.price * it.quantity, 0);
-
-    return {
-      items,
-      subtotal,
-      discount: 0,
-      voucherCode: undefined,
-      total: subtotal,
-    };
-  },
-
-  // Theo cách dùng ở UI: customerApi.addToCart(serviceId, quantity, price)
-  async addToCart(id_item: string, quantity: number = 1, price?: number, attribute?: unknown): Promise<void> {
-    await httpClient.post('/customer/cart', {
-      id_item,
-      quantity,
-      price,
-      attribute,
-    });
-  },
-
-  async removeCartItem(id: string): Promise<Cart> {
-    await httpClient.delete(`/customer/cart/${id}`);
-    // Trả lại cart mới để Cart page cập nhật
-    return this.getCart();
+  // ---- Booking ----
+  async createBooking(payload: {
+    id_item: string;
+    item_type: string;
+    payment_method: string;
+    details: any;
+  }): Promise<{ success: boolean; id_order: string; order_code: string; total_amount: number }> {
+    return httpClient.post('/customer/bookings', payload);
   },
 
   // ---- Orders & Payments ----
@@ -213,6 +180,10 @@ export const customerApi = {
 
   async createPayment(id_order: string, method: string): Promise<void> {
     await httpClient.post('/customer/payments', { id_order, method });
+  },
+
+  async initMomoPayment(id_order: string): Promise<{ payUrl: string }> {
+    return httpClient.post('/customer/payments/momo', { id_order });
   },
 
   // ---- Trip planner ----

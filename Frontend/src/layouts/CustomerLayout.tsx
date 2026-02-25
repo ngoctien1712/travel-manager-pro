@@ -5,7 +5,6 @@ import {
   Map,
   Menu,
   X,
-  ShoppingCart,
   User,
   LogOut,
   Package,
@@ -75,18 +74,6 @@ export const CustomerLayout = () => {
 
           {/* Right side actions */}
           <div className="flex items-center gap-2">
-            {/* Cart */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/cart')}
-              className="relative text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                0
-              </span>
-            </Button>
 
             {isAuthenticated ? (
               <DropdownMenu>

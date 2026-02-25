@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import ErrorState from '@/components/ErrorState';
 import { customerApi } from '@/api/customer.api';
+import { httpClient } from '@/api/http';
 
 export default function OrderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,25 +17,38 @@ export default function OrderDetail() {
   const [refundData, setRefundData] = useState({ amount: '', reason: '' });
 
   useEffect(() => {
-    const fetchOrder = async () => {
+    const fetchOrder = async (showLoading = true) => {
       try {
-        setLoading(true);
+        if (showLoading) setLoading(true);
         const data = await customerApi.getMyOrder(id!);
         setOrder(data);
-        setRefundData({ 
-          amount: (data?.total_amount ?? data?.totalAmount ?? 0).toString(), 
-          reason: '' 
+        setRefundData({
+          amount: (data?.total_amount ?? data?.totalAmount ?? 0).toString(),
+          reason: ''
         });
         setError(null);
       } catch (err) {
         setError('Không tìm thấy đơn hàng');
         console.error(err);
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     };
+
     if (id) fetchOrder();
-  }, [id]);
+
+    // Polling if pending
+    let interval: any;
+    if (id && order?.status === 'pending') {
+      interval = setInterval(() => {
+        fetchOrder(false); // background refresh
+      }, 5000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [id, order?.status]);
 
   const handleCancelOrder = async () => {
     if (!confirm('Xác nhận hủy đơn hàng này?')) return;
@@ -59,6 +73,36 @@ export default function OrderDetail() {
       setShowRefundForm(false);
     } catch (error) {
       alert('Lỗi khi gửi yêu cầu hoàn tiền');
+    }
+  };
+  const handleMomoPayment = async () => {
+    try {
+      setLoading(true);
+      const res = await customerApi.initMomoPayment(id!);
+      if (res.payUrl) {
+        window.location.href = res.payUrl;
+      }
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Lỗi khi thanh toán qua Momo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateSuccess = async () => {
+    try {
+      setLoading(true);
+      await httpClient.post('/customer/webhook/project', {
+        order_code: order.order_code,
+        amount: order.total_amount,
+        transaction_id: 'TRANS_' + Math.random().toString(36).substring(7).toUpperCase()
+      });
+      alert('Demo Thành Công: Hệ thống đã nhận được tiền và xác nhận đơn hàng!');
+      window.location.reload();
+    } catch (err) {
+      alert('Lỗi giả lập');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,42 +149,158 @@ export default function OrderDetail() {
             <div className="border-t border-b py-6 mb-6">
               <h2 className="font-bold mb-4">Chi tiết dịch vụ</h2>
               <div className="space-y-4">
-                {order.items && order.items.length > 0 ? (
-                  order.items.map((item: any, idx: number) => (
-                    <div key={idx} className="flex justify-between">
-                      <div>
-                        <p className="font-semibold">{item.title || `Dịch vụ ${idx + 1}`}</p>
-                        <p className="text-sm text-gray-600">
-                          {item.quantity || 1} × {((item.price || 0)).toLocaleString()}đ
-                        </p>
+                {order.details ? (
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-lg">{order.details.title || 'Dịch vụ đã đặt'}</p>
+                      <div className="text-sm text-gray-600 mt-2 space-y-1">
+                        {order.order_type === 'tour' && (
+                          <>
+                            <p>Ngày khởi hành: {new Date(order.details.booking_date).toLocaleDateString('vi-VN')}</p>
+                            <p>Số lượng: {order.details.quantity} khách</p>
+                          </>
+                        )}
+                        {order.order_type === 'accommodation' && (
+                          <>
+                            <p>Phòng: {order.details.name_room}</p>
+                            <p>Thời gian: {new Date(order.details.start_date).toLocaleDateString('vi-VN')} - {new Date(order.details.end_date).toLocaleDateString('vi-VN')}</p>
+                            <p>Số lượng: {order.details.quantity} phòng</p>
+                          </>
+                        )}
+                        {order.order_type === 'vehicle' && (
+                          <>
+                            <p>Chuyến: {order.details.code_vehicle}</p>
+                            <p>Vị trí ghế: {order.details.code_position}</p>
+                            <p>Thời gian: {order.details.from}</p>
+                          </>
+                        )}
+                        {order.order_type === 'ticket' && (
+                          <>
+                            <p>Ngày tham quan: {new Date(order.details.visit_date).toLocaleDateString('vi-VN')}</p>
+                            <p>Số lượng: {order.details.quantity} vé</p>
+                          </>
+                        )}
                       </div>
-                      <span className="font-semibold">
-                        {((item.price || 0) * (item.quantity || 1)).toLocaleString()}đ
-                      </span>
                     </div>
-                  ))
+                    <span className="font-black text-xl text-blue-600">
+                      {order.total_amount?.toLocaleString() || 0}đ
+                    </span>
+                  </div>
                 ) : (
-                  <p className="text-gray-600">Không có thông tin dịch vụ</p>
+                  <p className="text-gray-600">Đang tải chi tiết...</p>
                 )}
               </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded mb-6">
-              <h2 className="font-bold mb-3">Thông tin thanh toán</h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Tạm tính:</span>
-                  <span>{order.total_amount?.toLocaleString() || 0}đ</span>
+            {order.status === 'confirmed' && (
+              <div className="bg-emerald-50 border-2 border-dashed border-emerald-200 rounded-[2rem] p-8 mb-6 text-center animate-in fade-in zoom-in duration-500">
+                <div className="w-20 h-20 bg-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
+                  </svg>
                 </div>
-                {order.payments && order.payments.length > 0 && (
-                  <div className="flex justify-between">
-                    <span>Trạng thái thanh toán:</span>
-                    <span className="font-semibold">{order.payments[0].status}</span>
+                <h3 className="text-2xl font-black text-emerald-900 mb-2 uppercase tracking-tighter">Thanh toán thành công!</h3>
+                <p className="text-emerald-700 font-medium mb-6">
+                  Cảm ơn bạn! Giao dịch đã được hệ thống xác nhận tự động. <br />
+                  Thông tin dịch vụ đã sẵn sàng để bạn trải nghiệm.
+                </p>
+                <div className="flex flex-wrap justify-center gap-4">
+                  <Button
+                    onClick={() => navigate('/my-orders')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8 font-bold"
+                  >
+                    XEM DANH SÁCH ĐƠN HÀNG
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.print()}
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-100/50 rounded-xl px-8 font-bold"
+                  >
+                    IN HÓA ĐƠN
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {(order.status === 'pending' && (order.payment_method === 'momo' || order.payment_method === 'bank')) && (
+              <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-[2rem] p-8 mb-6">
+                <div className="flex flex-col md:flex-row gap-8 items-center">
+                  {/* QR Code Section */}
+                  <div className="bg-white p-4 rounded-3xl shadow-xl shadow-blue-100/50 flex flex-col items-center gap-3 shrink-0">
+                    <img
+                      src={`https://img.vietqr.io/image/MB-0383227692-compact2.png?amount=${order.total_amount ? Math.floor(order.total_amount) : 0}&addInfo=${order.order_code}&accountName=HUYNH%20NGOC%20TIEN`}
+                      alt="MBBank QR Code"
+                      className="w-48 h-48 object-contain"
+                    />
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Quét để thanh toán</p>
                   </div>
-                )}
-                <div className="border-t pt-2 flex justify-between font-bold">
-                  <span>Tổng cộng:</span>
-                  <span className="text-blue-600">{order.total_amount?.toLocaleString() || 0}đ</span>
+
+                  {/* Instructions Section */}
+                  <div className="flex-1">
+                    <h3 className="font-black text-blue-900 mb-4 flex items-center gap-2 uppercase tracking-[0.2em] text-xs">
+                      <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" /> Hướng dẫn chuyển khoản QR
+                    </h3>
+                    <div className="space-y-4 text-sm text-blue-800 font-medium">
+                      <div className="p-4 rounded-2xl bg-white/50 border border-blue-100">
+                        <p className="text-[10px] text-blue-400 uppercase font-black mb-1">Ngân hàng / Số tài khoản</p>
+                        <p className="font-black text-lg">MBBank - 0383227692</p>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">Chủ TK: HUYNH NGOC TIEN</p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white/50 border border-blue-100">
+                        <p className="text-[10px] text-blue-400 uppercase font-black mb-1">Nội dung chuyển khoản</p>
+                        <p className="font-black text-lg text-blue-600">{order.order_code}</p>
+                      </div>
+                      <div className="pt-4">
+                        <Button
+                          onClick={handleMomoPayment}
+                          className="w-full h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-sm shadow-lg shadow-blue-100/50 flex items-center justify-center gap-2 group transition-all"
+                        >
+                          MỞ APP NGÂN HÀNG ĐỂ QUÉT MÃ
+                          <div className="w-6 h-6 bg-white rounded-lg flex items-center justify-center">
+                            <img src="https://vietqr.net/portal-v2/images/img/logo-vietqr.png" className="w-8 h-4 object-contain" alt="vietqr" />
+                          </div>
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-blue-500 italic leading-relaxed">
+                        * Mở app MBBank hoặc bất kỳ ứng dụng Ngân hàng nào, chọn quét mã QR để thanh toán nhanh.
+                        Tiền sẽ được cộng trực tiếp vào dịch vụ sau khi giao dịch thành công.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Demo Zone */}
+                <div className="mt-8 pt-6 border-t border-blue-100 flex flex-col items-center gap-2">
+                  <p className="text-[9px] font-black text-blue-300 uppercase tracking-widest">Khu vực Demo (Dành cho đồ án)</p>
+                  <Button
+                    variant="outline"
+                    onClick={handleSimulateSuccess}
+                    className="text-[10px] font-black uppercase text-blue-400 hover:text-blue-600 border-blue-100 rounded-full h-8 px-6 bg-transparent"
+                  >
+                    Mô phỏng: Server nhận được tiền từ Momo
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-gray-50 p-6 rounded-2xl mb-6">
+              <h2 className="font-bold mb-4">Thông tin thanh toán</h2>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Phương thức:</span>
+                  <span className="font-bold uppercase">{order.payment_method || 'momo'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Trạng thái:</span>
+                  <span className={`font-bold ${order.payments?.[0]?.status === 'paid' ? 'text-emerald-600' : 'text-yellow-600'}`}>
+                    {order.payments?.[0]?.status || 'Chưa thanh toán'}
+                  </span>
+                </div>
+                <div className="border-t border-gray-200 my-3 pt-3 flex justify-between font-black text-lg">
+                  <span>Tổng tiền thanh toán:</span>
+                  <span className="text-blue-600">
+                    {order.total_amount ? Number(order.total_amount).toLocaleString('vi-VN') : 0}đ
+                  </span>
                 </div>
               </div>
             </div>
@@ -149,14 +309,14 @@ export default function OrderDetail() {
           {/* Actions */}
           <div className="flex gap-2">
             {order.status === 'pending' && (
-              <Button 
+              <Button
                 variant="destructive"
                 onClick={handleCancelOrder}
               >
                 Hủy đơn hàng
               </Button>
             )}
-            <Button 
+            <Button
               onClick={() => setShowRefundForm(!showRefundForm)}
             >
               {showRefundForm ? 'Hủy' : 'Yêu cầu hoàn tiền'}
@@ -175,7 +335,7 @@ export default function OrderDetail() {
                   <Input
                     type="number"
                     value={refundData.amount}
-                    onChange={(e) => setRefundData({...refundData, amount: e.target.value})}
+                    onChange={(e) => setRefundData({ ...refundData, amount: e.target.value })}
                     placeholder="Nhập số tiền"
                   />
                 </div>
@@ -183,7 +343,7 @@ export default function OrderDetail() {
                   <label className="block text-sm font-semibold mb-1">Lý do hoàn tiền</label>
                   <textarea
                     value={refundData.reason}
-                    onChange={(e) => setRefundData({...refundData, reason: e.target.value})}
+                    onChange={(e) => setRefundData({ ...refundData, reason: e.target.value })}
                     placeholder="Nhập lý do..."
                     className="w-full p-2 border rounded text-sm"
                     rows={4}

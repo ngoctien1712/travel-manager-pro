@@ -156,50 +156,8 @@ export default function ServiceDetail() {
     if (id) fetchService();
   }, [id]);
 
-  const handleAddToCart = async () => {
-    if (!service) return;
-
-    // For vehicles, must select at least one seat
-    if (service.item_type === 'vehicle' && selectedSeats.length === 0) {
-      alert('Vui lòng chọn ít nhất một chỗ ngồi');
-      return;
-    }
-
-    try {
-      const finalPrice = service.item_type === 'vehicle'
-        ? selectedSeats.reduce((sum, seat) => sum + Number(seat.price || 0), 0)
-        : Number(service.price) * quantity;
-
-      const bookingAttribute = {
-        ...service.attribute,
-        selectedSeats: selectedSeats.map(s => s.code_position),
-        itemType: service.item_type
-      };
-
-      await customerApi.addToCart(service.id_item, quantity, finalPrice, bookingAttribute);
-      alert('Đã thêm vào giỏ hàng thành công!');
-      navigate('/cart');
-    } catch (error) {
-      alert('Lỗi khi thêm vào giỏ hàng');
-    }
-  };
-
-  const handleSeatToggle = (pos: any) => {
-    if (pos.is_booked) return;
-
-    const isSelected = selectedSeats.some(s => s.id_position === pos.id_position);
-    let newSelected;
-    if (isSelected) {
-      newSelected = selectedSeats.filter(s => s.id_position !== pos.id_position);
-    } else {
-      newSelected = [...selectedSeats, pos];
-    }
-
-    setSelectedSeats(newSelected);
-    // For vehicles, quantity is determined by number of seats
-    if (service?.item_type === 'vehicle') {
-      setQuantity(newSelected.length || 1);
-    }
+  const handleBookingRedirect = () => {
+    navigate(`/booking/${id}`);
   };
 
   if (error) return <ErrorState message={error} />;
@@ -553,7 +511,14 @@ export default function ServiceDetail() {
                             <p className="text-3xl font-black text-blue-600 tracking-tight">{room.price.toLocaleString()}đ</p>
                             <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">/ đêm / phòng</p>
                           </div>
-                          <Button onClick={handleAddToCart} className="rounded-xl h-12 px-8 bg-gray-900 hover:bg-black text-white font-bold">Đặt ngay</Button>
+                          <Button
+                            onClick={() => {
+                              document.getElementById('booking-card')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className="rounded-xl h-12 px-8 bg-gray-900 hover:bg-black text-white font-bold"
+                          >
+                            Chọn phòng
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -647,7 +612,9 @@ export default function ServiceDetail() {
                             <button
                               key={pos.id_position}
                               disabled={pos.is_booked}
-                              onClick={() => handleSeatToggle(pos)}
+                              onClick={() => {
+                                document.getElementById('booking-card')?.scrollIntoView({ behavior: 'smooth' });
+                              }}
                               className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all transform active:scale-95 ${pos.is_booked
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                                 : isSelected
@@ -730,84 +697,50 @@ export default function ServiceDetail() {
             <div className="sticky top-12 space-y-8">
 
               {/* Card đặt chỗ - Traveloka Style (White with heavy shadow) */}
-              <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
+              <div id="booking-card" className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
                 <div className="absolute top-0 right-0 p-6 flex flex-col gap-2 items-end">
                   <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">Xác nhận tức thì</Badge>
                 </div>
 
-                <div className="mb-10 text-center md:text-left">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Giá khởi điểm từ</p>
+                <div className="mb-8 text-center md:text-left">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Thông tin đặt chỗ</p>
                   <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-4xl font-black tracking-tighter text-gray-900">{service.price?.toLocaleString() || '0'}đ</span>
-                    <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">/ lượt khách</span>
+                    <span className="text-4xl font-black tracking-tighter text-gray-900">
+                      {service.item_type === 'vehicle'
+                        ? selectedSeats.reduce((sum, s) => sum + Number(s.price || 0), 0).toLocaleString()
+                        : (quantity * (service.price || 0)).toLocaleString()
+                      }đ
+                    </span>
+                    <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">tổng phí</span>
                   </div>
                 </div>
 
-                <div className="space-y-8">
-                  {service.item_type === 'vehicle' ? (
-                    <div className="space-y-4">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Ghế đã chọn ({selectedSeats.length})</label>
-                      <div className="p-6 rounded-[2rem] bg-blue-50/50 border-2 border-dashed border-blue-200 text-center min-h-[100px] flex items-center justify-center">
-                        {selectedSeats.length > 0 ? (
-                          <div className="flex flex-wrap justify-center gap-2">
-                            {selectedSeats.map(s => (
-                              <Badge key={s.id_position} className="bg-blue-600 text-white border-none py-1.5 px-3 rounded-xl font-black text-[10px] shadow-lg shadow-blue-100">
-                                {s.code_position}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs font-bold text-blue-400 italic">Vui lòng nhấp chọn ghế ở sơ đồ bên trái</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest px-1">Chọn số lượng hành khách</label>
-                      <div className="flex items-center gap-4 bg-[#F8FAFC] p-3 rounded-2xl border-2 border-transparent focus-within:border-blue-500 focus-within:bg-white transition-all shadow-inner">
-                        <button
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          className="w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center text-xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-95"
-                        >
-                          -
-                        </button>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={quantity}
-                          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-                          className="flex-1 text-center bg-transparent border-none font-black text-3xl focus-visible:ring-0 shadow-none pointer-events-none"
-                        />
-                        <button
-                          onClick={() => setQuantity(quantity + 1)}
-                          className="w-12 h-12 rounded-xl bg-white shadow-md border border-gray-100 flex items-center justify-center text-xl font-black hover:bg-gray-900 hover:text-white transition-all active:scale-95"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between items-center py-8 border-y border-gray-50">
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tổng thanh toán</span>
-                    <div className="text-right">
-                      <span className="text-3xl font-black text-blue-600 tracking-tighter">
-                        {service.item_type === 'vehicle'
-                          ? selectedSeats.reduce((sum, s) => sum + Number(s.price || 0), 0).toLocaleString()
-                          : (quantity * (service.price || 0)).toLocaleString()
-                        }đ
-                      </span>
-                      <p className="text-[9px] text-emerald-500 font-bold uppercase mt-1">Đã bao gồm thuế & phí</p>
+                <div className="space-y-6">
+                  <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái dịch vụ</p>
+                    <div className="flex items-center gap-2 text-emerald-600 font-bold">
+                      <CheckCircle2 size={16} /> <span>Còn chỗ trống</span>
                     </div>
                   </div>
 
-                  <Button
-                    onClick={handleAddToCart}
-                    className="w-full h-18 rounded-[2rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-xl tracking-tighter shadow-2xl shadow-blue-200 transition-all border-none group relative overflow-hidden h-16 active:scale-95"
-                  >
-                    <span className="relative z-10">Tiếp tục đặt chỗ</span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                  </Button>
+                  <div className="pt-6">
+                    <Button
+                      onClick={handleBookingRedirect}
+                      className="w-full h-16 rounded-[1.5rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-[0.98]"
+                    >
+                      ĐẶT CHỖ NGAY
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-3">
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigate('/my-orders')}
+                      className="text-gray-400 hover:text-blue-600 font-bold text-xs uppercase tracking-widest h-auto p-2"
+                    >
+                      Lịch sử đặt chỗ của tôi
+                    </Button>
+                  </div>
                 </div>
               </div>
 

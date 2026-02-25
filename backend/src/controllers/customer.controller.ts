@@ -1,5 +1,18 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
+import { MomoService } from '../services/momo.service.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const momoService = new MomoService({
+  partnerCode: process.env.MOMO_PARTNER_CODE || '',
+  accessKey: process.env.MOMO_ACCESS_KEY || '',
+  secretKey: process.env.MOMO_SECRET_KEY || '',
+  apiUrl: process.env.MOMO_API_URL || '',
+  redirectUrl: process.env.MOMO_REDIRECT_URL || '',
+  ipnUrl: process.env.MOMO_IPN_URL || ''
+});
 
 const toIso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
@@ -365,81 +378,92 @@ export const getService = async (req: Request, res: Response) => {
   }
 };
 
-export const addToCart = async (req: Request, res: Response) => {
+export const createBooking = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
-    const { id_item, quantity, price, attribute } = req.body;
-    // ensure cart
-    const cartRes = await query(`SELECT id_cart FROM cart WHERE id_user = $1 LIMIT 1`, [userId]);
-    let idCart = cartRes.rows[0]?.id_cart;
-    if (!idCart) {
-      const insert = await query(`INSERT INTO cart (id_user) VALUES ($1) RETURNING id_cart`, [userId]);
-      idCart = insert.rows[0].id_cart;
+
+    const { id_item, item_type, payment_method, details } = req.body;
+
+    if (!id_item || !item_type) {
+      return res.status(400).json({ message: 'Thiếu thông tin dịch vụ' });
     }
-    const insertItem = await query(`INSERT INTO cart_item (id_cart, id_item, quantity, price, attribute) VALUES ($1,$2,$3,$4,$5) RETURNING *`, [idCart, id_item, quantity || 1, price || null, attribute || null]);
-    res.json(insertItem.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi khi thêm vào giỏ' });
-  }
-};
 
-export const getCart = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
-    const cartRes = await query(`SELECT id_cart FROM cart WHERE id_user = $1 LIMIT 1`, [userId]);
-    const idCart = cartRes.rows[0]?.id_cart;
-    if (!idCart) return res.json({ items: [] });
-    const items = await query(`SELECT ci.*, bi.title, bi.price as base_price FROM cart_item ci LEFT JOIN bookable_items bi ON bi.id_item = ci.id_item WHERE ci.id_cart = $1`, [idCart]);
-    res.json({ items: items.rows });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi khi lấy giỏ hàng' });
-  }
-};
+    // 1. Fetch base price from bookable_items
+    const itemQuery = await query('SELECT price FROM bookable_items WHERE id_item = $1', [id_item]);
+    if (!itemQuery.rows[0]) {
+      return res.status(404).json({ message: 'Dịch vụ không tồn tại' });
+    }
+    const price = Number(itemQuery.rows[0].price || 0);
+    let totalAmount = 0;
+    const orderCode = `ORD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
-export const removeCartItem = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params; // cart_item id
-    await query(`DELETE FROM cart_item WHERE id_cart_item = $1`, [id]);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi khi xóa item khỏi giỏ' });
-  }
-};
-
-export const createOrder = async (req: Request, res: Response) => {
-  try {
-    const userId = req.user?.userId;
-    if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
-    const { payment_method } = req.body;
-    // get cart
-    const cartRes = await query(`SELECT id_cart FROM cart WHERE id_user = $1 LIMIT 1`, [userId]);
-    const idCart = cartRes.rows[0]?.id_cart;
-    if (!idCart) return res.status(400).json({ message: 'Giỏ hàng trống' });
-    const itemsRes = await query(`SELECT ci.*, bi.title FROM cart_item ci LEFT JOIN bookable_items bi ON bi.id_item = ci.id_item WHERE ci.id_cart = $1`, [idCart]);
-    const items = itemsRes.rows;
-    const total = items.reduce((s: number, it: any) => s + (Number(it.price || it.base_price || 0) * (it.quantity || 1)), 0);
     const orderInsert = await query(
-      `INSERT INTO "order" (status, order_code, total_amount, currency, order_type, id_user) VALUES ($1, concat('ORD-', substring(uuid_generate_v4()::text,1,8)), $2, $3, $4, $5) RETURNING id_order`,
-      ['pending', total, 'VND', 'service', userId]
+      `INSERT INTO "order" (status, order_code, total_amount, currency, order_type, id_user, payment_method) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_order`,
+      ['pending', orderCode, 0, 'VND', item_type, userId, payment_method]
     );
     const idOrder = orderInsert.rows[0].id_order;
-    // insert order items
-    for (const it of items) {
-      await query(`INSERT INTO order_tour_detail (id_item, id_order, quantity, price) VALUES ($1,$2,$3,$4)`, [it.id_item, idOrder, it.quantity || 1, it.price || it.base_price || 0]);
+
+    if (item_type === 'tour') {
+      const { quantity, booking_date, guest_info } = details;
+      totalAmount = price * (quantity || 1);
+
+      await query(
+        `INSERT INTO order_tour_detail (id_item, id_order, quantity, price, guest_info, booking_date) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id_item, idOrder, quantity || 1, price, JSON.stringify(guest_info), booking_date]
+      );
+    } else if (item_type === 'accommodation') {
+      const { id_room, start_date, end_date, quantity, guest_info } = details;
+
+      const days = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24));
+      totalAmount = price * (quantity || 1) * (days || 1);
+
+      await query(
+        `INSERT INTO order_accommodations_detail (id_order, id_room, start_date, end_date, quantity, price) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [idOrder, id_room, start_date, end_date, quantity || 1, price]
+      );
+    } else if (item_type === 'vehicle') {
+      const { id_position, from, to } = details;
+      totalAmount = price * (details.quantity || 1);
+
+      await query(
+        `INSERT INTO order_pos_vehicle_detail (id_order, id_position, "from", "to", price) 
+         VALUES ($1, $2, $3, $4, $5)`,
+        [idOrder, id_position, from, to, price]
+      );
+    } else if (item_type === 'ticket') {
+      const { visit_date, quantity, guest_info } = details;
+      totalAmount = price * (quantity || 1);
+
+      await query(
+        `INSERT INTO order_ticket_detail (id_order, id_item, visit_date, quantity, price, guest_info) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [idOrder, id_item, visit_date, quantity || 1, price, JSON.stringify(guest_info)]
+      );
     }
-    // create payment record (pending)
-    const pay = await query(`INSERT INTO payments (id_order, status, amount, method) VALUES ($1,$2,$3,$4) RETURNING id_pay`, [idOrder, 'pending', total, payment_method || 'unknown']);
-    // clear cart
-    await query(`DELETE FROM cart_item WHERE id_cart = $1`, [idCart]);
-    res.json({ id_order: idOrder, id_pay: pay.rows[0].id_pay, total });
+
+    // Update total amount
+    await query(`UPDATE "order" SET total_amount = $1 WHERE id_order = $2`, [totalAmount, idOrder]);
+
+    // Create payment record
+    const pay = await query(
+      `INSERT INTO payments (id_order, status, amount, method) VALUES ($1, $2, $3, $4) RETURNING id_pay`,
+      [idOrder, 'pending', totalAmount, payment_method || 'momo']
+    );
+
+    res.json({
+      success: true,
+      id_order: idOrder,
+      order_code: orderCode,
+      total_amount: totalAmount,
+      payment_method
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Lỗi khi tạo đơn hàng' });
+    res.status(500).json({ message: 'Lỗi khi đặt chỗ' });
   }
 };
 
@@ -447,7 +471,24 @@ export const listOrders = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
-    const orders = await query(`SELECT * FROM "order" WHERE id_user = $1 ORDER BY create_at DESC LIMIT 200`, [userId]);
+
+    const orders = await query(`
+      SELECT o.*, bi.title as service_name, bi.item_type
+      FROM "order" o
+      LEFT JOIN (
+        SELECT id_order, id_item FROM order_tour_detail
+        UNION ALL
+        SELECT id_order, id_item FROM order_ticket_detail
+        UNION ALL
+        SELECT id_order, r.id_item FROM order_accommodations_detail d JOIN accommodations_rooms r ON r.id_room = d.id_room
+        UNION ALL
+        SELECT id_order, v.id_item FROM order_pos_vehicle_detail d JOIN positions p ON p.id_position = d.id_position JOIN vehicle v ON v.id_vehicle = p.id_vehicle
+      ) od ON o.id_order = od.id_order
+      LEFT JOIN bookable_items bi ON bi.id_item = od.id_item
+      WHERE o.id_user = $1
+      ORDER BY o.create_at DESC
+    `, [userId]);
+
     res.json(orders.rows.map((o: any) => ({ ...o, create_at: toIso(o.create_at) })));
   } catch (err) {
     console.error(err);
@@ -458,16 +499,49 @@ export const listOrders = async (req: Request, res: Response) => {
 export const getOrder = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const order = await query(`SELECT * FROM "order" WHERE id_order = $1 LIMIT 1`, [id]);
-    if (!order.rows[0]) return res.status(404).json({ message: 'Không tìm thấy đơn' });
-    const items = await query(`SELECT * FROM order_tour_detail WHERE id_order = $1`, [id]);
+    const orderRes = await query(`SELECT * FROM "order" WHERE id_order = $1`, [id]);
+    if (orderRes.rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy đơn' });
+
+    const rawOrder = orderRes.rows[0];
+    const order = {
+      ...rawOrder,
+      total_amount: parseFloat(rawOrder.total_amount.toString())
+    };
+
+    let details: any = {};
+    if (order.order_type === 'tour') {
+      const res = await query(`SELECT d.*, bi.title FROM order_tour_detail d JOIN bookable_items bi ON bi.id_item = d.id_item WHERE d.id_order = $1`, [id]);
+      details = res.rows[0];
+    } else if (order.order_type === 'accommodation') {
+      const res = await query(`
+        SELECT d.*, r.name_room, bi.title 
+        FROM order_accommodations_detail d 
+        JOIN accommodations_rooms r ON r.id_room = d.id_room 
+        JOIN bookable_items bi ON bi.id_item = r.id_item
+        WHERE d.id_order = $1`, [id]);
+      details = res.rows[0];
+    } else if (order.order_type === 'vehicle') {
+      const res = await query(`
+        SELECT d.*, v.code_vehicle, p.code_position, bi.title 
+        FROM order_pos_vehicle_detail d 
+        JOIN positions p ON p.id_position = d.id_position 
+        JOIN vehicle v ON v.id_vehicle = p.id_vehicle
+        JOIN bookable_items bi ON bi.id_item = v.id_item
+        WHERE d.id_order = $1`, [id]);
+      details = res.rows[0];
+    } else if (order.order_type === 'ticket') {
+      const res = await query(`SELECT d.*, bi.title FROM order_ticket_detail d JOIN bookable_items bi ON bi.id_item = d.id_item WHERE d.id_order = $1`, [id]);
+      details = res.rows[0];
+    }
+
     const payments = await query(`SELECT * FROM payments WHERE id_order = $1`, [id]);
-    res.json({ order: order.rows[0], items: items.rows, payments: payments.rows });
+    res.json({ order, details, payments: payments.rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy chi tiết đơn' });
   }
 };
+
 
 export const cancelOrder = async (req: Request, res: Response) => {
   try {
@@ -507,6 +581,132 @@ export const createPayment = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi thực hiện thanh toán' });
+  }
+};
+
+export const initMomoPayment = async (req: Request, res: Response) => {
+  try {
+    const { id_order } = req.body;
+    const orderRes = await query(`SELECT * FROM "order" WHERE id_order = $1`, [id_order]);
+    if (!orderRes.rows[0]) return res.status(404).json({ message: 'Đơn hàng không tồn tại' });
+
+    const order = orderRes.rows[0];
+
+    const momoRes = await momoService.createPayment({
+      amount: order.total_amount.toString(),
+      orderId: order.order_code,
+      orderInfo: `Thanh toán đơn hàng ${order.order_code}`,
+      requestId: order.id_order,
+      extraData: ''
+    });
+
+    if (momoRes.resultCode === 0) {
+      res.json({ payUrl: momoRes.payUrl });
+    } else {
+      res.status(400).json({ message: momoRes.message || 'Lỗi khi tạo giao dịch Momo' });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi khi kết nối với Momo' });
+  }
+};
+
+export const handleMomoIPN = async (req: Request, res: Response) => {
+  try {
+    const params = req.body;
+    console.log('Momo IPN received:', params);
+
+    const isValid = momoService.verifySignature(params);
+    if (!isValid) {
+      console.error('Invalid Momo signature');
+      return res.status(400).send('Invalid Signature');
+    }
+
+    const { orderId, resultCode, transId, amount } = params;
+
+    if (resultCode === 0) {
+      // Payment success
+      const orderRes = await query(`SELECT id_order FROM "order" WHERE order_code = $1`, [orderId]);
+      if (orderRes.rows[0]) {
+        const idOrder = orderRes.rows[0].id_order;
+        await query(`UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`, [transId, idOrder]);
+        await query(`UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`, [idOrder]);
+      }
+    } else {
+      // Payment failed or cancelled
+      console.log(`Payment failed for order ${orderId} with code ${resultCode}`);
+    }
+
+    res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Internal Server Error');
+  }
+};
+
+/** 
+ * API dành riêng cho Đồ án: Nhận Webhook từ Sepay/Casso hoặc Trình giả lập
+ * Giúp tự động xác nhận đơn hàng khi nhận được tiền vào Momo cá nhân
+ */
+export const handleProjectWebhook = async (req: Request, res: Response) => {
+  try {
+    // Sepay gửi dữ liệu qua req.body. Dữ liệu mẫu: { content: 'ORD-ABC12345', transferAmount: 50000, id: 12345 }
+    // Nếu là nút Demo, ta gửi { order_code, amount, transaction_id }
+    const { content, transferAmount, id, order_code, amount, transaction_id } = req.body;
+
+    // Đồng bộ tên biến tài liệu Sepay và nút Demo
+    const finalContent = content || order_code;
+    const finalAmount = transferAmount || amount;
+    const finalTransId = id || transaction_id;
+
+    console.log(`[Webhook] Nhận thông báo giao dịch: ${finalTransId} - Nội dung: ${finalContent}`);
+
+    if (!finalContent) return res.status(400).json({ message: 'Nội dung chuyển khoản trống' });
+
+    // 1. Tìm mã đơn hàng từ nội dung (Xử lý cả trường hợp mất dấu gạch ngang)
+    const rawContent = String(finalContent).trim().toUpperCase();
+    const orderCodeMatch = rawContent.match(/ORD-?[A-Z0-9]+/i);
+    const codeToFind = orderCodeMatch ? orderCodeMatch[0] : rawContent;
+
+    // Loại bỏ dấu gạch ngang để so sánh chuẩn hơn
+    const cleanCode = codeToFind.replace(/-/g, '');
+
+    console.log(`[Webhook] Đang tìm đơn hàng khớp với mã "sạch": ${cleanCode}`);
+
+    // 2. Kiểm tra đơn hàng trong DB - Sử dụng REPLACE để bỏ dấu gạch ngang khi so sánh
+    const orderRes = await query(
+      `SELECT * FROM "order" WHERE REPLACE(order_code, '-', '') = $1 OR order_code = $1`,
+      [cleanCode]
+    );
+
+    if (orderRes.rows.length === 0) {
+      console.warn(`[Webhook] Không tìm thấy đơn hàng nào khớp với: ${cleanCode}`);
+      return res.status(404).json({ message: 'Không tìm thấy mã đơn hàng' });
+    }
+
+    const order = orderRes.rows[0];
+
+    // 3. Kiểm tra số tiền
+    if (Number(finalAmount) < Number(order.total_amount)) {
+      console.warn(`[Webhook] Đơn ${codeToFind} thanh toán thiếu tiền: ${finalAmount}/${order.total_amount}`);
+      return res.status(400).json({ message: 'Số tiền không đủ' });
+    }
+
+    // 4. Cập nhật trạng thái thành công
+    await query(
+      `UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`,
+      [finalTransId || 'DEMO_ID', order.id_order]
+    );
+    await query(
+      `UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`,
+      [order.id_order]
+    );
+
+    console.log(`[Webhook] Đơn hàng ${codeToFind} đã được xác nhận tự động!`);
+    res.json({ success: true, message: 'Xác nhận đơn hàng thành công' });
+  } catch (err) {
+    console.error('[Webhook Error]:', err);
+    res.status(500).json({ message: 'Lỗi xử lý Webhook' });
   }
 };
 
@@ -613,15 +813,15 @@ export const listTripPlans = async (req: Request, res: Response) => {
 export default {
   listServices,
   getService,
-  addToCart,
-  getCart,
-  removeCartItem,
-  createOrder,
+  createBooking,
   listOrders,
   getOrder,
   cancelOrder,
   requestRefund,
   createPayment,
+  initMomoPayment,
+  handleMomoIPN,
+  handleProjectWebhook,
   getHomeData,
   createTripPlan,
   listTripPlans,

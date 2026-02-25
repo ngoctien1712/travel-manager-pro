@@ -23,10 +23,9 @@ import HotelLanding from "@/pages/customer/HotelLanding";
 import VehicleLanding from "@/pages/customer/VehicleLanding";
 import ActivityLanding from "@/pages/customer/ActivityLanding";
 import ServiceDetail from "@/pages/customer/ServiceDetail";
-import Cart from "@/pages/customer/Cart";
-import Checkout from "@/pages/customer/Checkout";
 import MyOrders from "@/pages/customer/MyOrders";
 import OrderDetail from "@/pages/customer/OrderDetail";
+import BookingPage from "@/pages/customer/BookingPage";
 import TripPlanner from "@/pages/customer/TripPlanner";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminUsers from "@/pages/admin/Users";
@@ -64,22 +63,6 @@ const App = () => (
               <Route path="/services" element={<Navigate to="/" replace />} />
               <Route path="/services/:id" element={<ServiceDetail />} />
               <Route
-                path="/cart"
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <Cart />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/checkout"
-                element={
-                  <ProtectedRoute allowedRoles={['customer']}>
-                    <Checkout />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/my-orders"
                 element={
                   <ProtectedRoute allowedRoles={['customer']}>
@@ -92,6 +75,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={['customer']}>
                     <OrderDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/booking/:id"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <BookingPage />
                   </ProtectedRoute>
                 }
               />
