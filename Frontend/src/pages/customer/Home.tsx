@@ -301,6 +301,104 @@ export const Home = () => {
         </div>
       </section>
 
+      {/* Promotion Banners - New Section */}
+      <section className="container max-w-7xl py-12 px-4">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Khuyến mãi cực hot</h2>
+            <p className="text-gray-400 font-medium">Đừng bỏ lỡ những ưu đãi dành riêng cho bạn</p>
+          </div>
+          <Link to="/promotions" className="hidden md:flex items-center gap-2 text-blue-600 font-bold hover:underline">
+            Xem tất cả ưu đãi <ArrowRight size={16} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Card 1: Destinations */}
+          <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
+            <img src="https://images.unsplash.com/photo-1559592413-7ece35b49c2d?w=1000" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Đà Nẵng" />
+            <div className="absolute inset-0 bg-gradient-to-t from-blue-950 via-blue-900/20 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
+              <Badge className="bg-orange-500 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">Ưu đãi mùa hè</Badge>
+              <h3 className="text-3xl font-black mb-2 tracking-tighter leading-none">ĐÀ NẴNG <br /> RỰC RỠ</h3>
+              <p className="text-sm opacity-70 font-medium mb-8 max-w-[200px]">Giảm ngay 500k khi đặt combo vé máy bay & khách sạn 5 sao.</p>
+              <Button className="bg-white text-blue-900 hover:bg-blue-50 rounded-2xl h-12 px-8 font-black text-xs tracking-widest uppercase">Khám phá ngay</Button>
+            </div>
+          </div>
+
+          {/* Card 2: Activities */}
+          <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2 lg:mt-12">
+            <img src="https://images.unsplash.com/photo-1528127269322-539801943592?w=1000" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Hội An" />
+            <div className="absolute inset-0 bg-gradient-to-t from-orange-950 via-orange-900/20 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
+              <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">Trải nghiệm</Badge>
+              <h3 className="text-3xl font-black mb-2 tracking-tighter leading-none">HỘI AN <br /> HOÀI CỔ</h3>
+              <p className="text-sm opacity-70 font-medium mb-8 max-w-[200px]">Tour đi bộ phố cổ và thưởng thức ẩm thực địa phương chỉ từ 299k.</p>
+              <Button className="bg-white text-orange-900 hover:bg-orange-50 rounded-2xl h-12 px-8 font-black text-xs tracking-widest uppercase">Đặt vé ngay</Button>
+            </div>
+          </div>
+
+          {/* Card 3: New App Promo */}
+          <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-indigo-900" />
+            <div className="absolute inset-0 overflow-hidden opacity-20">
+              <div className="absolute top-[-100px] left-[-100px] w-64 h-64 rounded-full border-[20px] border-white" />
+              <div className="absolute bottom-[-100px] right-[-100px] w-96 h-96 rounded-full border-[40px] border-white/50" />
+            </div>
+            <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
+              <Sparkles className="text-yellow-400 mb-6 h-12 w-12" />
+              <h3 className="text-4xl font-black mb-4 tracking-tighter leading-tight uppercase">TẢI APP <br /> NHẬN QUÀ</h3>
+              <p className="text-lg opacity-80 font-medium mb-8">Quét mã QR để nhận ngay voucher giảm 20% cho lần đầu đặt chỗ trên ứng dụng.</p>
+
+              <div className="flex items-center gap-6">
+                <div className="bg-white p-2 rounded-2xl">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://vietravel.com/app" className="w-20 h-20" alt="QR Link" />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase tracking-widest">Available on</p>
+                  <div className="flex gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-black/20 backdrop-blur flex items-center justify-center"><Building2 size={16} /></div>
+                    <div className="w-8 h-8 rounded-lg bg-black/20 backdrop-blur flex items-center justify-center"><MapPin size={16} /></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Popular Destinations - New Section */}
+      <section className="container max-w-7xl py-12 px-4 shadow-sm bg-gray-50/50 rounded-[3rem] my-12">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Điểm đến phổ biến</h2>
+            <p className="text-gray-400 font-medium">Khám phá vẻ đẹp di sản Việt Nam tại những tọa độ đang "hot" nhất</p>
+          </div>
+          <Link to="/provinces" className="text-sm font-black text-blue-600 uppercase tracking-widest hover:underline">Khám phá bản đồ</Link>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+          {[
+            { name: "Đà Nẵng", img: "https://images.unsplash.com/photo-1559592413-7ece35b49c2d?w=400", count: "120+ chỗ ở" },
+            { name: "Hội An", img: "https://images.unsplash.com/photo-1528127269322-539801943592?w=400", count: "85+ hoạt động" },
+            { name: "Sapa", img: "https://images.unsplash.com/photo-1509030450996-939a2c47605e?w=400", count: "45+ tour" },
+            { name: "Phú Quốc", img: "https://images.unsplash.com/photo-1589394815804-964ed7be2eb5?w=400", count: "200+ ưu đãi" },
+            { name: "Đà Lạt", img: "https://images.unsplash.com/photo-1563810148560-60759086e102?w=400", count: "150+ homestay" },
+            { name: "Hạ Long", img: "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400", count: "30+ du thuyền" }
+          ].map((dest, i) => (
+            <Link key={i} to={`/hotels?q=${dest.name}`} className="group space-y-4">
+              <div className="aspect-[4/5] rounded-[2rem] overflow-hidden shadow-sm transition-all duration-700 group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-blue-100/50">
+                <img src={dest.img} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={dest.name} />
+              </div>
+              <div className="px-2 text-center md:text-left">
+                <h4 className="font-black text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{dest.name}</h4>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{dest.count}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* Main Content: Services List with Filters */}
       <section id="services-list" className="container max-w-7xl py-12 px-4">
         <div className="flex flex-col md:flex-row items-baseline justify-between mb-8 gap-4">

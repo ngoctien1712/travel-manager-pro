@@ -13,7 +13,7 @@ import {
     Loader2, Plus, Image as ImageIcon, ArrowLeft, Save, Trash2,
     MapPin, Calendar, Users, Info, Building2, Car, Ticket,
     ExternalLink, X, CheckCircle2, History, Settings, Armchair,
-    Clock, PlusCircle, Check, Text
+    Clock, PlusCircle, Check, Text, Sparkles, ShieldCheck
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -71,8 +71,8 @@ export const ServiceDetail = () => {
                 address: service.address || '',
                 ticketKind: service.ticketKind || '',
                 codeVehicle: service.codeVehicle || '',
-                maxGuest: service.maxGuest || '',
                 maxSlots: service.maxSlots || 0,
+                tourType: service.tourType || 'group',
                 hotelType: service.hotelType || 'Khách sạn',
                 starRating: service.starRating || 3,
                 checkinTime: service.checkinTime || '14:00',
@@ -526,8 +526,16 @@ export const ServiceDetail = () => {
                                         <CardHeader><CardTitle>Thông tin Tour bổ sung</CardTitle></CardHeader>
                                         <CardContent className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <Label>Kiểu Tour (VD: Daily, Private, Group)</Label>
-                                                <Input value={attribute.tourType || ''} onChange={(e) => setAttribute({ ...attribute, tourType: e.target.value })} />
+                                                <Label>Kiểu Tour</Label>
+                                                <select
+                                                    className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                                                    value={extraData.tourType || 'group'}
+                                                    onChange={(e) => setExtraData({ ...extraData, tourType: e.target.value })}
+                                                >
+                                                    <option value="daily">Daily (Lặp lại hàng ngày)</option>
+                                                    <option value="private">Private (Theo yêu cầu khách)</option>
+                                                    <option value="group">Group (Theo đoàn cố định)</option>
+                                                </select>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label>Tiêu chuẩn khách sạn (VD: 3 Sao, 4 Sao)</Label>
@@ -555,39 +563,87 @@ export const ServiceDetail = () => {
                                     </Card>
 
                                     <Card>
-                                        <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Lịch trình chi tiết (Timetable)</CardTitle></CardHeader>
+                                        <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Lịch trình chi tiết {extraData.tourType === 'daily' ? '(Chỉ 1 ngày cho tour Daily)' : ''}</CardTitle></CardHeader>
                                         <CardContent className="space-y-4">
-                                            {(attribute.itinerary || []).map((day: any, i: number) => (
-                                                <div key={i} className="border p-4 rounded-xl space-y-3 relative group bg-muted/5">
+                                            {(attribute.itinerary || []).map((it: any, i: number) => (
+                                                <div key={i} className="p-4 border rounded-xl bg-muted/20 space-y-3 relative group">
                                                     <div className="flex justify-between items-center">
-                                                        <Label className="font-bold text-primary">Ngày {day.day || i + 1}</Label>
-                                                        <Button size="icon" variant="ghost" onClick={() => removeArrayAttr('itinerary', i)}><Trash2 className="h-4 w-4 text-red-400" /></Button>
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge className="gradient-sunset">Ngày {it.day}</Badge>
+                                                            <Input
+                                                                className="font-bold border-none bg-transparent h-8 w-[300px]"
+                                                                value={it.title}
+                                                                onChange={(e) => {
+                                                                    const newIt = [...attribute.itinerary];
+                                                                    newIt[i].title = e.target.value;
+                                                                    setAttribute({ ...attribute, itinerary: newIt });
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {extraData.tourType !== 'daily' && (
+                                                            <Button size="icon" variant="ghost" className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => {
+                                                                const newIt = attribute.itinerary.filter((_: any, idx: number) => idx !== i);
+                                                                setAttribute({ ...attribute, itinerary: newIt });
+                                                            }}><X className="h-4 w-4" /></Button>
+                                                        )}
                                                     </div>
-                                                    <Input placeholder="Tiêu đề ngày (VD: Khám phá Vịnh Hạ Long)" value={day.title || ''} onChange={(e) => {
-                                                        const newArr = [...attribute.itinerary];
-                                                        newArr[i] = { ...day, title: e.target.value, day: i + 1 };
-                                                        setAttribute({ ...attribute, itinerary: newArr });
-                                                    }} />
                                                     <div className="space-y-2">
-                                                        <Label className="text-[10px] uppercase">Các hoạt động (mỗi dòng một hoạt động)</Label>
-                                                        <Textarea
-                                                            placeholder="Ăn sáng tại khách sạn&#10;Di chuyển ra bến tàu&#10;Tham quan hang Sửng Sốt"
-                                                            value={day.activities?.join('\n') || ''}
-                                                            onChange={(e) => {
-                                                                const newArr = [...attribute.itinerary];
-                                                                newArr[i] = { ...day, activities: e.target.value.split('\n').filter((a: string) => a.trim() !== '') };
-                                                                setAttribute({ ...attribute, itinerary: newArr });
+                                                        {(it.activities || []).map((act: string, j: number) => (
+                                                            <div key={j} className="flex gap-2">
+                                                                <Input
+                                                                    className="h-8 text-sm"
+                                                                    value={act}
+                                                                    onChange={(e) => {
+                                                                        const newIt = [...attribute.itinerary];
+                                                                        newIt[i].activities[j] = e.target.value;
+                                                                        setAttribute({ ...attribute, itinerary: newIt });
+                                                                    }}
+                                                                />
+                                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
+                                                                    const newIt = [...attribute.itinerary];
+                                                                    newIt[i].activities = newIt[i].activities.filter((_: any, idx: number) => idx !== j);
+                                                                    setAttribute({ ...attribute, itinerary: newIt });
+                                                                }}><X className="h-3 w-3" /></Button>
+                                                            </div>
+                                                        ))}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-8 text-[10px] uppercase font-black tracking-widest text-blue-600"
+                                                            onClick={() => {
+                                                                const newIt = [...attribute.itinerary];
+                                                                newIt[i].activities = [...(newIt[i].activities || []), ''];
+                                                                setAttribute({ ...attribute, itinerary: newIt });
                                                             }}
-                                                        />
+                                                        >
+                                                            + Thêm hoạt động
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <Button variant="outline" className="w-full border-dashed" onClick={() => {
-                                                const newArr = [...(attribute.itinerary || []), { day: (attribute.itinerary?.length || 0) + 1, title: '', activities: [] }];
-                                                setAttribute({ ...attribute, itinerary: newArr });
-                                            }}>
-                                                <PlusCircle className="h-4 w-4 mr-2" /> Thêm ngày lịch trình
-                                            </Button>
+                                            {extraData.tourType !== 'daily' && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full border-dashed"
+                                                    onClick={() => {
+                                                        const nextDay = (attribute.itinerary?.length || 0) + 1;
+                                                        setAttribute({ ...attribute, itinerary: [...(attribute.itinerary || []), { day: nextDay, title: 'Ngày mới', activities: [] }] });
+                                                    }}
+                                                >
+                                                    + Thêm ngày hành trình
+                                                </Button>
+                                            )}
+                                            {extraData.tourType === 'daily' && (attribute.itinerary?.length || 0) === 0 && (
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full border-dashed"
+                                                    onClick={() => {
+                                                        setAttribute({ ...attribute, itinerary: [{ day: 1, title: 'Lịch trình hàng ngày', activities: [] }] });
+                                                    }}
+                                                >
+                                                    + Thiết lập lịch trình Daily
+                                                </Button>
+                                            )}
                                         </CardContent>
                                     </Card>
 
@@ -727,6 +783,45 @@ export const ServiceDetail = () => {
                                     </Card>
 
                                     <Card>
+                                        <CardHeader className="flex flex-row items-center justify-between">
+                                            <div><CardTitle className="flex items-center gap-2"><Calendar className="h-5 w-5" /> Quản lý các chuyến đi</CardTitle></div>
+                                            <Button size="sm" variant="outline" onClick={() => {
+                                                const departureTime = prompt('Nhập ngày giờ khởi hành (YYYY-MM-DD HH:mm)');
+                                                const arrivalTime = prompt('Nhập ngày giờ đến dự kiến (YYYY-MM-DD HH:mm)');
+                                                if (departureTime) {
+                                                    ownerGeographyApi.addVehicleTrip(service.idVehicle, { departureTime, arrivalTime }).then(() => {
+                                                        queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+                                                    });
+                                                }
+                                            }}>+ Thêm chuyến</Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {service.trips?.map((trip: any) => (
+                                                    <div key={trip.idTrip} className="p-3 border rounded-lg flex justify-between items-center bg-muted/20">
+                                                        <div>
+                                                            <p className="font-bold text-sm">Khởi hành: {new Date(trip.departureTime).toLocaleString('vi-VN')}</p>
+                                                            <p className="text-xs text-muted-foreground">Đến: {trip.arrivalTime ? new Date(trip.arrivalTime).toLocaleString('vi-VN') : 'N/A'}</p>
+                                                        </div>
+                                                        <Button size="icon" variant="ghost" className="text-red-500" onClick={() => {
+                                                            if (confirm('Xóa chuyến đi này?')) {
+                                                                ownerGeographyApi.deleteVehicleTrip(trip.idTrip).then(() => {
+                                                                    queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+                                                                });
+                                                            }
+                                                        }}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                                {(!service.trips || service.trips.length === 0) && (
+                                                    <p className="text-center text-xs text-muted-foreground italic py-4">Chưa có chuyến đi nào được thiết lập.</p>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
                                         <CardHeader>
                                             <CardTitle className="flex items-center gap-2">
                                                 <MapPin className="h-5 w-5" /> Địa chỉ & Liên hệ
@@ -804,6 +899,7 @@ export const ServiceDetail = () => {
                                                     setRoomMaxGuest('2');
                                                     setRoomPrice('');
                                                     setRoomFacilities([]);
+                                                    setAttribute({ ...attribute, roomMedia: [], roomDescription: '' });
                                                 }
                                             }}>
                                                 <DialogTrigger asChild>
@@ -846,7 +942,14 @@ export const ServiceDetail = () => {
                                                         <Button
                                                             className="gradient-sunset border-none"
                                                             onClick={() => {
-                                                                const data = { nameRoom: roomName, maxGuest: Number(roomMaxGuest), price: Number(roomPrice) || Number(price), attribute: { facilities: roomFacilities } };
+                                                                const data = {
+                                                                    nameRoom: roomName,
+                                                                    maxGuest: Number(roomMaxGuest),
+                                                                    price: Number(roomPrice) || Number(price),
+                                                                    attribute: { facilities: roomFacilities },
+                                                                    media: attribute.roomMedia || [],
+                                                                    description: attribute.roomDescription || ''
+                                                                };
                                                                 if (editingRoomId) updateRoomMut.mutate(data);
                                                                 else addRoomMut.mutate(data);
                                                             }}

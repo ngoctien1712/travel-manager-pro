@@ -213,34 +213,56 @@ export const HotelLanding = () => {
                 </Card>
             </div>
 
+            {/* Promotion Section */}
+            <section className="container max-w-6xl py-12 px-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="group relative h-64 rounded-[2.5rem] overflow-hidden shadow-xl transition-all hover:-translate-y-1">
+                        <img src="https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Promo 1" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-transparent flex flex-col justify-center p-10 text-white">
+                            <Badge className="w-fit bg-orange-500 mb-3 border-none font-black px-4 py-1 rounded-full">HOT DEAL 40%</Badge>
+                            <h3 className="font-black text-3xl mb-2 tracking-tighter">Luxury Resort <br /> Đà Nẵng</h3>
+                            <p className="text-sm opacity-80 font-medium">Đặt phòng ngay để nhận ưu đãi bữa sáng miễn phí và nâng hạng phòng.</p>
+                        </div>
+                    </div>
+                    <div className="group relative h-64 rounded-[2.5rem] overflow-hidden shadow-xl transition-all hover:-translate-y-1">
+                        <img src="https://images.unsplash.com/photo-1540206276207-3af25c08abbb?w=800" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Promo 2" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-emerald-900/80 to-transparent flex flex-col justify-center p-10 text-white">
+                            <Badge className="w-fit bg-blue-500 mb-3 border-none font-black px-4 py-1 rounded-full">Mã: HOTELSTAY</Badge>
+                            <h3 className="font-black text-3xl mb-2 tracking-tighter">Staycation <br /> Tại Sài Gòn</h3>
+                            <p className="text-sm opacity-80 font-medium">Giảm 25% cho các đơn hàng đặt vào ngày thường trong tuần.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Trust Badges */}
             <section className="container max-w-6xl py-12 px-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-12 h-12 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-                            <ShieldCheck size={28} />
+                    <div className="flex items-center gap-4 p-6 rounded-[2rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-colors">
+                        <div className="w-14 h-14 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <ShieldCheck size={32} />
                         </div>
                         <div>
-                            <p className="font-bold text-gray-900 leading-tight">Giá cuối cùng</p>
-                            <p className="text-xs text-gray-500 font-medium">Đã bao gồm thuế & phí</p>
+                            <p className="font-black text-gray-900 tracking-tight uppercase text-xs mb-1">Giá cuối cùng</p>
+                            <p className="text-sm text-gray-400 font-bold">Đã bao gồm thuế & phí</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <Building2 size={28} />
+                    <div className="flex items-center gap-4 p-6 rounded-[2rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-colors">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Building2 size={32} />
                         </div>
                         <div>
-                            <p className="font-bold text-gray-900 leading-tight">Đối tác đa dạng</p>
-                            <p className="text-xs text-gray-500 font-medium">Từ Homestay đến Resort 5 sao</p>
+                            <p className="font-black text-gray-900 tracking-tight uppercase text-xs mb-1">Đối tác đa dạng</p>
+                            <p className="text-sm text-gray-400 font-bold">Từ Homestay đến Resort</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4 p-4 rounded-2xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                            <Zap size={28} />
+                    <div className="flex items-center gap-4 p-6 rounded-[2rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-colors">
+                        <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Zap size={32} />
                         </div>
                         <div>
-                            <p className="font-bold text-gray-900 leading-tight">Xác nhận tức thì</p>
-                            <p className="text-xs text-gray-500 font-medium">Đặt phòng chỉ trong 2 phút</p>
+                            <p className="font-black text-gray-900 tracking-tight uppercase text-xs mb-1">Xác nhận tức thì</p>
+                            <p className="text-sm text-gray-400 font-bold">Đặt phòng nhanh chóng</p>
                         </div>
                     </div>
                 </div>

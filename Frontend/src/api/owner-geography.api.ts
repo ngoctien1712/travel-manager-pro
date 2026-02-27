@@ -92,4 +92,10 @@ export const ownerGeographyApi = {
 
   manageVehicle: (idItem: string, data: { codeVehicle: string; maxGuest: number; attribute?: any }) =>
     httpClient.post(`/owner/bookable-items/${idItem}/vehicle`, data),
+
+  addVehicleTrip: (idVehicle: string, data: { departureTime: string; arrivalTime?: string; priceOverride?: number }) =>
+    httpClient.post(`/owner/vehicle/${idVehicle}/trips`, data),
+
+  deleteVehicleTrip: (idTrip: string) =>
+    httpClient.delete(`/owner/trips/${idTrip}`),
 };

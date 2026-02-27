@@ -90,6 +90,16 @@ router.post(
 );
 
 router.post(
+  '/vehicle/:idVehicle/trips',
+  ownerController.addVehicleTrip
+);
+
+router.delete(
+  '/trips/:idTrip',
+  ownerController.deleteVehicleTrip
+);
+
+router.post(
   '/bookable-items',
   [
     body('providerId').isUUID().withMessage('providerId không hợp lệ'),

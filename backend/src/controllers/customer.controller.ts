@@ -41,19 +41,30 @@ export const listServices = async (req: Request, res: Response) => {
       idx++;
     }
 
-    // New Date Filters
+    // Filter for Future Services only
+    const now = new Date().toISOString();
+
+    // Base Future Filter
+    conditions.push(`(
+      (bi.item_type = 'tour' AND EXISTS (SELECT 1 FROM tours t WHERE t.id_item = bi.id_item AND (t.tour_type = 'daily' OR t.start_at >= $${idx})))
+      OR (bi.item_type = 'vehicle' AND EXISTS (SELECT 1 FROM vehicle_trips vt WHERE vt.id_vehicle = v.id_vehicle AND vt.departure_time >= $${idx}))
+      OR (bi.item_type = 'accommodation')
+      OR (bi.item_type = 'ticket')
+    )`);
+    params.push(now);
+    idx++;
+
     if (date) {
       // For tours, check if date is within range
       conditions.push(`(
-        (bi.item_type = 'tour' AND EXISTS (SELECT 1 FROM tours t WHERE t.id_item = bi.id_item AND t.start_at <= $${idx} AND t.end_at >= $${idx}))
-        OR bi.item_type != 'tour'
+        (bi.item_type = 'tour' AND EXISTS (SELECT 1 FROM tours t WHERE t.id_item = bi.id_item AND (t.tour_type = 'daily' OR (t.start_at <= $${idx} AND t.end_at >= $${idx}))))
       )`);
       params.push(date);
       idx++;
     }
 
     if (departureDate && type === 'vehicle') {
-      conditions.push(`v.departure_time::date = $${idx++}`);
+      conditions.push(`EXISTS (SELECT 1 FROM vehicle_trips vt WHERE vt.id_vehicle = v.id_vehicle AND vt.departure_time::date = $${idx++})`);
       params.push(departureDate);
     }
 
@@ -267,6 +278,11 @@ export const getService = async (req: Request, res: Response) => {
         p.name AS provider_name, 
         p.phone AS provider_phone,
         p.image AS provider_image,
+        p.description AS provider_description,
+        p.address AS provider_address,
+        p.email AS provider_email,
+        p.website AS provider_website,
+        p.social_links AS provider_social_links,
         a.name AS area_name, 
         a.attribute AS area_attribute,
         c.name AS city_name,
@@ -289,10 +305,14 @@ export const getService = async (req: Request, res: Response) => {
     let details: any = {};
     if (itemType === 'tour') {
       const { rows: tourRows } = await query(
-        'SELECT guide_language, start_at, end_at, max_slots, attribute as tour_attribute FROM tours WHERE id_item = $1',
+        `SELECT 
+          guide_language, start_at, end_at, max_slots, tour_type, attribute as tour_attribute,
+          (SELECT COALESCE(SUM(quantity), 0) FROM order_tour_detail WHERE id_item = $1) as booked_slots
+         FROM tours WHERE id_item = $1`,
         [id]
       );
       details = tourRows[0] || {};
+      details.remaining_slots = Math.max(0, (details.max_slots || 0) - Number(details.booked_slots || 0));
     } else if (itemType === 'accommodation') {
       const { rows: accDetails } = await query(
         'SELECT address, hotel_type, star_rating, checkin_time, checkout_time, policies FROM accommodations WHERE id_item = $1',
@@ -303,18 +323,15 @@ export const getService = async (req: Request, res: Response) => {
 
       // Fetch rooms
       const { rows: rooms } = await query(
-        'SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC',
+        'SELECT id_room, name_room, max_guest, price, attribute, media, description FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC',
         [id]
       );
-      details.rooms = rooms;
+      // For each room, check availability (simulated for now, would need real booking check)
+      details.rooms = rooms.map(r => ({ ...r, is_available: true }));
     } else if (itemType === 'vehicle') {
       const { rows: vehRows } = await query(
         `SELECT 
           id_vehicle, code_vehicle, max_guest, 
-          departure_time as "departureTime", 
-          departure_point as "departurePoint", 
-          arrival_time as "arrivalTime", 
-          arrival_point as "arrivalPoint", 
           estimated_duration as "estimatedDuration", 
           attribute as vehicle_attribute 
          FROM vehicle WHERE id_item = $1`,
@@ -323,16 +340,18 @@ export const getService = async (req: Request, res: Response) => {
       details = vehRows[0] || {};
 
       if (details.id_vehicle) {
-        const { rows: positions } = await query(
-          `SELECT p.*, 
-            (SELECT COUNT(*) FROM order_pos_vehicle_detail opvd WHERE opvd.id_position = p.id_position) as is_booked
-           FROM positions p WHERE p.id_vehicle = $1 ORDER BY p.code_position`,
+        // Fetch Trips for this vehicle
+        const { rows: trips } = await query(
+          'SELECT * FROM vehicle_trips WHERE id_vehicle = $1 AND departure_time >= NOW() ORDER BY departure_time ASC',
           [details.id_vehicle]
         );
-        details.positions = positions.map((p: any) => ({
-          ...p,
-          is_booked: Number(p.is_booked) > 0
-        }));
+        details.trips = trips;
+
+        const { rows: positions } = await query(
+          `SELECT p.* FROM positions p WHERE p.id_vehicle = $1 ORDER BY p.code_position`,
+          [details.id_vehicle]
+        );
+        details.positions = positions;
       }
     } else if (itemType === 'ticket') {
       const { rows: tickRows } = await query(
@@ -407,8 +426,26 @@ export const createBooking = async (req: Request, res: Response) => {
 
     if (item_type === 'tour') {
       const { quantity, booking_date, guest_info } = details;
-      totalAmount = price * (quantity || 1);
 
+      // Check constraints
+      const { rows: tourRows } = await query('SELECT tour_type, max_slots FROM tours WHERE id_item = $1', [id_item]);
+      const tour = tourRows[0];
+
+      if (tour.tour_type === 'group' || tour.tour_type === 'daily') {
+        const dateFilter = tour.tour_type === 'daily' ? 'AND booking_date = $2' : '';
+        const dateParams = tour.tour_type === 'daily' ? [id_item, booking_date] : [id_item];
+
+        const { rows: bookedRows } = await query(
+          `SELECT SUM(quantity) as total FROM order_tour_detail WHERE id_item = $1 ${dateFilter}`,
+          dateParams
+        );
+        const alreadyBooked = Number(bookedRows[0].total || 0);
+        if (alreadyBooked + quantity > tour.max_slots) {
+          return res.status(400).json({ message: `Xin lỗi, chỉ còn ${tour.max_slots - alreadyBooked} chỗ trống.` });
+        }
+      }
+
+      totalAmount = price * (quantity || 1);
       await query(
         `INSERT INTO order_tour_detail (id_item, id_order, quantity, price, guest_info, booking_date) 
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -416,6 +453,16 @@ export const createBooking = async (req: Request, res: Response) => {
       );
     } else if (item_type === 'accommodation') {
       const { id_room, start_date, end_date, quantity, guest_info } = details;
+
+      // Check availability
+      const { rows: booked } = await query(
+        `SELECT 1 FROM order_accommodations_detail 
+         WHERE id_room = $1 AND NOT (end_date <= $2 OR start_date >= $3)`,
+        [id_room, start_date, end_date]
+      );
+      if (booked.length > 0) {
+        return res.status(400).json({ message: 'Phòng đã được đặt trong khoảng thời gian này.' });
+      }
 
       const days = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24));
       totalAmount = price * (quantity || 1) * (days || 1);
@@ -426,13 +473,27 @@ export const createBooking = async (req: Request, res: Response) => {
         [idOrder, id_room, start_date, end_date, quantity || 1, price]
       );
     } else if (item_type === 'vehicle') {
-      const { id_position, from, to } = details;
-      totalAmount = price * (details.quantity || 1);
+      const { id_position, id_trip } = details;
+
+      // Check if seat is booked for this trip
+      const { rows: booked } = await query(
+        'SELECT 1 FROM order_pos_vehicle_detail WHERE id_position = $1 AND id_trip = $2',
+        [id_position, id_trip]
+      );
+      if (booked.length > 0) {
+        return res.status(400).json({ message: 'Chỗ ngồi này đã được đặt.' });
+      }
+
+      // Get trip price if override exists
+      const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
+      const finalPrice = Number(tripRows[0]?.price_override || price);
+
+      totalAmount = finalPrice;
 
       await query(
-        `INSERT INTO order_pos_vehicle_detail (id_order, id_position, "from", "to", price) 
-         VALUES ($1, $2, $3, $4, $5)`,
-        [idOrder, id_position, from, to, price]
+        `INSERT INTO order_pos_vehicle_detail (id_order, id_position, id_trip, price) 
+         VALUES ($1, $2, $3, $4)`,
+        [idOrder, id_position, id_trip, finalPrice]
       );
     } else if (item_type === 'ticket') {
       const { visit_date, quantity, guest_info } = details;

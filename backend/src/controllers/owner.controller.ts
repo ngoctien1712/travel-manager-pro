@@ -170,7 +170,7 @@ export async function getServiceDetail(req: Request, res: Response) {
     // Fetch type-specific details
     let details: any = {};
     if (itemType === 'tour') {
-      const { rows } = await pool.query('SELECT guide_language, start_at, end_at, max_slots, attribute FROM tours WHERE id_item = $1', [idItem]);
+      const { rows } = await pool.query('SELECT guide_language, start_at, end_at, max_slots, attribute, tour_type FROM tours WHERE id_item = $1', [idItem]);
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
     } else if (itemType === 'accommodation') {
       const { rows } = await pool.query(
@@ -181,7 +181,7 @@ export async function getServiceDetail(req: Request, res: Response) {
       );
       details = rows[0] ? toCamel(rows[0] as Record<string, unknown>) : {};
       // Also fetch rooms for accommodation
-      const { rows: rooms } = await pool.query('SELECT id_room, name_room, max_guest, price, attribute FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC', [idItem]);
+      const { rows: rooms } = await pool.query('SELECT id_room, name_room, max_guest, price, attribute, media, description FROM accommodations_rooms WHERE id_item = $1 ORDER BY price ASC', [idItem]);
       details.rooms = rooms.map(r => toCamel(r as Record<string, unknown>));
     } else if (itemType === 'vehicle') {
       const { rows } = await pool.query(
@@ -204,6 +204,10 @@ export async function getServiceDetail(req: Request, res: Response) {
           ...toCamel(p as Record<string, unknown>),
           isBooked: Number(p.is_booked) > 0
         }));
+
+        // Fetch trips
+        const { rows: trips } = await pool.query('SELECT * FROM vehicle_trips WHERE id_vehicle = $1 ORDER BY departure_time ASC', [details.idVehicle]);
+        details.trips = trips.map(t => toCamel(t as Record<string, unknown>));
       }
     } else if (itemType === 'ticket') {
       const { rows } = await pool.query('SELECT ticket_kind FROM tickets WHERE id_item = $1', [idItem]);
@@ -270,15 +274,16 @@ export async function updateServiceDetail(req: Request, res: Response) {
       const endAt = extraData.endAt && extraData.endAt !== '' ? extraData.endAt : null;
 
       await client.query(
-        `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute, tour_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (id_item) DO UPDATE 
          SET guide_language = EXCLUDED.guide_language, 
              start_at = EXCLUDED.start_at, 
              end_at = EXCLUDED.end_at, 
              max_slots = EXCLUDED.max_slots,
-             attribute = EXCLUDED.attribute`,
-        [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null]
+             attribute = EXCLUDED.attribute,
+             tour_type = EXCLUDED.tour_type`,
+        [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null, extraData.tourType || 'group']
       );
     } else if (itemType === 'accommodation' && extraData) {
       await client.query(
@@ -618,7 +623,7 @@ export async function addAccommodationRoom(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { idItem } = req.params;
-    const { nameRoom, maxGuest, attribute, price } = req.body;
+    const { nameRoom, maxGuest, attribute, price, media, description } = req.body;
 
     // Check if accommodation belongs to user
     const check = await pool.query(
@@ -634,10 +639,10 @@ export async function addAccommodationRoom(req: Request, res: Response) {
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO accommodations_rooms (id_item, name_room, max_guest, attribute, price)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id_room, id_item, name_room, max_guest, attribute, price`,
-      [idItem, nameRoom, maxGuest, attribute ? JSON.stringify(attribute) : null, price]
+      `INSERT INTO accommodations_rooms (id_item, name_room, max_guest, attribute, price, media, description)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id_room, id_item, name_room, max_guest, attribute, price, media, description`,
+      [idItem, nameRoom, maxGuest, attribute ? JSON.stringify(attribute) : null, price, media ? JSON.stringify(media) : '[]', description]
     );
 
     res.status(201).json(toCamel(rows[0] as Record<string, unknown>));
@@ -652,7 +657,7 @@ export async function updateAccommodationRoom(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { idRoom } = req.params;
-    const { nameRoom, maxGuest, attribute, price } = req.body;
+    const { nameRoom, maxGuest, attribute, price, media, description } = req.body;
 
     const check = await pool.query(
       `SELECT r.id_room FROM accommodations_rooms r
@@ -668,10 +673,10 @@ export async function updateAccommodationRoom(req: Request, res: Response) {
 
     const { rows } = await pool.query(
       `UPDATE accommodations_rooms 
-       SET name_room = $1, max_guest = $2, attribute = $3, price = $4
-       WHERE id_room = $5
+       SET name_room = $1, max_guest = $2, attribute = $3, price = $4, media = $5, description = $6
+       WHERE id_room = $7
        RETURNING *`,
-      [nameRoom, maxGuest, attribute ? JSON.stringify(attribute) : null, price, idRoom]
+      [nameRoom, maxGuest, attribute ? JSON.stringify(attribute) : null, price, media ? JSON.stringify(media) : '[]', description, idRoom]
     );
 
     res.json(toCamel(rows[0] as Record<string, unknown>));
@@ -883,5 +888,65 @@ export async function createBookableItem(req: Request, res: Response) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   } finally {
     client.release();
+  }
+}
+
+/** Manage vehicle trips */
+export async function addVehicleTrip(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idVehicle } = req.params;
+    const { departureTime, arrivalTime, priceOverride } = req.body;
+
+    // Ownership check
+    const check = await pool.query(
+      `SELECT v.id_vehicle FROM vehicle v
+       JOIN bookable_items bi ON bi.id_item = v.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE v.id_vehicle = $1 AND p.id_user = $2`,
+      [idVehicle, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền quản lý phương tiện này' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO vehicle_trips (id_vehicle, departure_time, arrival_time, price_override)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [idVehicle, departureTime, arrivalTime || null, priceOverride || null]
+    );
+
+    res.status(201).json(toCamel(rows[0] as Record<string, unknown>));
+  } catch (err) {
+    console.error('Add vehicle trip error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+export async function deleteVehicleTrip(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idTrip } = req.params;
+
+    const check = await pool.query(
+      `SELECT vt.id_trip FROM vehicle_trips vt
+       JOIN vehicle v ON v.id_vehicle = vt.id_vehicle
+       JOIN bookable_items bi ON bi.id_item = v.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE vt.id_trip = $1 AND p.id_user = $2`,
+      [idTrip, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền xóa chuyến đi này' });
+    }
+
+    await pool.query('DELETE FROM vehicle_trips WHERE id_trip = $1', [idTrip]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete vehicle trip error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }

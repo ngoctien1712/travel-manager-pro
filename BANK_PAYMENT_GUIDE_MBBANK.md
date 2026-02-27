@@ -15,6 +15,7 @@ Vì ngân hàng không cho phép cá nhân gọi API trực tiếp, bạn cần 
 1.  **URL Webhook**: Bạn phải có một đường dẫn công khai. Sử dụng **ngrok** để chạy: `ngrok http 3000`.
 2.  Coppy link ngrok (Ví dụ: `https://abcd-123.ngrok-free.app`) và dán vào mục Webhook trên Dashboard Sepay:
     *   **Link**: `https://abcd-123.ngrok-free.app/api/customer/webhook/project`
+    *   **Link**: `https://paranormal-alise-unnuzzled.ngrok-free.dev/api/customer/webhook/project`
     *   **Phương thức**: `POST`
     *   **Kiểu dữ liệu**: `JSON`
 

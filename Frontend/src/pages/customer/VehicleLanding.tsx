@@ -246,36 +246,58 @@ export const VehicleLanding = () => {
                 </Card>
             </div>
 
+            {/* Promotion Section */}
+            <section className="container max-w-6xl py-12 px-4">
+                <div className="bg-blue-600 rounded-[3rem] p-8 md:p-12 overflow-hidden relative group">
+                    <div className="absolute top-0 right-0 w-1/2 h-full bg-white/10 blur-3xl rounded-full translate-x-1/2 group-hover:bg-white/20 transition-all duration-700" />
+                    <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+                        <div className="flex-1 text-center md:text-left space-y-4 text-white">
+                            <Badge className="bg-white/20 text-white border-none font-black text-[10px] uppercase px-4 py-1.5 rounded-full mb-2">Ưu đãi độc quyền</Badge>
+                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter leading-tight">Vé xe Tết 2024 <br /> Mở bán sớm - Giảm 20%</h2>
+                            <p className="opacity-80 font-medium text-lg">Đặt sớm để giữ chỗ tốt nhất và nhận ưu đãi giá cực hời cho hành trình về quê.</p>
+                            <div className="pt-4 flex flex-wrap justify-center md:justify-start gap-4">
+                                <Button className="h-14 px-10 bg-white text-blue-600 hover:bg-gray-100 rounded-2xl font-black">MUA VÉ NGAY</Button>
+                                <Button variant="outline" className="h-14 px-10 border-white/20 text-white hover:bg-white/10 rounded-2xl font-black">XEM LỊCH TRÌNH</Button>
+                            </div>
+                        </div>
+                        <div className="w-full md:w-80 h-64 rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+                            <img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600" className="w-full h-full object-cover" alt="Bus Promo" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-blue-900/60 to-transparent" />
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* Benefits */}
             <section className="container max-w-6xl py-12 px-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="flex flex-col items-center text-center gap-4 p-6 rounded-3xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                            <ShieldCheck size={32} />
+                    <div className="flex flex-col items-center text-center gap-4 p-8 rounded-[2.5rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-all">
+                        <div className="w-16 h-16 rounded-[2rem] bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <ShieldCheck size={36} />
                         </div>
-                        <h4 className="font-bold text-gray-900 leading-tight">Bảo hiểm hành trình</h4>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">Luôn có bảo hiểm kèm theo mỗi lượt vé đặt tại VietTravel</p>
+                        <h4 className="font-black text-gray-900 tracking-tight text-sm uppercase">Bảo hiểm hành trình</h4>
+                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Luôn có bảo hiểm kèm theo mỗi lượt vé đặt tại VietTravel</p>
                     </div>
-                    <div className="flex flex-col items-center text-center gap-4 p-6 rounded-3xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                            <Clock size={32} />
+                    <div className="flex flex-col items-center text-center gap-4 p-8 rounded-[2.5rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-all">
+                        <div className="w-16 h-16 rounded-[2rem] bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Clock size={36} />
                         </div>
-                        <h4 className="font-bold text-gray-900 leading-tight">Phục vụ 24/7</h4>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">Hỗ trợ khách hàng mọi lúc, kể cả các khung giờ khuya</p>
+                        <h4 className="font-black text-gray-900 tracking-tight text-sm uppercase">Phục vụ 24/7</h4>
+                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Hỗ trợ khách hàng mọi lúc, kể cả các khung giờ khuya</p>
                     </div>
-                    <div className="flex flex-col items-center text-center gap-4 p-6 rounded-3xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                            <Zap size={32} />
+                    <div className="flex flex-col items-center text-center gap-4 p-8 rounded-[2.5rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-all">
+                        <div className="w-16 h-16 rounded-[2rem] bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Zap size={36} />
                         </div>
-                        <h4 className="font-bold text-gray-900 leading-tight">Vé điện tử</h4>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">Không cần in vé, chỉ cần mã QR trên điện thoại</p>
+                        <h4 className="font-black text-gray-900 tracking-tight text-sm uppercase">Vé điện tử</h4>
+                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Không cần in vé, chỉ cần mã QR trên điện thoại</p>
                     </div>
-                    <div className="flex flex-col items-center text-center gap-4 p-6 rounded-3xl bg-white shadow-sm border border-gray-50">
-                        <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                            <Users size={32} />
+                    <div className="flex flex-col items-center text-center gap-4 p-8 rounded-[2.5rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-all">
+                        <div className="w-16 h-16 rounded-[2rem] bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Users size={36} />
                         </div>
-                        <h4 className="font-bold text-gray-900 leading-tight">Yên tâm tuyệt đối</h4>
-                        <p className="text-xs text-gray-500 font-medium leading-relaxed">Đơn vị vận chuyển được kiểm định chất lượng định kỳ</p>
+                        <h4 className="font-black text-gray-900 tracking-tight text-sm uppercase">Yên tâm tuyệt đối</h4>
+                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Đơn vị vận chuyển được kiểm định chất lượng định kỳ</p>
                     </div>
                 </div>
             </section>

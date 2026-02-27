@@ -27,7 +27,8 @@ import {
   Users,
   Car,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 
 interface ServiceDetail {
@@ -62,6 +63,7 @@ interface ServiceDetail {
   start_at?: string;
   end_at?: string;
   max_slots?: number;
+  remaining_slots?: number;
   tour_attribute?: {
     tour_type?: string;
     duration_days?: number;
@@ -92,6 +94,16 @@ interface ServiceDetail {
     max_guest: number;
     price: number;
     attribute: any;
+    media?: any[];
+    description?: string;
+  }>;
+  trips?: Array<{
+    id_trip: string;
+    id_vehicle: string;
+    departure_time: string;
+    arrival_time?: string;
+    price_override?: number;
+    status: string;
   }>;
 
   // POI specific
@@ -124,6 +136,13 @@ interface ServiceDetail {
     price: number;
     is_booked: boolean;
   }>;
+
+  // Expanded Provider Info
+  provider_description?: string;
+  provider_address?: string;
+  provider_email?: string;
+  provider_website?: string;
+  provider_social_links?: any;
 }
 
 export default function ServiceDetail() {
@@ -135,6 +154,9 @@ export default function ServiceDetail() {
   const [quantity, setQuantity] = useState(1);
   const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [activeImage, setActiveImage] = useState<string | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
+  const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
+  const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const fetchService = async () => {
@@ -157,7 +179,15 @@ export default function ServiceDetail() {
   }, [id]);
 
   const handleBookingRedirect = () => {
-    navigate(`/booking/${id}`);
+    let query = `?quantity=${quantity}`;
+    if (service.item_type === 'accommodation' && selectedRoom) {
+      query += `&id_room=${selectedRoom.id_room}`;
+    } else if (service.item_type === 'vehicle' && selectedTrip) {
+      query += `&id_trip=${selectedTrip.id_trip}&seats=${selectedSeats.map(s => s.id_position).join(',')}`;
+    } else if (service.item_type === 'tour') {
+      query += `&booking_date=${bookingDate}`;
+    }
+    navigate(`/booking/${id}${query}`);
   };
 
   if (error) return <ErrorState message={error} />;
@@ -242,7 +272,7 @@ export default function ServiceDetail() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           {/* CỘT TRÁI: Nội dung chi tiết */}
           <div className="lg:col-span-8 space-y-12">
 
@@ -296,8 +326,11 @@ export default function ServiceDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
                     <Tag size={24} className="text-blue-500 mb-3" />
-                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Loại</span>
-                    <span className="font-bold text-gray-900 capitalize">{service.attribute?.tourType || service.tour_attribute?.tour_type || 'Trọn gói'}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Loại / Còn trống</span>
+                    <span className="font-bold text-gray-900 capitalize">
+                      {service.attribute?.tourType || service.tour_attribute?.tour_type || 'Trọn gói'}
+                      {service.remaining_slots !== undefined && ` (${service.remaining_slots} chỗ)`}
+                    </span>
                   </div>
                   <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
                     <Clock size={24} className="text-blue-500 mb-3" />
@@ -494,7 +527,7 @@ export default function ServiceDetail() {
                     <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Các hạng phòng hiện có</h4>
                     <div className="grid grid-cols-1 gap-4">
                       {service.rooms.map(room => (
-                        <div key={room.id_room} className="p-6 rounded-[2rem] bg-gray-50 border border-transparent hover:border-blue-200 hover:bg-white hover:shadow-xl transition-all flex flex-col md:flex-row justify-between items-center gap-6">
+                        <div key={room.id_room} className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col md:flex-row justify-between items-center gap-6 ${selectedRoom?.id_room === room.id_room ? 'border-blue-600 bg-blue-50/30' : 'bg-gray-50 border-transparent hover:border-blue-200'}`}>
                           <div className="flex-1">
                             <h5 className="text-xl font-black text-gray-900 mb-2">{room.name_room}</h5>
                             <div className="flex items-center gap-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
@@ -502,10 +535,11 @@ export default function ServiceDetail() {
                               <span className="w-1 h-1 rounded-full bg-gray-300" />
                               <span className="flex flex-wrap gap-2">
                                 {(room.attribute?.facilities || []).slice(0, 3).map((f: string) => (
-                                  <span key={f} className="text-blue-600">{f}</span>
+                                  <span key={f} className="text-blue-600 font-black">{f}</span>
                                 ))}
                               </span>
                             </div>
+                            <p className="text-xs text-gray-500 mt-2 line-clamp-2">{room.description}</p>
                           </div>
                           <div className="text-center md:text-right shrink-0">
                             <p className="text-3xl font-black text-blue-600 tracking-tight">{room.price.toLocaleString()}đ</p>
@@ -513,11 +547,12 @@ export default function ServiceDetail() {
                           </div>
                           <Button
                             onClick={() => {
+                              setSelectedRoom(room);
                               document.getElementById('booking-card')?.scrollIntoView({ behavior: 'smooth' });
                             }}
-                            className="rounded-xl h-12 px-8 bg-gray-900 hover:bg-black text-white font-bold"
+                            className={`rounded-xl h-12 px-8 font-black ${selectedRoom?.id_room === room.id_room ? 'bg-blue-600 text-white' : 'bg-gray-900 hover:bg-black text-white'}`}
                           >
-                            Chọn phòng
+                            {selectedRoom?.id_room === room.id_room ? 'Đã chọn' : 'Chọn phòng'}
                           </Button>
                         </div>
                       ))}
@@ -594,10 +629,38 @@ export default function ServiceDetail() {
 
                 {/* TICKET / POI INFO ... existing code ... */}
 
-                {service.positions && service.positions.length > 0 && (
+                {service.item_type === 'vehicle' && service.trips && service.trips.length > 0 && (
+                  <div className="pt-8 border-t border-gray-50 space-y-6">
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Lịch khởi hành hiện có</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {service.trips.map(trip => (
+                        <div
+                          key={trip.id_trip}
+                          onClick={() => setSelectedTrip(trip)}
+                          className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all ${selectedTrip?.id_trip === trip.id_trip ? 'border-blue-600 bg-blue-50/30' : 'bg-gray-50 border-transparent hover:border-blue-200'}`}
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Giờ đi</p>
+                              <p className="text-2xl font-black text-gray-900">{new Date(trip.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                              <p className="text-xs text-gray-500 font-bold">{new Date(trip.departure_time).toLocaleDateString('vi-VN')}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Giá từ</p>
+                              <p className="text-xl font-black text-gray-900">{(Number(trip.price_override) || Number(service.price)).toLocaleString()}đ</p>
+                            </div>
+                          </div>
+                          <p className="text-[10px] font-bold text-gray-400 italic">Dự kiến đến: {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {service.item_type === 'vehicle' && selectedTrip && service.positions && service.positions.length > 0 && (
                   <div className="pt-8 space-y-8">
                     <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest pl-2 border-l-4 border-blue-600">Sơ đồ chỗ ngồi công nghệ</h4>
+                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest pl-2 border-l-4 border-blue-600">Sơ đồ chỗ ngồi chuyến {new Date(selectedTrip.departure_time).toLocaleTimeString()}</h4>
                       <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest">
                         <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-gray-100" /> Trống</span>
                         <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-blue-600 shadow-lg shadow-blue-200" /> Đang chọn</span>
@@ -613,7 +676,11 @@ export default function ServiceDetail() {
                               key={pos.id_position}
                               disabled={pos.is_booked}
                               onClick={() => {
-                                document.getElementById('booking-card')?.scrollIntoView({ behavior: 'smooth' });
+                                if (isSelected) {
+                                  setSelectedSeats(prev => prev.filter(s => s.id_position !== pos.id_position));
+                                } else {
+                                  setSelectedSeats(prev => [...prev, pos]);
+                                }
                               }}
                               className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all transform active:scale-95 ${pos.is_booked
                                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -627,15 +694,6 @@ export default function ServiceDetail() {
                           );
                         })}
                       </div>
-                      {selectedSeats.length > 0 && (
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {selectedSeats.map(s => (
-                            <Badge key={s.id_position} className="bg-blue-600 text-white border-none py-1 px-3 rounded-lg font-black text-[10px]">
-                              GHẾ {s.code_position} - {s.price.toLocaleString()}đ
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -690,11 +748,26 @@ export default function ServiceDetail() {
               </section>
             )}
 
+            {/* Promotional Banner */}
+            <div className="rounded-[2.5rem] overflow-hidden relative h-56 group shadow-2xl shadow-blue-100/50 mt-12 bg-gray-900 border-none">
+              <img src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=1200" className="w-full h-full object-cover opacity-60 transition-transform duration-1000 group-hover:scale-110" alt="Promotion" />
+              <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
+                <Badge className="w-fit bg-blue-600 mb-4 border-none font-black text-[10px] uppercase tracking-[0.2em] px-4 py-1 text-white">Đặc quyền VIP</Badge>
+                <h3 className="text-3xl font-black tracking-tight mb-2 uppercase italic text-white italic">Giảm thêm 15% khi đặt qua App</h3>
+                <p className="text-sm font-medium opacity-80 max-w-md text-white/80">Quét mã QR để nhận coupon giảm giá đặc biệt dành riêng cho khách hàng thân thiết của VietTravel.</p>
+                <div className="mt-8 flex items-center gap-4">
+                  <div className="w-16 h-16 bg-white p-1 rounded-xl shadow-lg">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://viettravel.vn/app" className="w-full h-full" alt="QR" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-60 text-white/60">Quét để tải App</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* CỘT PHẢI: Card đặt chỗ & Nhà cung cấp */}
           <div className="lg:col-span-4">
-            <div className="sticky top-12 space-y-8">
+            <div className="sticky top-24 space-y-8">
 
               {/* Card đặt chỗ - Traveloka Style (White with heavy shadow) */}
               <div id="booking-card" className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
@@ -755,9 +828,37 @@ export default function ServiceDetail() {
                     )}
                   </div>
                   <div>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Đơn vị cung cấp</p>
                     <h4 className="font-black text-lg text-gray-900 leading-tight">{service.provider_name || 'VietTravel Premium'}</h4>
                   </div>
+                </div>
+
+                {service.provider_description && (
+                  <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-200 pl-4">
+                    {service.provider_description}
+                  </p>
+                )}
+
+                <div className="space-y-3 pt-2">
+                  {service.provider_address && (
+                    <div className="flex items-start gap-3 text-xs text-gray-500">
+                      <MapPin size={14} className="shrink-0 text-blue-400" />
+                      <span>{service.provider_address}</span>
+                    </div>
+                  )}
+                  {service.provider_email && (
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <Phone size={14} className="shrink-0 text-blue-400 rotate-90" />
+                      <span>{service.provider_email}</span>
+                    </div>
+                  )}
+                  {service.provider_website && (
+                    <div className="flex items-center gap-3 text-xs text-blue-500">
+                      <ExternalLink size={14} className="shrink-0" />
+                      <a href={service.provider_website.startsWith('http') ? service.provider_website : `https://${service.provider_website}`} target="_blank" rel="noopener noreferrer" className="hover:underline font-bold">
+                        Website chính thức
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4 pt-4 border-t border-gray-50">
@@ -793,6 +894,22 @@ export default function ServiceDetail() {
             <span className="px-6 py-3 rounded-full bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer shadow-sm">#{service.item_type} giá rẻ</span>
           </div>
         </div>
+      </div>
+
+      {/* Mobile Floating Booking Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex items-center justify-between shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Giá chỉ từ</p>
+          <p className="text-xl font-black text-blue-600">
+            {service.price?.toLocaleString() || 0}đ
+          </p>
+        </div>
+        <Button
+          onClick={handleBookingRedirect}
+          className="rounded-2xl h-12 px-8 bg-blue-600 text-white font-black text-sm shadow-lg shadow-blue-200"
+        >
+          ĐẶT CHỖ
+        </Button>
       </div>
     </div>
   );
