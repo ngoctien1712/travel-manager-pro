@@ -241,4 +241,37 @@ export const customerApi = {
     await userApi.changePassword(oldPassword, newPassword);
     return { success: true, message: 'Đổi mật khẩu thành công!' };
   },
+
+  // ---- Cart (Mock since backend is missing it) ----
+  async getCart(): Promise<any> {
+    const saved = localStorage.getItem('travel_cart');
+    if (saved) return JSON.parse(saved);
+
+    // Default empty cart with some high-quality mock items if never set
+    const initialCart = {
+      items: [
+        {
+          id_cart_item: 'mock-1',
+          title: 'Premium Halong Bay Cruise',
+          thumbnail: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=600',
+          price: 2500000,
+          quantity: 1
+        }
+      ],
+      subtotal: 2500000,
+      discount: 0,
+      total: 2500000
+    };
+    localStorage.setItem('travel_cart', JSON.stringify(initialCart));
+    return initialCart;
+  },
+
+  async removeCartItem(id: string): Promise<any> {
+    const cart = await this.getCart();
+    cart.items = cart.items.filter((item: any) => item.id_cart_item !== id);
+    cart.subtotal = cart.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
+    cart.total = cart.subtotal - cart.discount;
+    localStorage.setItem('travel_cart', JSON.stringify(cart));
+    return cart;
+  },
 };

@@ -458,9 +458,78 @@ export default function OrderDetail() {
                 </form>
               </Card>
             )}
+
+            {/* Sidebar Promo */}
+            <div className="rounded-[2.5rem] overflow-hidden relative h-64 group shadow-xl bg-gradient-to-br from-indigo-600 to-blue-700 border-none">
+              <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
+              <div className="relative z-10 p-8 h-full flex flex-col justify-between text-white">
+                <div>
+                  <Badge className="bg-white/20 text-white border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 mb-3">Chương trình đối tác</Badge>
+                  <h3 className="text-xl font-black leading-tight uppercase tracking-tighter">Mời bạn bè <br /> Nhận quà khủng</h3>
+                </div>
+                <p className="text-[10px] font-medium opacity-70">Nhận ngay voucher 200k cho mỗi người bạn đặt chỗ thành công.</p>
+                <Button className="w-full bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">LẤY MÃ GIỚI THIỆU</Button>
+              </div>
+            </div>
+
+            {/* Travel Tips Widget */}
+            <Card className="p-8 rounded-[2rem] border-none shadow-sm space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center">
+                  <Info size={18} />
+                </div>
+                <h4 className="font-black text-gray-900 uppercase tracking-tight">Kinh nghiệm du lịch</h4>
+              </div>
+              <ul className="space-y-4">
+                {[
+                  "Nên đến sớm 30 phút trước giờ khởi hành.",
+                  "Mang theo CCCD/Hộ chiếu bản gốc để check-in.",
+                  "Lưu vé điện tử vào điện thoại để dùng offline."
+                ].map((tip, i) => (
+                  <li key={i} className="flex gap-3 text-xs font-medium text-gray-500">
+                    <div className="w-1 h-1 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        </div>
+
+        {/* Recommended experiences - TO FILL BOTTOM SPACE */}
+        <div className="mt-24 space-y-12">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                <Sparkles className="text-blue-600" /> CÓ THỂ BẠN SẼ THÍCH
+              </h3>
+              <p className="text-gray-400 font-medium">Gợi ý những trải nghiệm tuyệt vời khác tại {order.details.city_name || 'khu vực này'}</p>
+            </div>
+            <Button variant="ghost" className="text-blue-600 font-black text-xs uppercase tracking-widest hover:bg-blue-50">Xem thêm</Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            {[
+              { title: "Tour Bà Nà Hills 1 Ngày", price: "1,250,000", img: "https://images.unsplash.com/photo-1559592413-7ece35b49c2d?w=400" },
+              { title: "Vé Ký Ức Hội An", price: "600,000", img: "https://images.unsplash.com/photo-1528127269322-539801943592?w=400" },
+              { title: "Show diễn Tinh Hoa Việt Nam", price: "300,000", img: "https://images.unsplash.com/photo-1509030450996-939a2c47605e?w=400" },
+              { title: "Vé Sun World Fansipan Legend", price: "850,000", img: "https://images.unsplash.com/photo-1589394815804-964ed7be2eb5?w=400" }
+            ].map((item, i) => (
+              <div key={i} className="group cursor-pointer">
+                <div className="relative aspect-[4/3] rounded-[2rem] overflow-hidden mb-4 shadow-sm group-hover:shadow-xl transition-all duration-500">
+                  <img src={item.img} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={item.title} />
+                  <div className="absolute top-4 left-4">
+                    <Badge className="bg-white/90 backdrop-blur text-blue-600 border-none font-black text-[8px] uppercase px-2 py-0.5">Phổ biến</Badge>
+                  </div>
+                </div>
+                <h4 className="font-black text-gray-900 text-sm mb-1 group-hover:text-blue-600 transition-colors line-clamp-1">{item.title}</h4>
+                <p className="text-blue-600 font-black text-sm">{item.price}đ</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
     </div>
+
   );
 }

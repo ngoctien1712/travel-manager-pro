@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import adLeft from '@/assets/banners/ads-left.jpg';
+import adRight from '@/assets/banners/ads-right.jpg';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,6 +159,46 @@ export default function ServiceDetail() {
   const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [stickyStyle, setStickyStyle] = useState<React.CSSProperties>({ position: 'sticky', top: '96px' });
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+
+    const handleScroll = () => {
+      if (!sidebarRef.current) return;
+
+      const sidebar = sidebarRef.current;
+      const viewportHeight = window.innerHeight;
+      const sidebarHeight = sidebar.offsetHeight;
+      const scrollY = window.scrollY;
+      const scrollingDown = scrollY > lastScrollY;
+
+      // Traveloka-style sticky: if taller than screen, stick to bottom on down, top on up
+      if (sidebarHeight > viewportHeight - 100) {
+        if (scrollingDown) {
+          setStickyStyle({
+            position: 'sticky',
+            top: `calc(${viewportHeight}px - ${sidebarHeight}px - 32px)`,
+            alignSelf: 'flex-end'
+          });
+        } else {
+          setStickyStyle({
+            position: 'sticky',
+            top: '96px',
+            alignSelf: 'flex-start'
+          });
+        }
+      } else {
+        setStickyStyle({ position: 'sticky', top: '96px' });
+      }
+
+      lastScrollY = scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const fetchService = async () => {
@@ -203,7 +245,37 @@ export default function ServiceDetail() {
   };
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans">
+    <div className="bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans relative">
+      {/* Full-height Skyscraper Ads */}
+      <div className="hidden 2xl:block fixed left-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
+        <div className="h-full rounded-[2.5rem] overflow-hidden bg-white shadow-2xl border border-white/20 relative">
+          <img src={adLeft} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="Halong Bay Ad" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent p-10 flex flex-col justify-end text-white text-left items-start">
+            <div className="mb-auto">
+              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">DI SẢN THẾ GIỚI</Badge>
+              <div className="h-1 w-12 bg-blue-400 rounded-full mb-4" />
+            </div>
+            <h4 className="text-2xl font-black uppercase italic leading-none mb-2">VỊNH <br /> HẠ LONG</h4>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-6 font-medium">Trải nghiệm du thuyền 5 sao đẳng cấp</p>
+            <Button size="sm" className="bg-white text-blue-900 hover:bg-blue-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">KHÁM PHÁ NGAY</Button>
+          </div>
+        </div>
+      </div>
+      <div className="hidden 2xl:block fixed right-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
+        <div className="h-full rounded-[2.5rem] overflow-hidden bg-white shadow-2xl border border-white/20 relative">
+          <img src={adRight} className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110" alt="Ancient Town Ad" />
+          <div className="absolute inset-0 bg-gradient-to-t from-orange-950/90 via-orange-900/40 to-transparent p-10 flex flex-col justify-end text-white text-right items-end">
+            <div className="mb-auto">
+              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">HỘI AN CHILL</Badge>
+              <div className="h-1 w-12 bg-orange-400 rounded-full mb-4 ml-auto" />
+            </div>
+            <h4 className="text-2xl font-black uppercase italic leading-none mb-2">PHỐ CỔ <br /> HOÀI NIỆM</h4>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-6 font-medium text-right">Combo phòng khách sạn & vé show Ký Ức</p>
+            <Button size="sm" className="bg-white text-orange-900 hover:bg-orange-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">ĐẶT VÉ NGAY</Button>
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 lg:px-20 py-8">
         {/* Navigation Breadcrumb */}
         <button
@@ -700,53 +772,41 @@ export default function ServiceDetail() {
               </section>
             )}
 
-            {/* AREA EXPERIENCE */}
-            {service.area_attribute && (
-              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-10">
-                <div className="flex items-center gap-4">
-                  <CloudSun size={24} className="text-orange-500" />
-                  <h3 className="text-2xl font-black text-gray-900 tracking-tight">Kinh nghiệm tại {service.area_name}</h3>
-                </div>
+            {/* Replace Area Experience with General Travel Ads */}
+            <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-blue-50 shadow-sm space-y-10 overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-12 opacity-10 pointer-events-none">
+                <Sparkles size={120} className="text-blue-500" />
+              </div>
+              <div className="flex items-center gap-4 relative z-10">
+                <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full">GỢI Ý TỪ TRAVELPRO</Badge>
+                <h3 className="text-2xl font-black text-gray-900 tracking-tight">Trải nghiệm không nên bỏ lỡ</h3>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Khí hậu</p>
-                        <p className="font-black text-gray-900 text-lg uppercase tracking-tight">{service.area_attribute.climate_type}</p>
-                      </div>
-                      <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Nhiệt độ TB</p>
-                        <p className="font-black text-gray-900 text-lg">{service.area_attribute.average_temperature?.min}°-{service.area_attribute.average_temperature?.max}°C</p>
-                      </div>
-                    </div>
-                    <div className="p-8 rounded-[2rem] bg-orange-50/50 border border-orange-100 text-orange-900 font-bold italic text-sm leading-relaxed relative">
-                      <Info size={16} className="mb-4 text-orange-500" />
-                      "{service.area_attribute.weather_notes?.[0] || 'Vùng đất có khí hậu ôn hòa quanh năm, thích hợp cho mọi hoạt động nghỉ dưỡng.'}"
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                <div className="group cursor-pointer">
+                  <div className="aspect-video rounded-3xl overflow-hidden mb-4 shadow-lg border border-gray-100">
+                    <img src={getImageUrl('/uploads/ads/combo-vinpearl.jpg')} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Ad 1" />
                   </div>
-
-                  <div className="space-y-6">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Mùa du lịch lý tưởng nhất</h4>
-                    <div className="grid grid-cols-4 gap-3">
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => {
-                        const isBest = service.area_attribute?.best_travel_months?.includes(m);
-                        return (
-                          <div key={m} className={`aspect-square rounded-2xl flex flex-col items-center justify-center font-black text-sm transition-all shadow-sm ${isBest ? 'bg-blue-600 text-white border-none scale-110 shadow-blue-200' : 'bg-white text-gray-300 border border-gray-50'}`}>
-                            <span className="text-[8px] opacity-40 leading-none mb-0.5">TH</span>
-                            {m}
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] font-black text-gray-400 uppercase tracking-[0.1em] px-2 pt-4">
-                      <span>Mùa mưa: Th{service.area_attribute.rainy_season?.from_month || '5'}-{service.area_attribute.rainy_season?.to_month || '10'}</span>
-                      <span className="text-blue-600 flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-blue-600" /> Tháng Đẹp</span>
-                    </div>
-                  </div>
+                  <h4 className="font-black text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Combo Nghỉ dưỡng 3N2Đ tại Vinpearl</h4>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Giảm ngay 2.000.000đ khi đặt trong hôm nay</p>
                 </div>
-              </section>
-            )}
+                <div className="group cursor-pointer">
+                  <div className="aspect-video rounded-3xl overflow-hidden mb-4 shadow-lg border border-gray-100">
+                    <img src={getImageUrl('/uploads/ads/platinum-member.jpg')} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Ad 2" />
+                  </div>
+                  <h4 className="font-black text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Thẻ Thành viên TravelPro Platinum</h4>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Đặc quyền phòng chờ thương gia & Bảo hiểm cao cấp</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-8 rounded-[2rem] border border-blue-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div>
+                  <h4 className="text-lg font-black text-blue-900 mb-1">Chương trình Khách hàng Thân thiết</h4>
+                  <p className="text-sm text-blue-700 font-medium">Tích lũy điểm thưởng cho mỗi giao dịch và đổi lấy vé máy bay miễn phí.</p>
+                </div>
+                <Button className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-black text-[10px] uppercase tracking-widest h-12 px-8 shrink-0 shadow-lg shadow-blue-200">Tìm hiểu thêm</Button>
+              </div>
+            </section>
 
             {/* Promotional Banner */}
             <div className="rounded-[2.5rem] overflow-hidden relative h-56 group shadow-2xl shadow-blue-100/50 mt-12 bg-gray-900 border-none">
@@ -754,20 +814,41 @@ export default function ServiceDetail() {
               <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
                 <Badge className="w-fit bg-blue-600 mb-4 border-none font-black text-[10px] uppercase tracking-[0.2em] px-4 py-1 text-white">Đặc quyền VIP</Badge>
                 <h3 className="text-3xl font-black tracking-tight mb-2 uppercase italic text-white italic">Giảm thêm 15% khi đặt qua App</h3>
-                <p className="text-sm font-medium opacity-80 max-w-md text-white/80">Quét mã QR để nhận coupon giảm giá đặc biệt dành riêng cho khách hàng thân thiết của VietTravel.</p>
+                <p className="text-sm font-medium opacity-80 max-w-md text-white/80">Quét mã QR để nhận coupon giảm giá đặc biệt dành riêng cho khách hàng thân thiết của TravelPro.</p>
                 <div className="mt-8 flex items-center gap-4">
                   <div className="w-16 h-16 bg-white p-1 rounded-xl shadow-lg">
-                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://viettravel.vn/app" className="w-full h-full" alt="QR" />
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://travel-pro.vn/app" className="w-full h-full" alt="QR" />
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-60 text-white/60">Quét để tải App</p>
                 </div>
               </div>
             </div>
+
+            {/* Safety Information to fill space */}
+            <div className="bg-emerald-50 rounded-[2.5rem] p-10 border border-emerald-100 mt-12 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
+                  <ShieldCheck size={24} />
+                </div>
+                <h3 className="text-xl font-black text-emerald-900 uppercase">Thông tin an toàn & Sức khỏe</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex gap-4">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
+                  <p className="text-sm font-medium text-emerald-800">Khử khuẩn định kỳ và tuân thủ quy tắc 5K trong suốt hành trình.</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0" />
+                  <p className="text-sm font-medium text-emerald-800">Nhân viên được tiêm chủng đầy đủ và kiểm tra sức khỏe hàng tuần.</p>
+                </div>
+              </div>
+            </div>
+
           </div>
 
           {/* CỘT PHẢI: Card đặt chỗ & Nhà cung cấp */}
           <div className="lg:col-span-4">
-            <div className="sticky top-24 space-y-8">
+            <div ref={sidebarRef} style={stickyStyle} className="space-y-8">
 
               {/* Card đặt chỗ - Traveloka Style (White with heavy shadow) */}
               <div id="booking-card" className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
@@ -799,10 +880,11 @@ export default function ServiceDetail() {
                   <div className="pt-6">
                     <Button
                       onClick={handleBookingRedirect}
-                      className="w-full h-16 rounded-[1.5rem] bg-blue-600 hover:bg-blue-700 text-white font-black text-lg shadow-xl shadow-blue-200 transition-all hover:-translate-y-1 active:scale-[0.98]"
+                      className="w-full h-16 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black text-lg shadow-xl shadow-blue-200 transition-all active:scale-[0.98] uppercase"
                     >
                       ĐẶT CHỖ NGAY
                     </Button>
+                    <p className="text-center mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Không mất phí đặt chỗ</p>
                   </div>
 
                   <div className="mt-4 flex flex-col gap-3">
@@ -813,6 +895,15 @@ export default function ServiceDetail() {
                     >
                       Lịch sử đặt chỗ của tôi
                     </Button>
+                  </div>
+                </div>
+
+                {/* Travel Guarantee Badge */}
+                <div className="p-6 bg-blue-50 border-t border-blue-100 flex items-center gap-4">
+                  <ShieldCheck className="text-blue-600 shrink-0" size={24} />
+                  <div>
+                    <p className="text-[10px] font-black text-blue-900 uppercase">TravelPro Guarantee</p>
+                    <p className="text-[9px] font-medium text-blue-700">Giá tốt nhất - Hoàn tiền nếu tìm được giá rẻ hơn.</p>
                   </div>
                 </div>
               </div>
@@ -871,6 +962,29 @@ export default function ServiceDetail() {
                       <p className="font-bold text-gray-900 text-sm">{service.provider_phone || '1900 1234'}</p>
                     </div>
                   </a>
+                </div>
+              </div>
+
+              {/* Additional Sidebar Ads */}
+              <div className="space-y-4">
+                <div className="rounded-[2.5rem] overflow-hidden bg-orange-600 relative h-64 group shadow-xl">
+                  <img src={getImageUrl('/uploads/ads/resort-special.jpg')} className="w-full h-full object-cover opacity-50 transition-transform duration-1000 group-hover:scale-110" alt="Resort Ad" />
+                  <div className="absolute inset-0 p-8 flex flex-col justify-end text-white">
+                    <Badge className="w-fit bg-white text-orange-600 mb-4 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">ƯU ĐÃI ĐẶC BIỆT</Badge>
+                    <h4 className="text-xl font-black mb-1 leading-tight uppercase tracking-tighter italic">Voucher Ẩm thực <br /> Trị giá 500k</h4>
+                    <p className="text-[10px] font-medium opacity-80 mb-4">Tặng kèm khi đặt phòng khách sạn 5 sao trong tuần này</p>
+                    <Button className="w-full bg-white text-orange-600 hover:bg-orange-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">NHẬN NGAY</Button>
+                  </div>
+                </div>
+
+                <div className="rounded-[2.5rem] overflow-hidden bg-emerald-600 relative h-64 group shadow-xl">
+                  <img src={getImageUrl('/uploads/ads/global-insurance.jpg')} className="w-full h-full object-cover opacity-50 transition-transform duration-1000 group-hover:scale-110" alt="Insurance Ad" />
+                  <div className="absolute inset-0 p-8 flex flex-col justify-end text-white text-right items-end">
+                    <Badge className="w-fit bg-white text-emerald-600 mb-4 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">MIỄN PHÍ</Badge>
+                    <h4 className="text-xl font-black mb-1 leading-tight uppercase tracking-tighter italic">Bảo hiểm <br /> Du lịch Toàn cầu</h4>
+                    <p className="text-[10px] font-medium opacity-80 mb-4">An tâm tận hưởng mọi hành trình cùng TravelPro Care</p>
+                    <Button className="w-full bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TÌM HIỂU THÊM</Button>
+                  </div>
                 </div>
               </div>
 

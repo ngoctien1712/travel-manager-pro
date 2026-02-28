@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import adLeft from '@/assets/banners/ads-left.jpg';
+import adRight from '@/assets/banners/ads-right.jpg';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -91,7 +93,27 @@ export default function Checkout() {
   ];
 
   return (
-    <div className="bg-[#F8FAFC] min-h-screen">
+    <div className="bg-[#F8FAFC] min-h-screen relative">
+      {/* Full-height Skyscraper Ads */}
+      <div className="hidden 2xl:block fixed left-4 top-24 bottom-8 w-48 z-0 opacity-50 hover:opacity-100 transition-opacity">
+        <div className="h-full rounded-[2rem] overflow-hidden bg-white shadow-sm border border-gray-100 relative group text-left">
+          <img src={adLeft} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="Beach Ad" />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent p-10 flex flex-col justify-end text-white">
+            <h4 className="text-xl font-black uppercase italic leading-none mb-1">STAY RELAX</h4>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Resorts starting from $99</p>
+          </div>
+        </div>
+      </div>
+      <div className="hidden 2xl:block fixed right-4 top-24 bottom-8 w-48 z-0 opacity-50 hover:opacity-100 transition-opacity">
+        <div className="h-full rounded-[2rem] overflow-hidden bg-white shadow-sm border border-gray-100 relative group text-right">
+          <img src={adRight} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700" alt="Flight Ad" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-900 via-transparent to-transparent p-10 flex flex-col justify-end text-white text-right items-end">
+            <h4 className="text-xl font-black uppercase italic leading-none mb-1">FLY HIGH</h4>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Global flights discount</p>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white border-b border-gray-100">
         <div className="container mx-auto px-4 h-24 flex items-center justify-between">
           <Button
@@ -228,6 +250,32 @@ export default function Checkout() {
               </div>
             </Card>
 
+            <div className="p-10 rounded-[2.5rem] bg-white border border-gray-100 shadow-sm space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <ShieldCheck size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Quyền lợi thành viên</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Bạn đang nhận được các ưu đãi tốt nhất</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-sm font-bold text-gray-600">Tích lũy 150 điểm thưởng</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-sm font-bold text-gray-600">Bảo hiểm du lịch miễn phí</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-sm font-bold text-gray-600">Hỗ trợ ưu tiên 24/7</span>
+                </div>
+              </div>
+            </div>
+
             <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-10 rounded-[2.5rem] bg-gray-900 text-white shadow-2xl relative overflow-hidden group">
               <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32 group-hover:bg-blue-600/20 transition-all duration-700" />
               <div className="relative z-10">
@@ -235,7 +283,7 @@ export default function Checkout() {
                   <ShieldCheck size={20} className="text-emerald-400" />
                   <span className="font-black text-xs uppercase tracking-widest text-emerald-400">Cam kết bảo mật</span>
                 </div>
-                <p className="text-sm opacity-60 font-medium">Bằng việc nhấn "Thanh toán", bạn đồng ý với các Điều khoản & Chính sách của VietTravel.</p>
+                <p className="text-sm opacity-60 font-medium whitespace-nowrap">Bằng việc nhấn "Thanh toán", bạn đồng ý với Điều khoản của TravelPro.</p>
               </div>
               <Button
                 onClick={handleSubmit}
@@ -245,6 +293,25 @@ export default function Checkout() {
                 {loading ? 'ĐANG XỬ LÝ...' : 'THANH TOÁN NGAY'}
               </Button>
             </div>
+
+            {/* FAQ Section */}
+            <div className="pt-12 space-y-8">
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight text-center uppercase">Các câu hỏi thường gặp</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                  { q: "Vé của tôi khi nào sẽ được gửi?", a: "Ngay sau khi thanh toán thành công, vé điện tử sẽ được gửi qua email và hiển thị trong mục 'Đơn hàng của tôi'." },
+                  { q: "Tôi có thể đổi ngày đi không?", a: "Có, tùy thuộc vào chính sách của nhà cung cấp. Vui lòng liên hệ CSKH để được hỗ trợ cụ thể." },
+                  { q: "Thanh toán có an toàn không?", a: "Chúng tôi sử dụng chuẩn bảo mật PCI DSS quốc tế, đảm bảo mọi thông tin thẻ và tài khoản của bạn được bảo mật tuyệt đối." },
+                  { q: "Làm sao để lấy hóa đơn GTGT?", a: "Bạn có thể yêu cầu xuất hóa đơn đỏ ngay trong phần 'Ghi chú' hoặc liên hệ hotline sau khi đặt chỗ thành công." }
+                ].map((faq, i) => (
+                  <div key={i} className="p-6 rounded-3xl bg-white border border-gray-50 shadow-sm">
+                    <h4 className="font-black text-sm text-gray-900 mb-2">? {faq.q}</h4>
+                    <p className="text-xs text-gray-500 font-medium leading-relaxed">{faq.a}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
 
           {/* Summary Side */}
@@ -314,6 +381,34 @@ export default function Checkout() {
                 </div>
               </div>
             </Card>
+
+            {/* Sidebar Promo Ad */}
+            <div className="rounded-[2.5rem] overflow-hidden relative h-80 group shadow-xl bg-blue-600 border-none">
+              <img src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600" className="w-full h-full object-cover opacity-60 transition-transform duration-1000 group-hover:scale-110" alt="Promotion" />
+              <div className="absolute inset-0 flex flex-col justify-end p-8 text-white bg-gradient-to-t from-blue-900 to-transparent">
+                <h3 className="text-2xl font-black mb-2 leading-tight uppercase tracking-tighter">Ưu đãi <br /> Đặc quyền App</h3>
+                <p className="text-xs font-medium opacity-80 mb-6">Giảm ngay 100k cho lần đặt đầu tiên trên TravelPro Mobile!</p>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-white p-1 rounded-lg">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://travel-pro.vn/app" className="w-full h-full" alt="QR" />
+                  </div>
+                  <span className="text-[8px] font-black uppercase tracking-widest opacity-60 leading-tight">Quét mã để <br /> nhận ưu đãi</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Trust Badges */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-6 rounded-[2rem] bg-white shadow-sm flex flex-col items-center text-center gap-3">
+                <Lock size={24} className="text-blue-500" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Security Verified</span>
+              </div>
+              <div className="p-6 rounded-[2rem] bg-white shadow-sm flex flex-col items-center text-center gap-3">
+                <ShieldCheck size={24} className="text-emerald-500" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Buyer Protection</span>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>

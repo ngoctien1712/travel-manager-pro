@@ -1,4 +1,18 @@
 import { useState, useEffect } from 'react';
+import adLeft from '@/assets/banners/ads-left.jpg';
+import adRight from '@/assets/banners/ads-right.jpg';
+import danang from '@/assets/destinations/danang.jpg';
+import hoian from '@/assets/destinations/hoian.jpg';
+import sapa from '@/assets/destinations/sapa.jpg';
+import phuquoc from '@/assets/destinations/phuquoc.jpg';
+import dalat from '@/assets/destinations/dalat.jpg';
+import halong from '@/assets/destinations/halong.jpg';
+import nhatrang from '@/assets/destinations/nhatrang.jpg';
+import vungtau from '@/assets/destinations/vungtau.jpg';
+import hue from '@/assets/destinations/hue.jpg';
+import hanoi from '@/assets/destinations/hanoi.jpg';
+import cantho from '@/assets/destinations/cantho.jpg';
+import quynhon from '@/assets/destinations/quynhon.jpg';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
@@ -158,11 +172,44 @@ export const Home = () => {
   };
 
   return (
-    <div className="page-enter bg-[#F7F9FA]">
+    <div className="page-enter bg-[#F7F9FA] relative">
+      {/* Full-height Skyscraper Ads */}
+      <div className="hidden 2xl:block fixed left-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
+        <div className="h-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 bg-white relative">
+          <img src={adLeft} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Flash Sale Left" />
+          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent p-10 flex flex-col justify-end text-white text-left items-start">
+            <div className="mb-auto">
+              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">HOT DEAL 2024</Badge>
+              <div className="h-1 w-12 bg-orange-500 rounded-full mb-4" />
+            </div>
+            <Badge className="bg-orange-500 text-white border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 mb-4 w-fit">FLASH SALE</Badge>
+            <h4 className="text-2xl font-black mb-2 uppercase tracking-tighter leading-none italic">SĂN DEAL <br /> PHÚ QUỐC</h4>
+            <p className="text-[10px] font-bold opacity-70 mb-6">Chỉ từ 1.990k bao gồm máy bay & khách sạn 5 sao</p>
+            <Button size="sm" className="bg-white text-blue-900 hover:bg-blue-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">BOOK NOW</Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden 2xl:block fixed right-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
+        <div className="h-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 bg-white relative">
+          <img src={adRight} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="New Tour Right" />
+          <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/90 via-indigo-900/40 to-transparent p-10 flex flex-col justify-end text-white text-right items-end">
+            <div className="mb-auto">
+              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">SPRING 2024</Badge>
+              <div className="h-1 w-12 bg-blue-400 rounded-full mb-4 ml-auto" />
+            </div>
+            <Badge className="bg-blue-500 text-white border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 mb-4 w-fit">NEW TOUR</Badge>
+            <h4 className="text-2xl font-black mb-2 uppercase tracking-tighter leading-none italic">KHÁM PHÁ <br /> LÀO CAI</h4>
+            <p className="text-[10px] font-bold opacity-70 mb-6 text-right">Trải nghiệm cung đường Tây Bắc mùa lúa chín</p>
+            <Button size="sm" className="bg-white text-indigo-900 hover:bg-blue-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">XEM NGAY</Button>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section - Traveloka Style */}
       <section className="relative h-[480px] flex flex-col items-center justify-center text-white overflow-hidden">
         <div
-          className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1528127269322-539801943592?w=1920')] bg-cover bg-center transition-transform duration-[10s] hover:scale-110"
+          className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1506929112261-26244dc467d3?w=1920&q=80')] bg-cover bg-center transition-transform duration-[15s] hover:scale-110"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-blue-900/40 to-[#F7F9FA]" />
 
@@ -301,7 +348,7 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Promotion Banners - New Section */}
+      {/* Promotion Banners - Enhanced */}
       <section className="container max-w-7xl py-12 px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -316,7 +363,7 @@ export const Home = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Card 1: Destinations */}
           <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
-            <img src="https://images.unsplash.com/photo-1559592413-7ece35b49c2d?w=1000" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Đà Nẵng" />
+            <img src={danang} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Đà Nẵng" />
             <div className="absolute inset-0 bg-gradient-to-t from-blue-950 via-blue-900/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
               <Badge className="bg-orange-500 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">Ưu đãi mùa hè</Badge>
@@ -328,7 +375,7 @@ export const Home = () => {
 
           {/* Card 2: Activities */}
           <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2 lg:mt-12">
-            <img src="https://images.unsplash.com/photo-1528127269322-539801943592?w=1000" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Hội An" />
+            <img src={hoian} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Hội An" />
             <div className="absolute inset-0 bg-gradient-to-t from-orange-950 via-orange-900/20 to-transparent" />
             <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
               <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">Trải nghiệm</Badge>
@@ -352,7 +399,7 @@ export const Home = () => {
 
               <div className="flex items-center gap-6">
                 <div className="bg-white p-2 rounded-2xl">
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://vietravel.com/app" className="w-20 h-20" alt="QR Link" />
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://travel-pro.vn/app" className="w-20 h-20" alt="QR Link" />
                 </div>
                 <div className="space-y-2">
                   <p className="text-xs font-black uppercase tracking-widest">Available on</p>
@@ -367,6 +414,21 @@ export const Home = () => {
         </div>
       </section>
 
+      {/* Horizontal Partners Section */}
+      <section className="bg-white py-12 border-y border-gray-100 mb-12">
+        <div className="container max-w-7xl px-4">
+          <p className="text-center text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-8">ĐỐI TÁC CHIẾN LƯỢC CỦA CHÚNG TÔI</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-700">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/d/d2/Vietnam_Airlines_logo_2015.svg" className="h-8 md:h-10" alt="Vietnam Airlines" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Bamboo_Airways_logo.svg" className="h-6 md:h-8" alt="Bamboo Airways" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a3/VietJet_Air_logo.svg" className="h-6 md:h-8" alt="Vietjet" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Traveloka_Logo.svg/1024px-Traveloka_Logo.svg.png" className="h-6 md:h-8" alt="Traveloka" />
+            <img src="https://upload.wikimedia.org/wikipedia/commons/b/be/Booking.com_logo.svg" className="h-4 md:h-6" alt="Booking.com" />
+          </div>
+        </div>
+      </section>
+
+
       {/* Popular Destinations - New Section */}
       <section className="container max-w-7xl py-12 px-4 shadow-sm bg-gray-50/50 rounded-[3rem] my-12">
         <div className="flex items-center justify-between mb-10">
@@ -379,12 +441,18 @@ export const Home = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
           {[
-            { name: "Đà Nẵng", img: "https://images.unsplash.com/photo-1559592413-7ece35b49c2d?w=400", count: "120+ chỗ ở" },
-            { name: "Hội An", img: "https://images.unsplash.com/photo-1528127269322-539801943592?w=400", count: "85+ hoạt động" },
-            { name: "Sapa", img: "https://images.unsplash.com/photo-1509030450996-939a2c47605e?w=400", count: "45+ tour" },
-            { name: "Phú Quốc", img: "https://images.unsplash.com/photo-1589394815804-964ed7be2eb5?w=400", count: "200+ ưu đãi" },
-            { name: "Đà Lạt", img: "https://images.unsplash.com/photo-1563810148560-60759086e102?w=400", count: "150+ homestay" },
-            { name: "Hạ Long", img: "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400", count: "30+ du thuyền" }
+            { name: "Đà Nẵng", img: danang, count: "120+ chỗ ở" },
+            { name: "Hội An", img: hoian, count: "85+ hoạt động" },
+            { name: "Sapa", img: sapa, count: "45+ tour" },
+            { name: "Phú Quốc", img: phuquoc, count: "200+ ưu đãi" },
+            { name: "Đà Lạt", img: dalat, count: "150+ homestay" },
+            { name: "Hạ Long", img: halong, count: "30+ du thuyền" },
+            { name: "Nha Trang", img: nhatrang, count: "90+ khách sạn" },
+            { name: "Vũng Tàu", img: vungtau, count: "60+ biệt thự" },
+            { name: "Huế", img: hue, count: "25+ di sản" },
+            { name: "Hà Nội", img: hanoi, count: "300+ quán ăn" },
+            { name: "Cần Thơ", img: cantho, count: "15+ chợ nổi" },
+            { name: "Quy Nhơn", img: quynhon, count: "40+ resort" }
           ].map((dest, i) => (
             <Link key={i} to={`/hotels?q=${dest.name}`} className="group space-y-4">
               <div className="aspect-[4/5] rounded-[2rem] overflow-hidden shadow-sm transition-all duration-700 group-hover:scale-105 group-hover:shadow-xl group-hover:shadow-blue-100/50">
@@ -636,32 +704,121 @@ export const Home = () => {
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="container max-w-7xl py-24 px-4 text-center">
+      {/* Why Choose Us - Enhanced */}
+      <section className="container max-w-7xl py-24 px-4">
+        <div className="text-center mb-16">
+          <Badge className="bg-blue-600/10 text-blue-600 border-none font-black text-[10px] uppercase tracking-[0.3em] px-4 py-1 mb-4">Ưu điểm vượt trội</Badge>
+          <h2 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tighter">Tại sao nên chọn chúng tôi?</h2>
+        </div>
         <div className="grid md:grid-cols-3 gap-12">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-20 h-20 rounded-[2rem] bg-orange-50 text-orange-500 flex items-center justify-center">
-              <Sparkles size={32} />
+          <div className="group flex flex-col items-center gap-6 p-10 rounded-[3rem] bg-white border border-gray-100 shadow-sm hover:shadow-2xl hover:border-blue-100 transition-all duration-500">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-orange-50 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
+              <Sparkles size={40} />
             </div>
-            <h4 className="font-black text-xl text-gray-900">Chất lượng hàng đầu</h4>
-            <p className="text-gray-500 text-sm leading-relaxed px-8">Dịch vụ được chọn lọc kỹ càng, đảm bảo trải nghiệm tốt nhất cho khách hàng.</p>
+            <div className="text-center">
+              <h4 className="font-black text-2xl text-gray-900 mb-3 tracking-tight">Chất lượng hàng đầu</h4>
+              <p className="text-gray-500 text-sm leading-relaxed px-4">Mọi dịch vụ đều được đội ngũ chuyên gia của chúng tôi kiểm duyệt khắt khe, đảm bảo tiêu chuẩn 5 sao.</p>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-20 h-20 rounded-[2rem] bg-blue-50 text-blue-500 flex items-center justify-center">
-              <Calendar size={32} />
+          <div className="group flex flex-col items-center gap-6 p-10 rounded-[3rem] bg-gradient-to-b from-blue-600 to-indigo-700 text-white shadow-2xl hover:-translate-y-2 transition-all duration-500">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-white/20 text-white flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
+              <Calendar size={40} />
             </div>
-            <h4 className="font-black text-xl text-gray-900">Đặt chỗ linh hoạt</h4>
-            <p className="text-gray-500 text-sm leading-relaxed px-8">Hủy phòng hoặc đổi lịch trình dễ dàng với chính sách linh hoạt.</p>
+            <div className="text-center">
+              <h4 className="font-black text-2xl text-white mb-3 tracking-tight">Đặt chỗ linh hoạt</h4>
+              <p className="text-white/80 text-sm leading-relaxed px-4">Đổi lịch hoặc hoàn tiền nhanh chóng chỉ với vài cú chạm. Chúng tôi hiểu rằng kế hoạch của bạn có thể thay đổi.</p>
+            </div>
           </div>
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-20 h-20 rounded-[2rem] bg-green-50 text-green-500 flex items-center justify-center">
-              <Users size={32} />
+          <div className="group flex flex-col items-center gap-6 p-10 rounded-[3rem] bg-white border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-100 transition-all duration-500">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-green-50 text-green-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-inner">
+              <Users size={40} />
             </div>
-            <h4 className="font-black text-xl text-gray-900">Hỗ trợ 24/7</h4>
-            <p className="text-gray-500 text-sm leading-relaxed px-8">Đội ngũ CSKH chuyên nghiệp luôn sẵn sàng hỗ trợ bạn mọi lúc mọi nơi.</p>
+            <div className="text-center">
+              <h4 className="font-black text-2xl text-gray-900 mb-3 tracking-tight">Hỗ trợ 24/7</h4>
+              <p className="text-gray-500 text-sm leading-relaxed px-4">Không bao giờ cảm thấy cô đơn. Đội ngũ CSKH chuyên nghiệp luôn sẵn sàng đồng hành cùng bạn trên mọi nẻo đường.</p>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Customer Feedback - New Section to fill space */}
+      <section className="bg-gray-900 py-24 overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/20 rounded-full blur-[120px] -mr-48 -mt-48" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-600/20 rounded-full blur-[120px] -ml-48 -mb-48" />
+
+        <div className="container max-w-7xl px-4 relative z-10">
+          <div className="flex flex-col md:flex-row items-end justify-between mb-16 gap-8">
+            <div className="max-w-2xl">
+              <Badge className="bg-white/10 text-white border-none font-black text-[10px] uppercase tracking-[0.3em] px-4 py-1 mb-4">Đánh giá thực tế</Badge>
+              <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-none mb-6">Tiếng nói từ <br /> cộng đồng du lịch</h2>
+              <p className="text-white/50 text-xl font-medium">Hơn 100,000+ khách hàng đã tin tưởng và có những trải nghiệm không thể quên cùng TravelPro.</p>
+            </div>
+            <div className="flex gap-4">
+              <Button variant="outline" className="rounded-full w-14 h-14 border-white/20 text-white hover:bg-white/10"><ArrowRight className="rotate-180" /></Button>
+              <Button variant="outline" className="rounded-full w-14 h-14 border-white border-white text-white hover:bg-white/10"><ArrowRight /></Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Minh Anh",
+                role: "Travel Blogger",
+                comment: "Trải nghiệm đặt tour tại đây cực kỳ mượt mà. Đội ngũ hỗ trợ nhiệt tình, khách sạn đúng như hình ảnh quảng cáo.",
+                avatar: "https://i.pravatar.cc/150?u=1"
+              },
+              {
+                name: "Hoàng Long",
+                role: "Doanh nhân",
+                comment: "Giao diện hiện đại, dễ sử dụng. Phần thanh toán linh hoạt và an toàn khiến tôi rất yên tâm khi đặt phòng cho gia đình.",
+                avatar: "https://i.pravatar.cc/150?u=2"
+              },
+              {
+                name: "Thùy Chi",
+                role: "Nhiếp ảnh gia",
+                comment: "Tôi đã đi nhiều nơi và sử dụng nhiều ứng dụng, nhưng sự tinh tế trong cách TravelPro gợi ý điểm đến là thứ làm tôi ấn tượng nhất.",
+                avatar: "https://i.pravatar.cc/150?u=3"
+              }
+            ].map((review, i) => (
+              <div key={i} className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[3rem] hover:bg-white/10 transition-all duration-500">
+                <div className="flex items-center gap-1 mb-6 text-yellow-400">
+                  {Array.from({ length: 5 }).map((_, j) => <Star key={j} size={16} className="fill-current" />)}
+                </div>
+                <p className="text-white/80 text-lg font-medium leading-relaxed mb-8 italic">"{review.comment}"</p>
+                <div className="flex items-center gap-4">
+                  <img src={review.avatar} className="w-12 h-12 rounded-full border-2 border-blue-500" alt={review.name} />
+                  <div>
+                    <h5 className="text-white font-black text-sm uppercase tracking-tight">{review.name}</h5>
+                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest">{review.role}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Newsletter - New Section to fill space at bottom */}
+      <section className="container max-w-7xl py-24 px-4">
+        <div className="bg-blue-600 rounded-[4rem] p-12 md:p-24 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-12 text-white">
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/10 rounded-full -mr-64 -mt-64 blur-[100px]" />
+          <div className="relative z-10 max-w-xl">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tighter mb-6 leading-none">Tham gia cùng <br /> 500,000+ khách hàng</h2>
+            <p className="text-blue-100 text-lg font-medium">Đăng ký nhận tin để không bao giờ bỏ lỡ các ưu đãi bí mật và mã giảm giá lên đến 50% chỉ dành riêng cho thành viên.</p>
+          </div>
+          <div className="relative z-10 w-full max-w-md">
+            <div className="flex gap-4 p-3 bg-white/10 backdrop-blur-md rounded-[2.5rem] border border-white/20">
+              <Input
+                placeholder="Nhập email của bạn..."
+                className="bg-transparent border-none text-white placeholder:text-blue-200 focus-visible:ring-0 text-lg font-medium pl-6"
+              />
+              <Button className="bg-white text-blue-600 hover:bg-blue-50 rounded-full px-8 h-12 font-black text-sm uppercase tracking-widest">Gửi ngay</Button>
+            </div>
+            <p className="text-[10px] text-blue-200/60 font-medium mt-4 ml-6 uppercase tracking-widest">Chúng tôi cam kết không spam. Hủy đăng ký bất cứ lúc nào.</p>
+          </div>
+        </div>
+      </section>
+
     </div>
   );
 };
