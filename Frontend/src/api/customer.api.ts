@@ -226,9 +226,10 @@ export const customerApi = {
     return userApi.getProfile();
   },
 
-  async updateProfile(data: { fullName?: string; phone?: string; travel_style?: string }): Promise<any> {
+  async updateProfile(data: { fullName?: string; phone?: string; travel_style?: string | string[]; date?: string }): Promise<any> {
     const profile: Record<string, unknown> = {};
-    if (data.travel_style) profile.travel_style = data.travel_style;
+    if (data.travel_style !== undefined) profile.travel_style = data.travel_style;
+    if (data.date !== undefined) profile.date = data.date;
 
     return userApi.updateProfile({
       fullName: data.fullName,

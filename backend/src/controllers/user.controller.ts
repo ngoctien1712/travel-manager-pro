@@ -39,6 +39,9 @@ export async function getProfile(req: Request, res: Response) {
         [userId]
       );
       profile = p[0] || {};
+      if (typeof profile.travel_style === 'string' && profile.travel_style.startsWith('[')) {
+        try { profile.travel_style = JSON.parse(profile.travel_style); } catch (e) { }
+      }
     } else if (role === 'owner') {
       const { rows: p } = await pool.query(
         'SELECT business_name FROM area_owner_profile WHERE id_user = $1',
@@ -73,7 +76,7 @@ export async function getProfile(req: Request, res: Response) {
 export async function updateProfile(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
-    const { fullName, phone, ...profileData } = req.body;
+    const { fullName, phone, profile: profileData = {} } = req.body;
 
     await pool.query(
       'UPDATE users SET full_name = COALESCE($1, full_name), phone = COALESCE($2, phone), updated_at = NOW() WHERE id_user = $3',
@@ -81,12 +84,13 @@ export async function updateProfile(req: Request, res: Response) {
     );
 
     const role = await getUserRole(userId);
-    if (role === 'customer' && (profileData.travel_style !== undefined || profileData.date)) {
+    if (role === 'customer' && (profileData.travel_style !== undefined || profileData.date !== undefined)) {
+      const tsValue = Array.isArray(profileData.travel_style) ? JSON.stringify(profileData.travel_style) : (profileData.travel_style || null);
       await pool.query(
         `INSERT INTO customer_profiles (id_user, date, travel_style)
          VALUES ($1, $2, $3)
          ON CONFLICT (id_user) DO UPDATE SET date = COALESCE(EXCLUDED.date, customer_profiles.date), travel_style = COALESCE(EXCLUDED.travel_style, customer_profiles.travel_style)`,
-        [userId, profileData.date || null, profileData.travel_style || null]
+        [userId, profileData.date || null, tsValue]
       );
     } else if (role === 'owner' && profileData.business_name !== undefined) {
       await pool.query(

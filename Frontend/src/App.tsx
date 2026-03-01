@@ -35,7 +35,9 @@ import OwnerDashboard from "@/pages/owner/Dashboard";
 import OwnerMyProviders from "@/pages/owner/MyProviders";
 import OwnerMyServices from "@/pages/owner/MyServices";
 import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
+import OwnerOrders from "@/pages/owner/Orders";
 import Profile from "@/pages/Profile";
+import CustomerProfile from "@/pages/customer/Profile";
 
 const queryClient = new QueryClient();
 
@@ -94,7 +96,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer']}><Profile /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute allowedRoles={['customer']}><CustomerProfile /></ProtectedRoute>} />
             </Route>
 
             {/* Admin Routes */}
@@ -138,8 +140,8 @@ const App = () => (
               <Route path="services" element={<OwnerMyServices />} />
               <Route path="services/:idItem" element={<OwnerServiceDetail />} />
               <Route path="media" element={<OwnerDashboard />} />
-              <Route path="orders" element={<OwnerDashboard />} />
-              <Route path="orders/:id" element={<OwnerDashboard />} />
+              <Route path="orders" element={<OwnerOrders />} />
+              <Route path="orders/:id" element={<OwnerOrders />} />
               <Route path="profile" element={<Profile />} />
             </Route>
 

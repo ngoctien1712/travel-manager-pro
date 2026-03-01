@@ -11,7 +11,7 @@ export interface UserProfile {
   emailVerified: boolean;
   profile?: {
     date?: string;
-    travel_style?: string;
+    travel_style?: string | string[];
     business_name?: string;
     department?: string;
   };
