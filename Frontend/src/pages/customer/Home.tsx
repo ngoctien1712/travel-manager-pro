@@ -14,6 +14,14 @@ import hue from '@/assets/destinations/hue.jpg';
 import hanoi from '@/assets/destinations/hanoi.jpg';
 import cantho from '@/assets/destinations/cantho.jpg';
 import quynhon from '@/assets/destinations/quynhon.jpg';
+
+// Partner Logos
+import partnerPhuongTrang from '@/assets/partners/phuong-trang.png';
+import partnerVietravel from '@/assets/partners/vietravel.png';
+import partnerSaigontourist from '@/assets/partners/saigontourist.png';
+import partnerBenThanh from '@/assets/partners/benthanh.png';
+import partnerThanhBuoi from '@/assets/partners/thanh-buoi.png';
+
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
@@ -28,6 +36,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ServiceCardSkeleton } from '@/components/LoadingSkeleton';
 import EmptyState from '@/components/EmptyState';
 import {
@@ -116,6 +131,14 @@ export const Home = () => {
     date: searchParams.get('date') || '',
   });
 
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [comingSoonContent, setComingSoonContent] = useState({ title: '', desc: '' });
+
+  const openComingSoon = (title: string, desc: string) => {
+    setComingSoonContent({ title, desc });
+    setShowComingSoon(true);
+  };
+
   const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
   const getImageUrl = (url: string | null) => {
     if (!url) return 'https://images.unsplash.com/photo-1528127269322-539801943592?w=800';
@@ -174,53 +197,21 @@ export const Home = () => {
 
   return (
     <div className="page-enter bg-[#F7F9FA] relative">
-      {/* Full-height Skyscraper Ads */}
-      <div className="hidden 2xl:block fixed left-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
-        <div className="h-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 bg-white relative">
-          <img src={adLeft} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Flash Sale Left" />
-          <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/40 to-transparent p-10 flex flex-col justify-end text-white text-left items-start">
-            <div className="mb-auto">
-              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">HOT DEAL 2024</Badge>
-              <div className="h-1 w-12 bg-orange-500 rounded-full mb-4" />
-            </div>
-            <Badge className="bg-orange-500 text-white border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 mb-4 w-fit">FLASH SALE</Badge>
-            <h4 className="text-2xl font-black mb-2 uppercase tracking-tighter leading-none italic">SĂN DEAL <br /> PHÚ QUỐC</h4>
-            <p className="text-[10px] font-bold opacity-70 mb-6">Chỉ từ 1.990k bao gồm máy bay & khách sạn 5 sao</p>
-            <Button size="sm" className="bg-white text-blue-900 hover:bg-blue-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">BOOK NOW</Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden 2xl:block fixed right-4 top-24 bottom-8 w-48 z-[5] group cursor-pointer">
-        <div className="h-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/20 bg-white relative">
-          <img src={adRight} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="New Tour Right" />
-          <div className="absolute inset-0 bg-gradient-to-t from-indigo-900/90 via-indigo-900/40 to-transparent p-10 flex flex-col justify-end text-white text-right items-end">
-            <div className="mb-auto">
-              <Badge className="bg-white/20 backdrop-blur text-white border-none font-bold text-[8px] uppercase tracking-widest px-3 py-1 mb-2">SPRING 2024</Badge>
-              <div className="h-1 w-12 bg-blue-400 rounded-full mb-4 ml-auto" />
-            </div>
-            <Badge className="bg-blue-500 text-white border-none font-black text-[8px] uppercase tracking-widest px-3 py-1 mb-4 w-fit">NEW TOUR</Badge>
-            <h4 className="text-2xl font-black mb-2 uppercase tracking-tighter leading-none italic">KHÁM PHÁ <br /> LÀO CAI</h4>
-            <p className="text-[10px] font-bold opacity-70 mb-6 text-right">Trải nghiệm cung đường Tây Bắc mùa lúa chín</p>
-            <Button size="sm" className="bg-white text-indigo-900 hover:bg-blue-50 rounded-xl font-black text-[9px] uppercase tracking-widest h-10 w-full shadow-lg">XEM NGAY</Button>
-          </div>
-        </div>
-      </div>
-
       {/* Hero Section - Traveloka Style */}
-      <section className="relative h-[480px] flex flex-col items-center justify-center text-white overflow-hidden">
+      <section className="relative h-[520px] flex flex-col items-center justify-center text-white overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-[15s] hover:scale-110"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[20s] hover:scale-110"
           style={{ backgroundImage: `url(${heroBg})` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-blue-900/40 to-[#F7F9FA]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-blue-900/20 to-[#F7F9FA]" />
 
         <div className="relative z-10 text-center px-4 max-w-4xl mb-12">
-          <h1 className="text-4xl md:text-6xl font-display font-bold mb-4 drop-shadow-lg tracking-tight">
-            Khám phá thế giới, <br /> bắt đầu từ đây
+          <Badge className="bg-white/20 backdrop-blur-md text-white border-none font-black text-[10px] uppercase tracking-[0.4em] px-6 py-2 rounded-full mb-6">Trải nghiệm du lịch 5 sao</Badge>
+          <h1 className="text-5xl md:text-7xl font-display font-black mb-6 drop-shadow-2xl tracking-tighter leading-[0.9]">
+            KHÁM PHÁ THẾ GIỚI, <br /><span className="text-blue-400">BẮT ĐẦU TỪ ĐÂY</span>
           </h1>
-          <p className="text-lg md:text-xl opacity-90 drop-shadow-md font-medium">
-            Hàng ngàn tour, khách sạn và phương tiện đang chờ đón bạn
+          <p className="text-xl md:text-2xl opacity-95 drop-shadow-xl font-medium max-w-2xl mx-auto">
+            Đặt tour, khách sạn và phương tiện di chuyển dễ dàng hơn bao giờ hết với TravelPro.
           </p>
         </div>
 
@@ -310,55 +301,67 @@ export const Home = () => {
 
       {/* Categories Horizontal */}
       <section className="container max-w-7xl pt-24 pb-12 overflow-x-auto scrollbar-hide">
-        <div className="flex justify-center gap-4 min-w-max px-4">
+        <div className="flex justify-center gap-6 min-w-max px-4">
           <Link
             to="/activities"
-            className="flex flex-col items-center gap-3 p-6 rounded-[2.5rem] min-w-[140px] transition-all duration-300 border bg-white text-gray-600 border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 shadow-sm"
+            className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-blue-300 hover:bg-blue-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500">
+            <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-blue-50 text-blue-600 transition-all duration-500 group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
               {iconMap['tour']}
             </div>
-            <span className="font-bold text-sm">Tour du lịch</span>
+            <span className="font-black text-sm uppercase tracking-tight">Tour du lịch</span>
           </Link>
           <Link
             to="/hotels"
-            className="flex flex-col items-center gap-3 p-6 rounded-[2.5rem] min-w-[140px] transition-all duration-300 border bg-white text-gray-600 border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 shadow-sm"
+            className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500">
+            <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-orange-50 text-orange-600 transition-all duration-500 group-hover:bg-orange-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
               {iconMap['accommodation']}
             </div>
-            <span className="font-bold text-sm">Khách sạn</span>
+            <span className="font-black text-sm uppercase tracking-tight">Khách sạn</span>
           </Link>
           <Link
             to="/bus-shuttle"
-            className="flex flex-col items-center gap-3 p-6 rounded-[2.5rem] min-w-[140px] transition-all duration-300 border bg-white text-gray-600 border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 shadow-sm"
+            className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-emerald-300 hover:bg-emerald-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500">
+            <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-emerald-50 text-emerald-600 transition-all duration-500 group-hover:bg-emerald-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
               {iconMap['vehicle']}
             </div>
-            <span className="font-bold text-sm">Phương tiện</span>
+            <span className="font-black text-sm uppercase tracking-tight">Phương tiện</span>
           </Link>
-          <Link
-            to="/activities"
-            className="flex flex-col items-center gap-3 p-6 rounded-[2.5rem] min-w-[140px] transition-all duration-300 border bg-white text-gray-600 border-gray-100 hover:border-blue-200 hover:bg-blue-50/30 shadow-sm"
+          <button
+            onClick={() => openComingSoon("Combo Tiết Kiệm", "Chúng tôi đang tổng hợp các gói Combo Du lịch + Khách sạn với mức giá ưu đãi nhất. Tính năng sẽ sớm ra mắt!")}
+            className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-purple-300 hover:bg-purple-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group cursor-pointer"
           >
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-blue-50 text-blue-500">
-              {iconMap['ticket']}
+            <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-purple-50 text-purple-600 transition-all duration-500 group-hover:bg-purple-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
+              <Ticket className="h-6 w-6" />
             </div>
-            <span className="font-bold text-sm">Vé tham quan</span>
-          </Link>
+            <span className="font-black text-sm uppercase tracking-tight">Combo tiết kiệm</span>
+          </button>
+          <button
+            onClick={() => openComingSoon("Cẩm Nang Du Lịch", "Chuyên trang du lịch chia sẻ kinh nghiệm và các địa điểm 'check-in' hot nhất Việt Nam đang được biên tập.")}
+            className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-rose-300 hover:bg-rose-50/50 shadow-sm hover:shadow-xl hover:-translate-y-2 group cursor-pointer"
+          >
+            <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-rose-50 text-rose-600 transition-all duration-500 group-hover:bg-rose-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
+              <Users className="h-6 w-6" />
+            </div>
+            <span className="font-black text-sm uppercase tracking-tight">Cẩm nang du lịch</span>
+          </button>
         </div>
       </section>
 
-      {/* Promotion Banners - Enhanced */}
-      <section className="container max-w-7xl py-12 px-4">
-        <div className="flex items-center justify-between mb-8">
+      {/* Promotion Banners - Enhanced (Section Khuyến mãi) */}
+      <section id="section-khuyen-mai" className="container max-w-7xl py-24 px-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 gap-4">
           <div>
-            <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">Khuyến mãi cực hot</h2>
-            <p className="text-gray-400 font-medium">Đừng bỏ lỡ những ưu đãi dành riêng cho bạn</p>
+            <Badge className="bg-blue-100 text-blue-600 border-none px-4 py-1 mb-4">SPECIAL OFFERS</Badge>
+            <h2 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tighter uppercase italic leading-none">
+              CHƯƠNG TRÌNH <span className="text-blue-600">KHUYẾN MÃI</span>
+            </h2>
+            <p className="text-gray-500 font-medium text-lg mt-2">Tổng hợp các ưu đãi du lịch hấp dẫn nhất dành cho bạn</p>
           </div>
-          <Link to="/promotions" className="hidden md:flex items-center gap-2 text-blue-600 font-bold hover:underline">
-            Xem tất cả ưu đãi <ArrowRight size={16} />
+          <Link to="/promotions" className="flex items-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-black transition-all shadow-xl group">
+            Xem tất cả <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
           </Link>
         </div>
 
@@ -387,48 +390,95 @@ export const Home = () => {
             </div>
           </div>
 
-          {/* Card 3: New App Promo */}
-          <div className="group relative h-[450px] rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-indigo-900" />
-            <div className="absolute inset-0 overflow-hidden opacity-20">
-              <div className="absolute top-[-100px] left-[-100px] w-64 h-64 rounded-full border-[20px] border-white" />
-              <div className="absolute bottom-[-100px] right-[-100px] w-96 h-96 rounded-full border-[40px] border-white/50" />
+          {/* Card 3: App Promo with Tiled Banners (Advertising integrated here) */}
+          <div className="flex flex-col gap-8">
+            <div className="group relative flex-1 rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
+              <img src={adLeft} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="Special Offer" />
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-900/90 via-blue-900/20 to-transparent p-10 flex flex-col justify-end text-white">
+                <Badge className="bg-orange-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-4 w-fit">FLASH DEAL</Badge>
+                <h3 className="text-3xl font-black mb-2 tracking-tighter leading-none italic uppercase">SĂN DEAL <br /> PHÚ QUỐC</h3>
+                <p className="text-xs opacity-80 font-medium mb-6">Combo 3N2Đ Nghỉ dưỡng 5 sao <br />Giá chỉ từ <span className="text-orange-400 font-black">1.990k</span></p>
+                <Button className="bg-white text-blue-900 hover:bg-blue-600 hover:text-white rounded-2xl h-12 px-8 font-black text-xs tracking-widest uppercase shadow-xl transition-all">ĐẶT NGAY</Button>
+              </div>
             </div>
-            <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
-              <Sparkles className="text-yellow-400 mb-6 h-12 w-12" />
-              <h3 className="text-4xl font-black mb-4 tracking-tighter leading-tight uppercase">TẢI APP <br /> NHẬN QUÀ</h3>
-              <p className="text-lg opacity-80 font-medium mb-8">Quét mã QR để nhận ngay voucher giảm 20% cho lần đầu đặt chỗ trên ứng dụng.</p>
-
-              <div className="flex items-center gap-6">
-                <div className="bg-white p-2 rounded-2xl">
-                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://travel-pro.vn/app" className="w-20 h-20" alt="QR Link" />
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs font-black uppercase tracking-widest">Available on</p>
-                  <div className="flex gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-black/20 backdrop-blur flex items-center justify-center"><Building2 size={16} /></div>
-                    <div className="w-8 h-8 rounded-lg bg-black/20 backdrop-blur flex items-center justify-center"><MapPin size={16} /></div>
-                  </div>
-                </div>
+            <div className="group relative flex-1 rounded-[3rem] overflow-hidden shadow-2xl transition-all duration-700 hover:-translate-y-2">
+              <img src={adRight} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" alt="New Journey" />
+              <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/90 via-emerald-900/20 to-transparent p-10 flex flex-col justify-end text-white text-right items-end">
+                <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-4 w-fit">NEW TOUR</Badge>
+                <h3 className="text-3xl font-black mb-2 tracking-tighter leading-none italic uppercase text-right">KHÁM PHÁ <br /> LÀO CAI</h3>
+                <p className="text-xs opacity-80 font-medium mb-6 text-right">Chinh phục đỉnh Fansipan mùa mây <br />Chỉ tính từ <span className="text-emerald-400 font-black">890k</span></p>
+                <Button className="bg-white text-emerald-900 hover:bg-emerald-600 hover:text-white rounded-2xl h-12 px-8 font-black text-xs tracking-widest uppercase shadow-xl transition-all">XEM TOUR</Button>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Horizontal Partners Section */}
-      <section className="bg-white py-12 border-y border-gray-100 mb-12">
+      {/* Horizontal Partners Section - Updated with Highly Reliable URLs */}
+      <section className="bg-white py-24 border-y border-gray-100 mb-12">
         <div className="container max-w-7xl px-4">
-          <p className="text-center text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-8">ĐỐI TÁC CHIẾN LƯỢC CỦA CHÚNG TÔI</p>
-          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 grayscale opacity-40 hover:grayscale-0 hover:opacity-100 transition-all duration-700">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/d/d2/Vietnam_Airlines_logo_2015.svg" className="h-8 md:h-10" alt="Vietnam Airlines" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/0/0b/Bamboo_Airways_logo.svg" className="h-6 md:h-8" alt="Bamboo Airways" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/a/a3/VietJet_Air_logo.svg" className="h-6 md:h-8" alt="Vietjet" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/cd/Traveloka_Logo.svg/1024px-Traveloka_Logo.svg.png" className="h-6 md:h-8" alt="Traveloka" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/b/be/Booking.com_logo.svg" className="h-4 md:h-6" alt="Booking.com" />
+          <p className="text-center text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-16">ĐỐI TÁC CHIẾN LƯỢC TẠI VIỆT NAM</p>
+          <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24">
+            <div className="group relative">
+              <img
+                src={partnerPhuongTrang}
+                className="h-10 md:h-12 object-contain group-hover:scale-110 transition-all duration-500"
+                alt="Phương Trang"
+              />
+            </div>
+            <div className="group relative">
+              <img
+                src={partnerVietravel}
+                className="h-8 md:h-10 object-contain group-hover:scale-110 transition-all duration-500"
+                alt="Vietravel"
+              />
+            </div>
+            <div className="group relative">
+              <img
+                src={partnerSaigontourist}
+                className="h-10 md:h-12 object-contain group-hover:scale-110 transition-all duration-500 rounded"
+                alt="Saigontourist"
+              />
+            </div>
+            <div className="group relative">
+              <img
+                src={partnerBenThanh}
+                className="h-10 md:h-12 object-contain group-hover:scale-110 transition-all duration-500"
+                alt="BenThanh Tourist"
+              />
+            </div>
+            <div className="group relative">
+              <img
+                src={partnerThanhBuoi}
+                className="h-10 md:h-12 object-contain group-hover:scale-110 transition-all duration-500"
+                alt="Thành Bưởi"
+              />
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Coming Soon Dialog */}
+      <Dialog open={showComingSoon} onOpenChange={setShowComingSoon}>
+        <DialogContent className="sm:max-w-md rounded-[3rem] border-none shadow-2xl p-0 overflow-hidden bg-white/95 backdrop-blur-xl">
+          <div className="h-2 bg-gradient-to-r from-blue-600 via-purple-600 to-rose-600" />
+          <div className="p-10 space-y-6 text-center">
+            <div className="mx-auto w-20 h-20 bg-blue-50 rounded-[2rem] flex items-center justify-center text-blue-600 mb-4">
+              <Sparkles size={40} className="animate-pulse" />
+            </div>
+            <DialogTitle className="text-3xl font-black text-gray-900 tracking-tight uppercase leading-none italic">{comingSoonContent.title}</DialogTitle>
+            <DialogDescription className="text-lg font-medium text-gray-500 leading-relaxed">
+              {comingSoonContent.desc}
+            </DialogDescription>
+            <Button
+              className="bg-gray-900 hover:bg-black text-white px-12 h-14 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all w-full mt-4"
+              onClick={() => setShowComingSoon(false)}
+            >
+              Tôi đã hiểu
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
       {/* Popular Destinations - New Section */}
