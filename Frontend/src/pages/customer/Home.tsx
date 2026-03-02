@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import adLeft from '@/assets/banners/ads-left.jpg';
 import adRight from '@/assets/banners/ads-right.jpg';
+import heroBg from '@/assets/banners/hero-bg.jpg';
 import danang from '@/assets/destinations/danang.jpg';
 import hoian from '@/assets/destinations/hoian.jpg';
 import sapa from '@/assets/destinations/sapa.jpg';
@@ -209,7 +210,8 @@ export const Home = () => {
       {/* Hero Section - Traveloka Style */}
       <section className="relative h-[480px] flex flex-col items-center justify-center text-white overflow-hidden">
         <div
-          className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1506929112261-26244dc467d3?w=1920&q=80')] bg-cover bg-center transition-transform duration-[15s] hover:scale-110"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[15s] hover:scale-110"
+          style={{ backgroundImage: `url(${heroBg})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-blue-900/40 to-[#F7F9FA]" />
 
