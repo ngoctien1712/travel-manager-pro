@@ -8,6 +8,7 @@ import adminGeographyRoutes from './routes/admin-geography.routes.js';
 import geographyRoutes from './routes/geography.routes.js';
 import ownerRoutes from './routes/owner.routes.js';
 import customerRoutes from './routes/customer.routes.js';
+import chatRoutes from './routes/chat.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +17,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:8080', cred
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
+app.use('/api/chat', chatRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);

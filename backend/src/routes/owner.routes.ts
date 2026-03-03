@@ -100,7 +100,6 @@ router.delete(
   ownerController.deleteVehicleTrip
 );
 
-// Voucher Management
 router.get('/vouchers', voucherController.getMyVouchers);
 router.post(
   '/vouchers',

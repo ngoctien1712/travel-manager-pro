@@ -15,6 +15,7 @@ import {
   MapPin,
   Building2,
   Tag,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -33,6 +34,7 @@ const sidebarItems = [
   { icon: Map, label: 'Dịch vụ của tôi', path: '/owner/services' },
   { icon: Tag, label: 'Voucher', path: '/owner/vouchers' },
   { icon: ShoppingBag, label: 'Đơn hàng', path: '/owner/orders' },
+  { icon: MessageSquare, label: 'Tin nhắn', path: '/owner/messages' },
   { icon: User, label: 'Hồ sơ', path: '/owner/profile' },
 ];
 

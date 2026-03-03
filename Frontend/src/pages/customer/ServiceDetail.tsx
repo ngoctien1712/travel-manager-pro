@@ -30,8 +30,10 @@ import {
   Car,
   Sparkles,
   ShieldCheck,
-  ExternalLink
+  ExternalLink,
+  MessageCircle
 } from 'lucide-react';
+import ChatWidget from '@/components/chat/ChatWidget';
 
 interface ServiceDetail {
   id_item: string;
@@ -44,6 +46,7 @@ interface ServiceDetail {
   tags?: string[];
 
   // Provider info
+  id_provider?: string;
   provider_name?: string;
   provider_phone?: string;
   provider_image?: string;
@@ -1055,6 +1058,22 @@ export default function ServiceDetail() {
                       <p className="font-bold text-gray-900 text-sm">{service.provider_phone || '1900 1234'}</p>
                     </div>
                   </a>
+
+                  <Button
+                    onClick={() => {
+                      const chatBtn = document.querySelector('button[class*="fixed bottom-6 right-6"]') as HTMLButtonElement;
+                      if (chatBtn) chatBtn.click();
+                    }}
+                    className="w-full flex items-center gap-4 p-4 h-auto rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 border-none transition-all group"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
+                      <MessageCircle size={18} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[9px] font-black text-blue-400 uppercase mb-0.5">Hỗ trợ trực tuyến</p>
+                      <p className="font-bold text-blue-900 text-sm">Chat với {service.provider_name}</p>
+                    </div>
+                  </Button>
                 </div>
               </div>
 
@@ -1118,6 +1137,14 @@ export default function ServiceDetail() {
           ĐẶT CHỖ
         </Button>
       </div>
+      {service.id_provider && (
+        <ChatWidget
+          providerId={service.id_provider}
+          providerName={service.provider_name || 'Nhà cung cấp'}
+          itemId={service.id_item}
+          itemName={service.title}
+        />
+      )}
     </div>
   );
 }
