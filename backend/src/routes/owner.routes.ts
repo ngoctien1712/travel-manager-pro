@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { auth, requireRole } from '../middleware/auth.js';
 import * as ownerController from '../controllers/owner.controller.js';
+import * as voucherController from '../controllers/voucher.controller.js';
 import { upload } from '../utils/upload.js';
 
 const router = Router();
@@ -98,6 +99,22 @@ router.delete(
   '/trips/:idTrip',
   ownerController.deleteVehicleTrip
 );
+
+// Voucher Management
+router.get('/vouchers', voucherController.getMyVouchers);
+router.post(
+  '/vouchers',
+  [
+    body('code').trim().notEmpty().withMessage('Mã voucher bắt buộc'),
+    body('name').trim().notEmpty().withMessage('Tên voucher bắt buộc'),
+    body('idProvider').isUUID().withMessage('providerId không hợp lệ'),
+    body('discountType').isIn(['percentage', 'fixed_amount']).withMessage('Loại giảm giá không hợp lệ'),
+    body('discountValue').isFloat({ min: 0 }).withMessage('Giá trị giảm giá không hợp lệ'),
+  ],
+  voucherController.createVoucher
+);
+router.put('/vouchers/:idVoucher', voucherController.updateVoucher);
+router.delete('/vouchers/:idVoucher', voucherController.deleteVoucher);
 
 router.post(
   '/bookable-items',

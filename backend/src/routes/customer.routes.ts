@@ -7,6 +7,7 @@ const router = Router();
 // public
 router.get('/services', customerCtrl.listServices);
 router.get('/services/:id', customerCtrl.getService);
+router.get('/vouchers/applicable', customerCtrl.getApplicableVouchers);
 router.get('/home', customerCtrl.getHomeData);
 router.post('/webhook/momo', customerCtrl.handleMomoIPN);
 router.post('/webhook/project', customerCtrl.handleProjectWebhook);

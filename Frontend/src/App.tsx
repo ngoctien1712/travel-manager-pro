@@ -36,6 +36,7 @@ import OwnerMyProviders from "@/pages/owner/MyProviders";
 import OwnerMyServices from "@/pages/owner/MyServices";
 import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
 import OwnerOrders from "@/pages/owner/Orders";
+import OwnerVouchers from "@/pages/owner/Vouchers";
 import Profile from "@/pages/Profile";
 import CustomerProfile from "@/pages/customer/Profile";
 
@@ -142,6 +143,7 @@ const App = () => (
               <Route path="media" element={<OwnerDashboard />} />
               <Route path="orders" element={<OwnerOrders />} />
               <Route path="orders/:id" element={<OwnerOrders />} />
+              <Route path="vouchers" element={<OwnerVouchers />} />
               <Route path="profile" element={<Profile />} />
             </Route>
 

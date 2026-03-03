@@ -418,31 +418,28 @@ export const createBooking = async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
 
-    const { id_item, item_type, payment_method, details } = req.body;
+    const { id_item, item_type, payment_method, details, voucher_code } = req.body;
 
     if (!id_item || !item_type) {
       return res.status(400).json({ message: 'Thiếu thông tin dịch vụ' });
     }
 
-    // 1. Fetch base price from bookable_items
-    const itemQuery = await query('SELECT price FROM bookable_items WHERE id_item = $1', [id_item]);
+    // 1. Fetch base price and provider from bookable_items
+    const itemQuery = await query('SELECT price, id_provider FROM bookable_items WHERE id_item = $1', [id_item]);
     if (!itemQuery.rows[0]) {
       return res.status(404).json({ message: 'Dịch vụ không tồn tại' });
     }
     const price = Number(itemQuery.rows[0].price || 0);
-    let totalAmount = 0;
+    const itemProviderId = itemQuery.rows[0].id_provider;
+
+    let subtotal = 0;
+    let totalItemQuantity = 1; // Default to 1 for calculation
     const orderCode = `ORD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
-    const orderInsert = await query(
-      `INSERT INTO "order" (status, order_code, total_amount, currency, order_type, id_user, payment_method) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id_order`,
-      ['pending', orderCode, 0, 'VND', item_type, userId, payment_method]
-    );
-    const idOrder = orderInsert.rows[0].id_order;
-
+    // 2. Calculate subtotal and quantity based on item type
     if (item_type === 'tour') {
-      const { quantity, booking_date, guest_info } = details;
-
+      const { quantity, booking_date } = details;
+      totalItemQuantity = Number(quantity || 1);
       // Check constraints
       const { rows: tourRows } = await query('SELECT tour_type, max_slots FROM tours WHERE id_item = $1', [id_item]);
       const tour = tourRows[0];
@@ -456,20 +453,14 @@ export const createBooking = async (req: Request, res: Response) => {
           dateParams
         );
         const alreadyBooked = Number(bookedRows[0].total || 0);
-        if (alreadyBooked + quantity > tour.max_slots) {
+        if (alreadyBooked + totalItemQuantity > tour.max_slots) {
           return res.status(400).json({ message: `Xin lỗi, chỉ còn ${tour.max_slots - alreadyBooked} chỗ trống.` });
         }
       }
-
-      totalAmount = price * (quantity || 1);
-      await query(
-        `INSERT INTO order_tour_detail (id_item, id_order, quantity, price, guest_info, booking_date) 
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id_item, idOrder, quantity || 1, price, JSON.stringify(guest_info), booking_date]
-      );
+      subtotal = price * totalItemQuantity;
     } else if (item_type === 'accommodation') {
-      const { id_room, start_date, end_date, quantity, guest_info } = details;
-
+      const { id_room, start_date, end_date, quantity } = details;
+      totalItemQuantity = Number(quantity || 1);
       // Check availability
       const { rows: booked } = await query(
         `SELECT 1 FROM order_accommodations_detail 
@@ -479,18 +470,11 @@ export const createBooking = async (req: Request, res: Response) => {
       if (booked.length > 0) {
         return res.status(400).json({ message: 'Phòng đã được đặt trong khoảng thời gian này.' });
       }
-
       const days = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24));
-      totalAmount = price * (quantity || 1) * (days || 1);
-
-      await query(
-        `INSERT INTO order_accommodations_detail (id_order, id_room, start_date, end_date, quantity, price) 
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [idOrder, id_room, start_date, end_date, quantity || 1, price]
-      );
+      subtotal = price * totalItemQuantity * (days || 1);
     } else if (item_type === 'vehicle') {
       const { id_position, id_trip } = details;
-
+      totalItemQuantity = 1; // One position = 1 item
       // Check if seat is booked for this trip
       const { rows: booked } = await query(
         'SELECT 1 FROM order_pos_vehicle_detail WHERE id_position = $1 AND id_trip = $2',
@@ -499,13 +483,103 @@ export const createBooking = async (req: Request, res: Response) => {
       if (booked.length > 0) {
         return res.status(400).json({ message: 'Chỗ ngồi này đã được đặt.' });
       }
-
-      // Get trip price if override exists
       const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
       const finalPrice = Number(tripRows[0]?.price_override || price);
+      subtotal = finalPrice;
+    } else if (item_type === 'ticket') {
+      const { quantity } = details;
+      totalItemQuantity = Number(quantity || 1);
+      subtotal = price * totalItemQuantity;
+    }
 
-      totalAmount = finalPrice;
+    // 3. Apply Voucher logic
+    let discountAmount = 0;
+    let idVoucher = null;
+    let totalAmount = subtotal;
 
+    if (voucher_code) {
+      const vRes = await query(`
+        SELECT * FROM voucher 
+        WHERE code = $1 AND status = 'active' AND id_provider = $2 
+        AND (id_item IS NULL OR id_item = $3)
+        AND ("from" IS NULL OR "from" <= NOW())
+        AND ("to" IS NULL OR "to" >= NOW())
+        AND (quantity IS NULL OR quantity > 0)
+      `, [voucher_code, itemProviderId, id_item]);
+
+      const v = vRes.rows[0];
+      if (v) {
+        let isEligible = false;
+
+        // CSDL Check: Voucher type based logic
+        if (v.voucher_type === 'quantity') {
+          // Check if total items meet mini quantity requirement
+          if (totalItemQuantity >= Number(v.min_quantity || 0)) {
+            isEligible = true;
+          }
+        } else {
+          // Default to 'price' or handled as price-based
+          if (subtotal >= Number(v.min_order_value || 0)) {
+            isEligible = true;
+          }
+        }
+
+        if (isEligible) {
+          idVoucher = v.id_voucher;
+          if (v.discount_type === 'percentage') {
+            discountAmount = (subtotal * Number(v.discount_value)) / 100;
+            if (v.max_discount_amount && discountAmount > Number(v.max_discount_amount)) {
+              discountAmount = Number(v.max_discount_amount);
+            }
+          } else {
+            discountAmount = Number(v.discount_value);
+          }
+          totalAmount = Math.max(0, subtotal - discountAmount);
+
+          // Update quantity and quantity_pay in voucher table
+          await query(
+            'UPDATE voucher SET quantity = CASE WHEN quantity IS NOT NULL THEN quantity - 1 ELSE quantity END, quantity_pay = COALESCE(quantity_pay, 0) + 1 WHERE id_voucher = $1',
+            [idVoucher]
+          );
+        }
+      }
+    }
+
+    // 4. Create Order
+    const orderInsert = await query(
+      `INSERT INTO "order" (status, order_code, total_amount, currency, order_type, id_user, payment_method, id_voucher, discount_amount, subtotal_amount) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id_order`,
+      ['pending', orderCode, totalAmount, 'VND', item_type, userId, payment_method, idVoucher, discountAmount, subtotal]
+    );
+    const idOrder = orderInsert.rows[0].id_order;
+
+    // 5. Record voucher usage in voucher_detail (as per ERD)
+    if (idVoucher) {
+      await query(
+        `INSERT INTO voucher_detail (id_voucher, id_order) VALUES ($1, $2)`,
+        [idVoucher, idOrder]
+      );
+    }
+
+    // 5. Create Order Details
+    if (item_type === 'tour') {
+      const { quantity, booking_date, guest_info } = details;
+      await query(
+        `INSERT INTO order_tour_detail (id_item, id_order, quantity, price, guest_info, booking_date) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id_item, idOrder, quantity || 1, price, JSON.stringify(guest_info), booking_date]
+      );
+    } else if (item_type === 'accommodation') {
+      const { id_room, start_date, end_date, quantity } = details;
+      await query(
+        `INSERT INTO order_accommodations_detail (id_order, id_room, start_date, end_date, quantity, price) 
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [idOrder, id_room, start_date, end_date, quantity || 1, price]
+      );
+    } else if (item_type === 'vehicle') {
+      const { id_position, id_trip } = details;
+      const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
+      const finalPrice = Number(tripRows[0]?.price_override || price);
       await query(
         `INSERT INTO order_pos_vehicle_detail (id_order, id_position, id_trip, price) 
          VALUES ($1, $2, $3, $4)`,
@@ -513,8 +587,6 @@ export const createBooking = async (req: Request, res: Response) => {
       );
     } else if (item_type === 'ticket') {
       const { visit_date, quantity, guest_info } = details;
-      totalAmount = price * (quantity || 1);
-
       await query(
         `INSERT INTO order_ticket_detail (id_order, id_item, visit_date, quantity, price, guest_info) 
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -522,13 +594,10 @@ export const createBooking = async (req: Request, res: Response) => {
       );
     }
 
-    // Update total amount
-    await query(`UPDATE "order" SET total_amount = $1 WHERE id_order = $2`, [totalAmount, idOrder]);
-
-    // Create payment record
-    const pay = await query(
-      `INSERT INTO payments (id_order, status, amount, method) VALUES ($1, $2, $3, $4) RETURNING id_pay`,
-      [idOrder, 'pending', totalAmount, payment_method || 'momo']
+    // 6. Create payment record
+    await query(
+      `INSERT INTO payments (id_order, status, amount, method) VALUES ($1, $2, $3, $4)`,
+      [idOrder, 'pending', totalAmount, payment_method || 'bank']
     );
 
     res.json({
@@ -536,6 +605,8 @@ export const createBooking = async (req: Request, res: Response) => {
       id_order: idOrder,
       order_code: orderCode,
       total_amount: totalAmount,
+      subtotal_amount: subtotal,
+      discount_amount: discountAmount,
       payment_method
     });
   } catch (err) {
@@ -543,6 +614,7 @@ export const createBooking = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Lỗi khi đặt chỗ' });
   }
 };
+
 
 export const listOrders = async (req: Request, res: Response) => {
   try {
@@ -905,6 +977,34 @@ export const deleteTripPlan = async (req: Request, res: Response) => {
   }
 };
 
+export const getApplicableVouchers = async (req: Request, res: Response) => {
+  try {
+    const { id_item } = req.query;
+    if (!id_item) return res.status(400).json({ message: 'Thiếu id_item' });
+
+    // Find provider of the item
+    const itemRes = await query('SELECT id_provider FROM bookable_items WHERE id_item = $1', [id_item]);
+    if (itemRes.rows.length === 0) return res.status(404).json({ message: 'Dịch vụ không tồn tại' });
+    const idProvider = itemRes.rows[0].id_provider;
+
+    // List vouchers of this provider that are active and not expired
+    const sql = `
+      SELECT * FROM voucher 
+      WHERE id_provider = $1 
+      AND status = 'active'
+      AND ("from" IS NULL OR "from" <= NOW())
+      AND ("to" IS NULL OR "to" >= NOW())
+      AND (quantity IS NULL OR quantity > 0)
+      AND (id_item IS NULL OR id_item = $2)
+    `;
+    const vouchers = await query(sql, [idProvider, id_item]);
+    res.json(vouchers.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi khi lấy mã giảm giá' });
+  }
+};
+
 export default {
   listServices,
   getService,
@@ -921,4 +1021,5 @@ export default {
   createTripPlan,
   listTripPlans,
   deleteTripPlan,
+  getApplicableVouchers,
 };

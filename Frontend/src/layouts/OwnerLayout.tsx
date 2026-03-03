@@ -14,6 +14,7 @@ import {
   Bell,
   MapPin,
   Building2,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -30,6 +31,7 @@ const sidebarItems = [
   { icon: LayoutDashboard, label: 'Tổng quan', path: '/owner/dashboard' },
   { icon: Building2, label: 'Nhà cung cấp', path: '/owner/providers' },
   { icon: Map, label: 'Dịch vụ của tôi', path: '/owner/services' },
+  { icon: Tag, label: 'Voucher', path: '/owner/vouchers' },
   { icon: ShoppingBag, label: 'Đơn hàng', path: '/owner/orders' },
   { icon: User, label: 'Hồ sơ', path: '/owner/profile' },
 ];

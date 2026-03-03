@@ -200,7 +200,7 @@ export const Home = () => {
       {/* Hero Section - Traveloka Style */}
       <section className="relative h-[520px] flex flex-col items-center justify-center text-white overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-[20s] hover:scale-110"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[20000ms] hover:scale-110"
           style={{ backgroundImage: `url(${heroBg})` }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-blue-900/20 to-[#F7F9FA]" />

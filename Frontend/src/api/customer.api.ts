@@ -137,8 +137,13 @@ export const customerApi = {
     item_type: string;
     payment_method: string;
     details: any;
+    voucher_code?: string;
   }): Promise<{ success: boolean; id_order: string; order_code: string; total_amount: number }> {
     return httpClient.post('/customer/bookings', payload);
+  },
+
+  async getApplicableVouchers(id_item: string): Promise<any[]> {
+    return httpClient.get<any[]>(`/customer/vouchers/applicable?id_item=${id_item}`);
   },
 
   // ---- Orders & Payments ----

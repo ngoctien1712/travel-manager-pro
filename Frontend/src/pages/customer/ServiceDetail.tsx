@@ -159,6 +159,7 @@ export default function ServiceDetail() {
   const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [stickyStyle, setStickyStyle] = useState<React.CSSProperties>({ position: 'sticky', top: '96px' });
 
@@ -204,8 +205,12 @@ export default function ServiceDetail() {
     const fetchService = async () => {
       try {
         setLoading(true);
-        const data = await customerApi.getServiceDetail(id!);
+        const [data, vData] = await Promise.all([
+          customerApi.getServiceDetail(id!),
+          customerApi.getApplicableVouchers(id!)
+        ]);
         setService(data);
+        setVouchers(vData);
         if (data.media && data.media.length > 0) {
           setActiveImage(data.media[0].url);
         }
@@ -231,6 +236,8 @@ export default function ServiceDetail() {
     }
     navigate(`/booking/${id}${query}`);
   };
+
+
 
   if (error) return <ErrorState message={error} />;
   if (loading) return <LoadingSkeleton />;
@@ -384,6 +391,92 @@ export default function ServiceDetail() {
                 </div>
               )}
             </section>
+
+            {/* Vouchers Section - Cải tiến hiển thị mã ngay tại trang chi tiết */}
+            {vouchers.length > 0 && (
+              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-sm border border-gray-100 overflow-hidden relative">
+                <div className="absolute -right-8 -top-8 w-32 h-32 bg-blue-50 rounded-full opacity-50 blur-3xl" />
+                <div className="flex items-center justify-between mb-8 relative z-10">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Tag size={24} />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black text-gray-900">Mã giảm giá độc quyền</h2>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Sử dụng mã khi tiến hành đặt chỗ</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                  {vouchers.map((v) => {
+                    const isPercentage = v.discount_type === 'percentage';
+                    const displayValue = isPercentage
+                      ? `${Math.round(v.discount_value)}%`
+                      : v.discount_value >= 1000
+                        ? `${Math.floor(v.discount_value / 1000)}k`
+                        : v.discount_value.toLocaleString();
+
+                    return (
+                      <div key={v.id_voucher} className="group relative bg-white border border-blue-100 rounded-[2rem] p-0 flex items-stretch hover:shadow-2xl hover:shadow-blue-200/50 transition-all duration-500 overflow-hidden">
+                        {/* Left Part: Discount Amount */}
+                        <div className="w-32 bg-gradient-to-br from-blue-600 to-blue-800 flex flex-col items-center justify-center text-white relative px-4 shrink-0">
+                          {/* Semi-circles for ticket effect */}
+                          <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-white rounded-full" />
+                          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-6 h-6 bg-white rounded-full" />
+
+                          <span className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">Giảm</span>
+                          <span className="text-3xl font-black tracking-tighter leading-none">{displayValue}</span>
+
+                          {/* Decorative lines */}
+                          <div className="absolute right-0 top-1/2 -translate-y-1/2 h-12 w-px bg-white/20 border-r border-dashed border-white/40" />
+                        </div>
+
+                        {/* Right Part: Details */}
+                        <div className="flex-1 p-6 flex flex-col justify-between min-w-0">
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              {v.voucher_type === 'time' && <Badge className="bg-orange-50 text-orange-600 border-none text-[8px] font-black px-2 py-0.5">GIỚI HẠN GIỜ</Badge>}
+                              {v.voucher_type === 'price' && <Badge className="bg-emerald-50 text-emerald-600 border-none text-[8px] font-black px-2 py-0.5">ƯU ĐÃI GIÁ</Badge>}
+                              <h4 className="font-black text-gray-900 uppercase text-xs truncate">{v.name || v.code}</h4>
+                            </div>
+                            <p className="text-[10px] font-bold text-gray-500 line-clamp-2 leading-relaxed">
+                              {v.description || `Đơn tối thiểu ${Number(v.min_order_value).toLocaleString()}đ`}
+                            </p>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between gap-3">
+                            <div className="flex-1 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100 flex items-center justify-between overflow-hidden">
+                              <code className="text-[11px] font-bold text-blue-700 truncate">{v.code}</code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 hover:bg-white text-blue-600"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(v.code);
+                                  alert('Đã sao chép mã!');
+                                }}
+                              >
+                                <ExternalLink size={12} />
+                              </Button>
+                            </div>
+                            <Button
+                              onClick={() => {
+                                navigator.clipboard.writeText(v.code);
+                                alert('Đã sao chép: ' + v.code + '. Hãy sử dụng ở bước đặt chỗ!');
+                              }}
+                              className="bg-gray-900 hover:bg-black text-white h-10 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest shrink-0 shadow-lg shadow-gray-200 transition-transform active:scale-95"
+                            >
+                              SAO CHÉP
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* TOUR SPECIFIC */}
             {service.item_type === 'tour' && (

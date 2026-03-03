@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { customerApi } from '@/api/customer.api';
-import { MapPin, Calendar, Users, ChevronLeft, ChevronRight, CheckCircle2, CreditCard, ShieldCheck } from 'lucide-react';
+import { MapPin, Calendar, Users, ChevronLeft, ChevronRight, CheckCircle2, CreditCard, ShieldCheck, Ticket, Tag } from 'lucide-react';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import ErrorState from '@/components/ErrorState';
 
@@ -31,8 +31,11 @@ export default function BookingPage() {
             email: '',
             phone: ''
         },
-        paymentMethod: 'bank'
+        paymentMethod: 'bank',
+        voucherCode: ''
     });
+    const [vouchers, setVouchers] = useState<any[]>([]);
+    const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -59,6 +62,11 @@ export default function BookingPage() {
                 setLoading(true);
                 const data = await customerApi.getServiceDetail(id!);
                 setService(data);
+
+                // Fetch applicable vouchers
+                const vData = await customerApi.getApplicableVouchers(id!);
+                setVouchers(vData);
+
                 setError(null);
             } catch (err) {
                 setError('Không tìm thấy thông tin dịch vụ');
@@ -97,22 +105,71 @@ export default function BookingPage() {
     };
 
     const calculateTotal = () => {
+        const subtotal = calculateSubtotal();
+        let discount = 0;
+
+        if (appliedVoucher) {
+            const v = appliedVoucher;
+            if (v.discount_type === 'percentage') {
+                discount = (subtotal * Number(v.discount_value)) / 100;
+                if (v.max_discount_amount && discount > Number(v.max_discount_amount)) {
+                    discount = Number(v.max_discount_amount);
+                }
+            } else {
+                discount = Number(v.discount_value);
+            }
+        }
+
+        return Math.max(0, subtotal - discount);
+    };
+
+    const calculateSubtotal = () => {
         const price = getEffectivePrice();
         if (service?.item_type === 'vehicle' && formData.selectedSeats?.length > 0) {
             return price * formData.selectedSeats.length;
         }
 
-        let total = price * (formData.quantity || 1);
+        const quantity = Number(formData.quantity || 1);
+        let total = price * quantity;
 
         if (service?.item_type === 'accommodation' && formData.checkInDate && formData.checkOutDate) {
             const start = new Date(formData.checkInDate);
             const end = new Date(formData.checkOutDate);
             const diff = end.getTime() - start.getTime();
             const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            total = price * (formData.quantity || 1) * (days > 0 ? days : 1);
+            total = price * quantity * (days > 0 ? days : 1);
         }
 
         return total;
+    };
+
+    const applyVoucher = (code: string) => {
+        const v = vouchers.find(v => v.code === code);
+        if (!v) {
+            setAppliedVoucher(null);
+            setFormData({ ...formData, voucherCode: '' });
+            return;
+        }
+
+        const subtotal = calculateSubtotal();
+        const quantity = Number(formData.quantity || 1);
+        let isEligible = false;
+
+        if (v.voucher_type === 'quantity') {
+            if (quantity >= Number(v.min_quantity || 0)) isEligible = true;
+            else alert(`Cần đặt ít nhất ${v.min_quantity} để áp dụng mã này`);
+        } else {
+            if (subtotal >= Number(v.min_order_value || 0)) isEligible = true;
+            else alert(`Đơn hàng cần đạt tối thiểu ${Number(v.min_order_value).toLocaleString()}đ để áp dụng mã này`);
+        }
+
+        if (isEligible) {
+            setAppliedVoucher(v);
+            setFormData({ ...formData, voucherCode: code });
+        } else {
+            setAppliedVoucher(null);
+            setFormData({ ...formData, voucherCode: '' });
+        }
     };
 
     const handleSubmit = async () => {
@@ -144,6 +201,7 @@ export default function BookingPage() {
                 id_item: service.id_item,
                 item_type: service.item_type,
                 payment_method: formData.paymentMethod,
+                voucher_code: formData.voucherCode,
                 details
             });
 
@@ -394,6 +452,77 @@ export default function BookingPage() {
 
                                     <div className="pt-8 border-t border-gray-100">
                                         <div className="flex items-center gap-4 mb-6">
+                                            <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase px-4 py-1 rounded-full">ƯU ĐÃI</Badge>
+                                            <h3 className="font-black text-gray-900 uppercase tracking-tight">Mã giảm giá (Voucher)</h3>
+                                        </div>
+
+                                        {vouchers.length > 0 ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {vouchers.map((v) => {
+                                                    const subtotal = calculateSubtotal();
+                                                    const quantity = Number(formData.quantity || 1);
+                                                    const isLocked = v.voucher_type === 'quantity'
+                                                        ? quantity < Number(v.min_quantity || 0)
+                                                        : subtotal < Number(v.min_order_value || 0);
+
+                                                    return (
+                                                        <div
+                                                            key={v.id_voucher}
+                                                            onClick={() => !isLocked && applyVoucher(v.code)}
+                                                            className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex items-center gap-4 ${formData.voucherCode === v.code
+                                                                    ? 'border-blue-600 bg-blue-50'
+                                                                    : isLocked
+                                                                        ? 'border-gray-100 bg-gray-50 opacity-60 grayscale cursor-not-allowed'
+                                                                        : 'border-gray-100 hover:border-blue-200 bg-white'
+                                                                }`}
+                                                        >
+                                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${formData.voucherCode === v.code ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'}`}>
+                                                                <Tag size={20} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <h4 className="font-black text-gray-900 uppercase text-sm truncate">{v.name || v.code}</h4>
+                                                                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-tight">
+                                                                    {v.discount_type === 'percentage' ? `Giảm ${v.discount_value}%` : `Giảm ${Number(v.discount_value).toLocaleString()}đ`}
+                                                                </p>
+                                                                {isLocked && (
+                                                                    <p className="text-[9px] text-red-500 font-bold mt-1">
+                                                                        {v.voucher_type === 'quantity'
+                                                                            ? `Thêm ${Number(v.min_quantity) - quantity} dịch vụ để dùng`
+                                                                            : `Thêm ${(Number(v.min_order_value) - subtotal).toLocaleString()}đ để dùng`}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            {formData.voucherCode === v.code && <CheckCircle2 className="text-blue-600" size={18} />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="p-8 rounded-[2rem] bg-gray-50 border border-dashed border-gray-200 text-center">
+                                                <Ticket size={32} className="mx-auto text-gray-300 mb-3" />
+                                                <p className="text-sm font-bold text-gray-400">Không có mã giảm giá nào khả dụng</p>
+                                            </div>
+                                        )}
+
+                                        <div className="mt-6 flex gap-3">
+                                            <Input
+                                                placeholder="Nhập mã voucher khác"
+                                                className="h-14 rounded-xl font-bold uppercase"
+                                                value={formData.voucherCode}
+                                                onChange={(e) => setFormData({ ...formData, voucherCode: e.target.value.toUpperCase() })}
+                                            />
+                                            <Button
+                                                variant="outline"
+                                                className="h-14 px-8 rounded-xl font-black border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                                onClick={() => applyVoucher(formData.voucherCode)}
+                                            >
+                                                ÁP DỤNG
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-8 border-t border-gray-100">
+                                        <div className="flex items-center gap-4 mb-6">
                                             <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase px-4 py-1 rounded-full">BƯỚC CUỐI</Badge>
                                             <h3 className="font-black text-gray-900 uppercase tracking-tight">Phương thức thanh toán</h3>
                                         </div>
@@ -448,9 +577,18 @@ export default function BookingPage() {
                                 <div className="p-8 space-y-6">
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
-                                            <span>Đơn giá</span>
-                                            <span className="text-gray-900">{getEffectivePrice().toLocaleString()}đ</span>
+                                            <span>Tạm tính</span>
+                                            <span className="text-gray-900">{calculateSubtotal().toLocaleString()}đ</span>
                                         </div>
+                                        {appliedVoucher && (
+                                            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 p-2 rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <Tag size={14} />
+                                                    <span>Giảm giá ({appliedVoucher.code})</span>
+                                                </div>
+                                                <span>-{(calculateSubtotal() - calculateTotal()).toLocaleString()}đ</span>
+                                            </div>
+                                        )}
                                         {service.item_type === 'vehicle' ? (
                                             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
                                                 <span>Số ghế ({formData.selectedSeats?.length || 0})</span>
