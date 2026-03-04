@@ -100,20 +100,18 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
                 timestamp: ts,
             });
 
+            // Update only necessary per-message metadata
             await set(ref(database, `chats/${conversationId}/last_message`), msgContent);
             await set(ref(database, `chats/${conversationId}/updated_at`), ts);
             await set(ref(database, `chats/${conversationId}/last_sender_id`), currentUser.id);
-            await set(ref(database, `chats/${conversationId}/customer_name`),
-                currentUser.role === 'customer' ? currentUser.fullName : messages[0]?.sender_name || 'Khách hàng'
-            );
-            await set(ref(database, `chats/${conversationId}/item_name`), itemName || 'Dịch vụ');
 
+            // Sync with SQL database for dashboard listings
             const [cust_id, prov_id] = conversationId.split('_');
             await chatApi.trackActivity({
                 conversation_id: conversationId,
                 customer_id: cust_id,
                 provider_id: prov_id,
-                customer_name: currentUser.role === 'customer' ? currentUser.fullName : (messages.find(m => !m.is_auto_reply)?.sender_name || 'Khách hàng'),
+                customer_name: (currentUser.role === 'customer') ? (currentUser.fullName) : (title || 'Khách hàng'),
                 item_name: itemName || 'Dịch vụ',
                 last_message: msgContent,
                 sender_id: currentUser.id

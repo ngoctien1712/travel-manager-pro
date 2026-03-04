@@ -503,7 +503,7 @@ export default function OrderDetail() {
               <h3 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-3">
                 <Sparkles className="text-blue-600" /> CÓ THỂ BẠN SẼ THÍCH
               </h3>
-              <p className="text-gray-400 font-medium">Gợi ý những trải nghiệm tuyệt vời khác tại {order.details.city_name || 'khu vực này'}</p>
+              <p className="text-gray-400 font-medium">Gợi ý những trải nghiệm tuyệt vời khác tại {order.details?.city_name || 'khu vực này'}</p>
             </div>
             <Button variant="ghost" className="text-blue-600 font-black text-xs uppercase tracking-widest hover:bg-blue-50">Xem thêm</Button>
           </div>

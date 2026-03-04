@@ -41,7 +41,7 @@ export default function MyOrders() {
   }, []);
 
   const filteredOrders = orders.filter(o =>
-    (o.details?.title || '').toLowerCase().includes(search.toLowerCase()) ||
+    (o.service_name || o.details?.title || '').toLowerCase().includes(search.toLowerCase()) ||
     (o.order_code || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -99,7 +99,7 @@ export default function MyOrders() {
 
             <div className="flex-1">
               <h3 className="text-2xl font-black text-gray-900 mb-6 group-hover:text-blue-600 transition-colors leading-[1.1] tracking-tight">
-                {order.details?.title || 'Dịch vụ đã đặt'}
+                {order.service_name || order.details?.title || 'Dịch vụ đã đặt'}
               </h3>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-8 pt-6 border-t border-gray-50">
@@ -114,7 +114,7 @@ export default function MyOrders() {
                   <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Địa điểm</p>
                   <div className="flex items-center gap-2 text-gray-700 text-sm font-black">
                     <MapPin className="text-blue-500" size={14} />
-                    <span className="truncate">{order.details?.city_name || 'Hà Nội'}</span>
+                    <span className="truncate">{order.city_name || order.details?.city_name || 'Hà Nội'}</span>
                   </div>
                 </div>
                 <div className="space-y-1 hidden md:block">

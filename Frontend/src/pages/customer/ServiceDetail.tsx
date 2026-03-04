@@ -966,6 +966,22 @@ export default function ServiceDetail() {
                 </div>
 
                 <div className="space-y-6">
+                  {(service.item_type === 'tour' || service.item_type === 'ticket') && (
+                    <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-3">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Chọn ngày khởi hành</label>
+                      <div className="relative group">
+                        <Input
+                          type="date"
+                          className="h-14 rounded-2xl bg-white border-gray-200 font-bold text-sm focus:ring-2 focus:ring-blue-600 transition-all pl-12"
+                          value={bookingDate}
+                          onChange={(e) => setBookingDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                        <Calendar className="absolute left-4 top-4 text-blue-500" size={20} />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái dịch vụ</p>
                     <div className="flex items-center gap-2 text-emerald-600 font-bold">
@@ -1061,7 +1077,7 @@ export default function ServiceDetail() {
 
                   <Button
                     onClick={() => {
-                      const chatBtn = document.querySelector('button[class*="fixed bottom-6 right-6"]') as HTMLButtonElement;
+                      const chatBtn = document.getElementById('chat-widget-trigger') as HTMLButtonElement;
                       if (chatBtn) chatBtn.click();
                     }}
                     className="w-full flex items-center gap-4 p-4 h-auto rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 border-none transition-all group"

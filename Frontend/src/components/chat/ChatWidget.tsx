@@ -39,6 +39,10 @@ export default function ChatWidget({ providerId, providerName, itemId, itemName 
             }
         };
         fetchUser();
+
+        // Reset state when provider changes
+        setIsOpen(false);
+        setConversationId(null);
     }, [providerId]);
 
     const handleOpenChat = async () => {
@@ -93,6 +97,7 @@ export default function ChatWidget({ providerId, providerName, itemId, itemName 
 
             {/* Floating Button */}
             <Button
+                id="chat-widget-trigger"
                 onClick={handleOpenChat}
                 disabled={loading}
                 className={`w-16 h-16 rounded-full shadow-2xl border-none transition-all duration-500 scale-100 active:scale-90 ${isOpen ? 'bg-gray-900 hover:bg-black' : 'bg-blue-600 hover:bg-blue-700'}`}

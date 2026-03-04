@@ -166,11 +166,11 @@ export const customerApi = {
   },
 
   async getMyOrder(id: string): Promise<any> {
-    const res = await httpClient.get<{ order: any; items: any[]; payments: any[] }>(`/customer/orders/${id}`);
-    // OrderDetail page mong đợi order.items và order.payments nằm cùng object
+    const res = await httpClient.get<{ order: any; details: any; payments: any[] }>(`/customer/orders/${id}`);
+    // OrderDetail page mong đợi order.details và order.payments nằm cùng object
     return {
       ...res.order,
-      items: res.items,
+      details: res.details,
       payments: res.payments,
     };
   },

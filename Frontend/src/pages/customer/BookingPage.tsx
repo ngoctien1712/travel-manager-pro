@@ -124,7 +124,7 @@ export default function BookingPage() {
     };
 
     const calculateSubtotal = () => {
-        const price = getEffectivePrice();
+        const price = Number(getEffectivePrice()) || 0;
         if (service?.item_type === 'vehicle' && formData.selectedSeats?.length > 0) {
             return price * formData.selectedSeats.length;
         }
@@ -135,9 +135,11 @@ export default function BookingPage() {
         if (service?.item_type === 'accommodation' && formData.checkInDate && formData.checkOutDate) {
             const start = new Date(formData.checkInDate);
             const end = new Date(formData.checkOutDate);
-            const diff = end.getTime() - start.getTime();
-            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-            total = price * quantity * (days > 0 ? days : 1);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const diff = end.getTime() - start.getTime();
+                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                total = price * quantity * (days > 0 ? days : 1);
+            }
         }
 
         return total;
@@ -470,10 +472,10 @@ export default function BookingPage() {
                                                             key={v.id_voucher}
                                                             onClick={() => !isLocked && applyVoucher(v.code)}
                                                             className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden flex items-center gap-4 ${formData.voucherCode === v.code
-                                                                    ? 'border-blue-600 bg-blue-50'
-                                                                    : isLocked
-                                                                        ? 'border-gray-100 bg-gray-50 opacity-60 grayscale cursor-not-allowed'
-                                                                        : 'border-gray-100 hover:border-blue-200 bg-white'
+                                                                ? 'border-blue-600 bg-blue-50'
+                                                                : isLocked
+                                                                    ? 'border-gray-100 bg-gray-50 opacity-60 grayscale cursor-not-allowed'
+                                                                    : 'border-gray-100 hover:border-blue-200 bg-white'
                                                                 }`}
                                                         >
                                                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${formData.voucherCode === v.code ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'}`}>
@@ -565,7 +567,7 @@ export default function BookingPage() {
                         <div className="sticky top-28 space-y-6">
                             <Card className="rounded-[2.5rem] border-none shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] overflow-hidden bg-white">
                                 <div className="h-48 relative">
-                                    <img src={getImageUrl(service.thumbnail)} className="w-full h-full object-cover" alt={service.title} />
+                                    <img src={getImageUrl(service.media?.[0]?.url || service.thumbnail)} className="w-full h-full object-cover" alt={service.title} />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                     <div className="absolute bottom-6 left-6 right-6">
                                         <Badge className="bg-blue-600 mb-2 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1 text-white">
