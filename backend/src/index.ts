@@ -9,9 +9,13 @@ import geographyRoutes from './routes/geography.routes.js';
 import ownerRoutes from './routes/owner.routes.js';
 import customerRoutes from './routes/customer.routes.js';
 import chatRoutes from './routes/chat.routes.js';
+import { startOrderMonitor } from './services/order-monitor.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Start the periodic order monitor (SQL Polling)
+startOrderMonitor();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:8080', credentials: true }));
 app.use(express.json());

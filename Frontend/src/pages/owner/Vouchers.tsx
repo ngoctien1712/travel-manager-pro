@@ -184,10 +184,16 @@ export default function Vouchers() {
             return;
         }
 
+        const payload = {
+            ...formData,
+            from: formData.from ? `${formData.from}T00:00:00` : null,
+            to: formData.to ? `${formData.to}T23:59:59` : null
+        };
+
         if (editingVoucher) {
-            updateMut.mutate({ id: editingVoucher.idVoucher, data: formData });
+            updateMut.mutate({ id: editingVoucher.idVoucher, data: payload });
         } else {
-            createMut.mutate(formData);
+            createMut.mutate(payload);
         }
     };
 
@@ -373,7 +379,7 @@ export default function Vouchers() {
                                                         <>
                                                             <div className="flex items-center gap-1 text-muted-foreground">
                                                                 <Calendar className="h-3.5 w-3.5" />
-                                                                {v.from ? format(new Date(v.from), 'dd/MM/yyyy') : '...'} - {v.to ? format(new Date(v.to), 'dd/MM/yyyy') : '...'}
+                                                                {v.from ? format(new Date(v.from.split('T')[0]), 'dd/MM/yyyy') : '...'} - {v.to ? format(new Date(v.to.split('T')[0]), 'dd/MM/yyyy') : '...'}
                                                             </div>
                                                         </>
                                                     ) : (
@@ -620,23 +626,27 @@ export default function Vouchers() {
                                 )}
 
                                 {formData.voucherType === 'time' && (
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end bg-purple-50/30 p-3 rounded-lg border border-purple-100">
                                         <div className="space-y-2">
-                                            <Label htmlFor="from" className="font-bold text-xs text-purple-700">Từ ngày</Label>
+                                            <Label htmlFor="from" className="font-bold text-xs text-purple-700 flex items-center gap-1">
+                                                <Calendar className="h-3 w-3" /> Từ ngày
+                                            </Label>
                                             <Input
                                                 id="from"
                                                 type="date"
-                                                className="border-purple-200 focus-visible:ring-purple-500"
+                                                className="border-purple-200 focus-visible:ring-purple-500 w-full bg-white"
                                                 value={formData.from}
                                                 onChange={e => setFormData({ ...formData, from: e.target.value })}
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="to" className="font-bold text-xs text-purple-700">Đến ngày</Label>
+                                            <Label htmlFor="to" className="font-bold text-xs text-purple-700 flex items-center gap-1">
+                                                <Calendar className="h-3 w-3" /> Đến ngày
+                                            </Label>
                                             <Input
                                                 id="to"
                                                 type="date"
-                                                className="border-purple-200 focus-visible:ring-purple-500"
+                                                className="border-purple-200 focus-visible:ring-purple-500 w-full bg-white"
                                                 value={formData.to}
                                                 onChange={e => setFormData({ ...formData, to: e.target.value })}
                                             />
@@ -672,21 +682,23 @@ export default function Vouchers() {
                             </div>
 
                             {formData.voucherType !== 'time' && (
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="from" className="font-bold text-xs">Hạn từ</Label>
+                                        <Label htmlFor="from-alt" className="font-bold text-xs">Hạn từ</Label>
                                         <Input
-                                            id="from"
+                                            id="from-alt"
                                             type="date"
+                                            className="w-full"
                                             value={formData.from}
                                             onChange={e => setFormData({ ...formData, from: e.target.value })}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="to" className="font-bold text-xs">Hạn đến</Label>
+                                        <Label htmlFor="to-alt" className="font-bold text-xs">Hạn đến</Label>
                                         <Input
-                                            id="to"
+                                            id="to-alt"
                                             type="date"
+                                            className="w-full"
                                             value={formData.to}
                                             onChange={e => setFormData({ ...formData, to: e.target.value })}
                                         />

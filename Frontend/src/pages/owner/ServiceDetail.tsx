@@ -199,6 +199,12 @@ export const ServiceDetail = () => {
     const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
     const [isAddPosOpen, setIsAddPosOpen] = useState(false);
 
+    // New states for Room enhancements
+    const [roomDescription, setRoomDescription] = useState('');
+    const [roomMedia, setRoomMedia] = useState<any[]>([]);
+    const [roomImageInput, setRoomImageInput] = useState('');
+    const [roomImageFiles, setRoomImageFiles] = useState<FileList | null>(null);
+
     // Mutations
     const updateMut = useMutation({
         mutationFn: (d: any) => ownerGeographyApi.updateServiceDetail(idItem!, d),
@@ -285,6 +291,17 @@ export const ServiceDetail = () => {
         }
     });
 
+    const bulkAddPosMut = useMutation({
+        mutationFn: (positions: any[]) => ownerGeographyApi.bulkAddVehiclePositions(idItem!, { positions }),
+        onSuccess: () => {
+            toast({ title: 'Thành công', description: 'Đã tự động tạo sơ đồ ghế' });
+            queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Lỗi', description: err.response?.data?.message || 'Không thể tạo sơ đồ ghế', variant: 'destructive' });
+        }
+    });
+
     const deletePosMut = useMutation({
         mutationFn: (id: string) => ownerGeographyApi.deleteVehiclePosition(id),
         onSuccess: () => {
@@ -303,6 +320,8 @@ export const ServiceDetail = () => {
             setRoomName('');
             setRoomPrice('');
             setRoomFacilities([]);
+            setRoomDescription('');
+            setRoomMedia([]);
             setIsAddRoomOpen(false);
             queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
         },
@@ -318,6 +337,8 @@ export const ServiceDetail = () => {
             setRoomName('');
             setRoomPrice('');
             setRoomFacilities([]);
+            setRoomDescription('');
+            setRoomMedia([]);
             setEditingRoomId(null);
             setIsAddRoomOpen(false);
             queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
@@ -338,6 +359,20 @@ export const ServiceDetail = () => {
         }
     });
 
+    const uploadRoomMediaMut = useMutation({
+        mutationFn: ({ id, data }: { id: string; data: FormData }) => ownerGeographyApi.uploadRoomMedia(id, data),
+        onSuccess: (res: any) => {
+            toast({ title: 'Thành công', description: 'Đã tải lên ảnh phòng' });
+            // res.media is the updated array from backend
+            setRoomMedia(res.data?.media || res.media || []);
+            setRoomImageFiles(null);
+            queryClient.invalidateQueries({ queryKey: ['owner', 'service-detail', idItem] });
+        },
+        onError: (err: any) => {
+            toast({ title: 'Lỗi', description: err.response?.data?.message || 'Không thể tải lên ảnh phòng', variant: 'destructive' });
+        }
+    });
+
     const handleSave = () => {
         const sanitizedExtraData = { ...extraData };
         if (sanitizedExtraData.maxSlots === '' || sanitizedExtraData.maxSlots === undefined) {
@@ -352,6 +387,12 @@ export const ServiceDetail = () => {
             sanitizedExtraData.maxGuest = Number(sanitizedExtraData.maxGuest);
         }
 
+        // Fix: Ensure combined timestamp for tours if needed, 
+        // using ISO strings for startAt/endAt helps backend parse correctly
+        // Fix: Use datetime-local string directly to avoid UTC shift
+        const payloadStart = sanitizedExtraData.startAt || null;
+        const payloadEnd = sanitizedExtraData.endAt || null;
+
         updateMut.mutate({
             title,
             price: (price === '' || price === null) ? null : Number(price),
@@ -360,9 +401,13 @@ export const ServiceDetail = () => {
                 ...attribute,
                 departureDate: attribute.departureDate,
                 arrivalDate: attribute.arrivalDate,
+                departureTime: attribute.departureTime,
+                arrivalTime: attribute.arrivalTime,
             },
             extraData: {
                 ...sanitizedExtraData,
+                startAt: payloadStart,
+                endAt: payloadEnd,
                 phoneNumber: extraData.phoneNumber,
                 provinceId: extraData.provinceId,
                 districtId: extraData.districtId,
@@ -398,6 +443,33 @@ export const ServiceDetail = () => {
     const addArrayAttr = (key: string, defaultValue: any = '') => {
         const arr = [...(attribute[key] || []), defaultValue];
         setAttribute({ ...attribute, [key]: arr });
+    };
+
+    const handleAutoGenerateSeats = () => {
+        const max = Number(extraData.maxGuest) || 0;
+        if (max === 0) {
+            toast({ title: 'Cảnh báo', description: 'Hãy nhập số lượng chỗ ngồi trước', variant: 'destructive' });
+            return;
+        }
+
+        const currentPosCount = service?.positions?.length || 0;
+        if (currentPosCount > 0) {
+            if (!confirm('Phương tiện đã có sơ đồ ghế. Bạn có muốn tạo thêm không?')) return;
+        }
+
+        const seats = [];
+        const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+        let count = 0;
+        for (let r = 0; r < rows.length && count < max; r++) {
+            for (let c = 1; c <= 4 && count < max; c++) {
+                seats.push({
+                    codePosition: `${rows[r]}${c}`,
+                    price: Number(price) || 0
+                });
+                count++;
+            }
+        }
+        bulkAddPosMut.mutate(seats);
     };
 
     const removeArrayAttr = (key: string, index: number) => {
@@ -911,7 +983,8 @@ export const ServiceDetail = () => {
                                                     setRoomMaxGuest('2');
                                                     setRoomPrice('');
                                                     setRoomFacilities([]);
-                                                    setAttribute({ ...attribute, roomMedia: [], roomDescription: '' });
+                                                    setRoomDescription('');
+                                                    setRoomMedia([]);
                                                 }
                                             }}>
                                                 <DialogTrigger asChild>
@@ -948,6 +1021,103 @@ export const ServiceDetail = () => {
                                                                 ))}
                                                             </div>
                                                         </div>
+
+                                                        <div className="space-y-2">
+                                                            <Label>Mô tả chi tiết phòng</Label>
+                                                            <Textarea
+                                                                value={roomDescription}
+                                                                onChange={(e) => setRoomDescription(e.target.value)}
+                                                                placeholder="Mô tả về không gian, view, nệm..."
+                                                                className="h-20"
+                                                            />
+                                                        </div>
+
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <Label>Hình ảnh phòng</Label>
+                                                                <div className="flex gap-2">
+                                                                    <input
+                                                                        type="file"
+                                                                        id="room-upload"
+                                                                        className="hidden"
+                                                                        multiple
+                                                                        accept="image/*"
+                                                                        onChange={(e) => {
+                                                                            if (e.target.files && e.target.files.length > 0) {
+                                                                                setRoomImageFiles(e.target.files);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => document.getElementById('room-upload')?.click()}
+                                                                        disabled={uploadRoomMediaMut.isPending}
+                                                                    >
+                                                                        {uploadRoomMediaMut.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ImageIcon className="h-3 w-3 mr-1" />}
+                                                                        Chọn từ máy
+                                                                    </Button>
+                                                                    {roomImageFiles && roomImageFiles.length > 0 && (
+                                                                        <div className="flex gap-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                className="gradient-sunset border-none"
+                                                                                onClick={() => {
+                                                                                    if (editingRoomId) {
+                                                                                        const fd = new FormData();
+                                                                                        for (let i = 0; i < roomImageFiles.length; i++) {
+                                                                                            fd.append('images', roomImageFiles[i]);
+                                                                                        }
+                                                                                        uploadRoomMediaMut.mutate({ id: editingRoomId, data: fd });
+                                                                                    } else {
+                                                                                        toast({ title: 'Lưu ý', description: 'Hãy tạo loại phòng trước khi tải ảnh lên từ máy.' });
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                Tải lên ({roomImageFiles.length})
+                                                                            </Button>
+                                                                            <Button size="sm" variant="ghost" onClick={() => setRoomImageFiles(null)} className="h-8 w-8 p-0 text-red-500">
+                                                                                <X className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex gap-2">
+                                                                <Input
+                                                                    placeholder="Hoặc dán URL ảnh trực tiếp..."
+                                                                    value={roomImageInput}
+                                                                    onChange={(e) => setRoomImageInput(e.target.value)}
+                                                                />
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    onClick={() => {
+                                                                        if (roomImageInput) {
+                                                                            setRoomMedia([...roomMedia, { url: roomImageInput, type: 'image' }]);
+                                                                            setRoomImageInput('');
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    Thêm URL
+                                                                </Button>
+                                                            </div>
+                                                            <div className="grid grid-cols-4 gap-2">
+                                                                {roomMedia.map((m, idx) => (
+                                                                    <div key={idx} className="relative aspect-square rounded-md overflow-hidden border">
+                                                                        <img src={m.url} className="w-full h-full object-cover" />
+                                                                        <button
+                                                                            className="absolute top-0 right-0 bg-red-500 text-white p-0.5"
+                                                                            onClick={() => setRoomMedia(roomMedia.filter((_, i) => i !== idx))}
+                                                                        >
+                                                                            <X className="h-3 w-3" />
+                                                                        </button>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <DialogFooter>
                                                         <Button variant="outline" onClick={() => setIsAddRoomOpen(false)}>Hủy</Button>
@@ -959,8 +1129,8 @@ export const ServiceDetail = () => {
                                                                     maxGuest: Number(roomMaxGuest),
                                                                     price: Number(roomPrice) || Number(price),
                                                                     attribute: { facilities: roomFacilities },
-                                                                    media: attribute.roomMedia || [],
-                                                                    description: attribute.roomDescription || ''
+                                                                    media: roomMedia,
+                                                                    description: roomDescription
                                                                 };
                                                                 if (editingRoomId) updateRoomMut.mutate(data);
                                                                 else addRoomMut.mutate(data);
@@ -988,10 +1158,12 @@ export const ServiceDetail = () => {
                                                                     className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-50"
                                                                     onClick={() => {
                                                                         setEditingRoomId(room.idRoom);
-                                                                        setRoomName(room.nameRoom);
-                                                                        setRoomMaxGuest(room.maxGuest.toString());
-                                                                        setRoomPrice(room.price.toString());
+                                                                        setRoomName(room.nameRoom || '');
+                                                                        setRoomMaxGuest((room.maxGuest || 2).toString());
+                                                                        setRoomPrice((room.price || 0).toString());
                                                                         setRoomFacilities(room.attribute?.facilities || []);
+                                                                        setRoomDescription(room.description || '');
+                                                                        setRoomMedia(room.media || []);
                                                                         setIsAddRoomOpen(true);
                                                                     }}
                                                                 >
@@ -1330,44 +1502,55 @@ export const ServiceDetail = () => {
                                             <CardTitle className="flex items-center gap-2"><Armchair className="h-5 w-5" /> Sơ đồ ghế ngồi</CardTitle>
                                             <CardDescription>Mô phỏng vị trí các ghế trên phương tiện.</CardDescription>
                                         </div>
-                                        <Dialog open={isAddPosOpen} onOpenChange={(open) => {
-                                            setIsAddPosOpen(open);
-                                            if (!open) {
-                                                setEditingPosId(null);
-                                                setPosCode('');
-                                                setPosPrice('');
-                                            }
-                                        }}>
-                                            <DialogTrigger asChild>
-                                                <Button size="sm" className="gradient-sunset border-none"><Plus className="h-4 w-4 mr-2" /> Thêm ghế</Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader><DialogTitle>{editingPosId ? 'Chỉnh sửa vị trí ghế' : 'Thêm vị trí mới'}</DialogTitle></DialogHeader>
-                                                <div className="space-y-4 py-4">
-                                                    <div className="space-y-2">
-                                                        <Label>Mã ghế (VD: A1, VIP-01)</Label>
-                                                        <Input value={posCode} onChange={(e) => setPosCode(e.target.value)} placeholder="Nhập mã ghế duy nhất" />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={handleAutoGenerateSeats}
+                                                disabled={bulkAddPosMut.isPending}
+                                            >
+                                                {bulkAddPosMut.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2 text-orange-500" />}
+                                                Phát sinh ghế tự động
+                                            </Button>
+                                            <Dialog open={isAddPosOpen} onOpenChange={(open) => {
+                                                setIsAddPosOpen(open);
+                                                if (!open) {
+                                                    setEditingPosId(null);
+                                                    setPosCode('');
+                                                    setPosPrice('');
+                                                }
+                                            }}>
+                                                <DialogTrigger asChild>
+                                                    <Button size="sm" className="gradient-sunset border-none"><Plus className="h-4 w-4 mr-2" /> Thêm ghế</Button>
+                                                </DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader><DialogTitle>{editingPosId ? 'Chỉnh sửa vị trí ghế' : 'Thêm vị trí mới'}</DialogTitle></DialogHeader>
+                                                    <div className="space-y-4 py-4">
+                                                        <div className="space-y-2">
+                                                            <Label>Mã ghế (VD: A1, VIP-01)</Label>
+                                                            <Input value={posCode} onChange={(e) => setPosCode(e.target.value)} placeholder="Nhập mã ghế duy nhất" />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Giá ghế (Mặc định: {price || 0})</Label>
+                                                            <Input type="number" value={posPrice} onChange={(e) => setPosPrice(e.target.value)} placeholder="Nếu giá khác với giá cơ bản" />
+                                                        </div>
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Giá ghế (Mặc định: {price || 0})</Label>
-                                                        <Input type="number" value={posPrice} onChange={(e) => setPosPrice(e.target.value)} placeholder="Nếu giá khác với giá cơ bản" />
-                                                    </div>
-                                                </div>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsAddPosOpen(false)}>Hủy</Button>
-                                                    <Button
-                                                        className="gradient-sunset border-none"
-                                                        onClick={() => {
-                                                            const data = { codePosition: posCode, price: Number(posPrice) || Number(price) };
-                                                            if (editingPosId) updatePosMut.mutate({ id: editingPosId, ...data });
-                                                            else addPosMut.mutate(data);
-                                                        }}
-                                                    >
-                                                        {editingPosId ? 'Cập nhật' : 'Lưu vị trí'}
-                                                    </Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
+                                                    <DialogFooter>
+                                                        <Button variant="outline" onClick={() => setIsAddPosOpen(false)}>Hủy</Button>
+                                                        <Button
+                                                            className="gradient-sunset border-none"
+                                                            onClick={() => {
+                                                                const data = { codePosition: posCode, price: Number(posPrice) || Number(price) };
+                                                                if (editingPosId) updatePosMut.mutate({ id: editingPosId, ...data });
+                                                                else addPosMut.mutate(data);
+                                                            }}
+                                                        >
+                                                            {editingPosId ? 'Cập nhật' : 'Lưu vị trí'}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="max-w-md mx-auto bg-muted/10 rounded-3xl border-4 border-muted p-6 relative">

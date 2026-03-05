@@ -544,6 +544,47 @@ export async function addVehiclePosition(req: Request, res: Response) {
   }
 }
 
+/** Bulk add seats to vehicle */
+export async function bulkAddVehiclePositions(req: Request, res: Response) {
+  const client = await pool.connect();
+  try {
+    const userId = req.user!.userId;
+    const { idItem } = req.params;
+    const { positions } = req.body; // Array of { codePosition, price }
+
+    const check = await client.query(
+      `SELECT v.id_vehicle FROM vehicle v
+       JOIN bookable_items bi ON bi.id_item = v.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE bi.id_item = $1 AND p.id_user = $2`,
+      [idItem, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền quản lý phương tiện này' });
+    }
+
+    const idVehicle = check.rows[0].id_vehicle;
+
+    await client.query('BEGIN');
+    for (const pos of positions) {
+      await client.query(
+        `INSERT INTO positions (id_vehicle, code_position, price) VALUES ($1, $2, $3)`,
+        [idVehicle, pos.codePosition, pos.price]
+      );
+    }
+    await client.query('COMMIT');
+
+    res.json({ success: true, count: positions.length });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Bulk add positions error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  } finally {
+    client.release();
+  }
+}
+
 /** Delete position from vehicle */
 export async function deleteVehiclePosition(req: Request, res: Response) {
   try {
@@ -724,6 +765,45 @@ export async function updateAccommodationRoom(req: Request, res: Response) {
     res.json(toCamel(rows[0] as Record<string, unknown>));
   } catch (err) {
     console.error('Update room error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+/** Upload images for a specific room */
+export async function uploadRoomMedia(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const { idRoom } = req.params;
+    const files = req.files as Express.Multer.File[];
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: 'Không có ảnh nào được tải lên' });
+    }
+
+    const check = await pool.query(
+      `SELECT r.id_room, r.media FROM accommodations_rooms r
+       JOIN bookable_items bi ON bi.id_item = r.id_item
+       JOIN provider p ON p.id_provider = bi.id_provider
+       WHERE r.id_room = $1 AND p.id_user = $2`,
+      [idRoom, userId]
+    );
+
+    if (check.rows.length === 0) {
+      return res.status(403).json({ message: 'Bạn không có quyền quản lý phòng này' });
+    }
+
+    const currentMedia = check.rows[0].media ? (typeof check.rows[0].media === 'string' ? JSON.parse(check.rows[0].media) : check.rows[0].media) : [];
+    const newMedia = files.map(f => ({ url: `/uploads/${f.filename}`, type: 'image' }));
+    const updatedMedia = [...currentMedia, ...newMedia];
+
+    await pool.query(
+      'UPDATE accommodations_rooms SET media = $1 WHERE id_room = $2',
+      [JSON.stringify(updatedMedia), idRoom]
+    );
+
+    res.json({ success: true, media: updatedMedia });
+  } catch (err) {
+    console.error('Upload room media error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }

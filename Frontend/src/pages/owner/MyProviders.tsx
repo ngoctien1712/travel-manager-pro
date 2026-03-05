@@ -254,7 +254,7 @@ export const MyProviders = () => {
       </Card>
 
       <Dialog open={createOpen} onOpenChange={(v) => { setCreateOpen(v); if (!v) setError(''); }}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tạo nhà cung cấp</DialogTitle>
           </DialogHeader>

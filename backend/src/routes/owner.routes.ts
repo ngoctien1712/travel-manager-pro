@@ -86,6 +86,17 @@ router.delete(
 );
 
 router.post(
+  '/bookable-items/:idItem/positions/bulk',
+  ownerController.bulkAddVehiclePositions
+);
+
+router.post(
+  '/rooms/:idRoom/media',
+  upload.array('images', 5),
+  ownerController.uploadRoomMedia
+);
+
+router.post(
   '/bookable-items/:idItem/vehicle',
   ownerController.manageVehicle
 );

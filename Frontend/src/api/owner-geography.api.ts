@@ -104,4 +104,9 @@ export const ownerGeographyApi = {
 
   deleteVehicleTrip: (idTrip: string) =>
     httpClient.delete(`/owner/trips/${idTrip}`),
+  bulkAddVehiclePositions: (idItem: string, data: { positions: { codePosition: string; price: number }[] }) =>
+    httpClient.post<{ success: boolean; count: number }>(`/owner/bookable-items/${idItem}/positions/bulk`, data),
+
+  uploadRoomMedia: (idRoom: string, data: FormData) =>
+    httpClient.post<{ success: boolean; media: any[] }>(`/owner/rooms/${idRoom}/media`, data),
 };
