@@ -29,4 +29,7 @@ export const userApi = {
       currentPassword,
       newPassword,
     }),
+
+  requestBusiness: (data: { name: string; areaId: string; phone: string; email: string; serviceType?: string }) =>
+    httpClient.post<{ message: string; data: any }>('/users/request-business', data),
 };

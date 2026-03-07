@@ -152,3 +152,46 @@ export async function changePassword(req: Request, res: Response) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }
+
+export async function requestBusiness(req: Request, res: Response) {
+  try {
+    const userId = req.user!.userId;
+    const {
+      name, areaId, phone, email, fanpage, serviceType,
+      bankName, bankAccountNumber, bankAccountName
+    } = req.body;
+    // Handle multiple files
+    const files = req.files as Express.Multer.File[];
+    const legalDocuments = files ? files.map(f => `/uploads/${f.filename}`) : [];
+
+    // Check if there's already a pending request
+    const { rows: existing } = await pool.query(
+      "SELECT id_provider FROM provider WHERE id_user = $1 AND status = 'pending'",
+      [userId]
+    );
+    if (existing.length > 0) {
+      return res.status(400).json({ message: 'Bạn đã có một yêu cầu đăng ký doanh nghiệp đang chờ duyệt' });
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO provider (
+        name, id_area, id_user, phone, email, fanpage, service_type, 
+        legal_documents, status, bank_name, bank_account_number, bank_account_name
+      ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11)
+       RETURNING id_provider, name, status`,
+      [
+        name, areaId, userId, phone, email, fanpage, serviceType || 'tour',
+        legalDocuments, bankName, bankAccountNumber, bankAccountName
+      ]
+    );
+
+    res.status(201).json({
+      message: 'Yêu cầu đăng ký doanh nghiệp đã được gửi. Vui lòng chờ admin phê duyệt.',
+      data: rows[0]
+    });
+  } catch (err) {
+    console.error('Request business error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}

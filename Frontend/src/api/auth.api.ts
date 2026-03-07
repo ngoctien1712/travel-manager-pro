@@ -10,7 +10,8 @@ export interface LoginResponse {
     role: UserRole;
     status: string;
   };
-  token: string;
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface RegisterRequest {
@@ -18,7 +19,6 @@ export interface RegisterRequest {
   password: string;
   fullName?: string;
   phone?: string;
-  role: UserRole;
 }
 
 export const authApi = {
@@ -28,7 +28,17 @@ export const authApi = {
   register: (data: RegisterRequest) =>
     httpClient.post<LoginResponse>('/auth/register', data),
 
-  logout: () => httpClient.post<{ message: string }>('/auth/logout', {}),
+  registerBusiness: (data: FormData) =>
+    httpClient.post<{ message: string; data: any }>('/auth/register-business', data),
+
+  logout: (refreshToken?: string | null) =>
+    httpClient.post<{ message: string }>('/auth/logout', { refreshToken }),
+
+  googleLogin: (data: { idToken?: string; accessToken?: string }) =>
+    httpClient.post<LoginResponse>('/auth/google-login', data),
+
+  refreshToken: (refreshToken: string) =>
+    httpClient.post<{ accessToken: string; refreshToken: string }>('/auth/refresh-token', { refreshToken }),
 
   forgotPassword: (email: string) =>
     httpClient.post<{ message: string; resetLink?: string }>('/auth/forgot-password', { email }),

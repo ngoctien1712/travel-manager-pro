@@ -109,9 +109,9 @@ const Providers = () => {
                                         <TableRow key={r.id}>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
-                                                    {r.image && (
+                                                    {r.legalDocuments && r.legalDocuments.length > 0 && (
                                                         <img
-                                                            src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${r.image}`}
+                                                            src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${r.legalDocuments[0]}`}
                                                             alt={r.name}
                                                             className="h-10 w-10 rounded-md object-cover"
                                                         />

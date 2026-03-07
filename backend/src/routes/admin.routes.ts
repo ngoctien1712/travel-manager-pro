@@ -38,4 +38,8 @@ router.delete('/users/:id', adminController.deleteUser);
 router.get('/providers', adminController.listProviders);
 router.patch('/providers/:id/status', adminController.updateProviderStatus);
 
+// Business Registration Approval
+router.get('/pending-business', adminController.listPendingBusinessRegistrations);
+router.post('/approve-business-account/:userId', adminController.approveBusinessAccount);
+
 export default router;

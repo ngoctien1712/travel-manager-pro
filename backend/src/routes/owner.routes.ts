@@ -22,7 +22,7 @@ router.post(
 router.get('/providers/:providerId/bookable-items', ownerController.getProviderBookableItems);
 router.post(
   '/providers',
-  upload.single('image'),
+  upload.array('images', 5),
   [
     body('name').trim().notEmpty().withMessage('Tên nhà cung cấp bắt buộc'),
     body('areaId').isUUID().withMessage('areaId không hợp lệ'),

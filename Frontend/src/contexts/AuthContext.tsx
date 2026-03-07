@@ -17,6 +17,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (data: { idToken?: string; accessToken?: string }) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -28,7 +29,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       setUser(null);
       return;
@@ -44,14 +45,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         status: profile.status,
       });
     } catch {
-      localStorage.removeItem('authToken');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
       localStorage.removeItem('userRole');
       setUser(null);
     }
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       setIsLoading(false);
       return;
@@ -59,9 +61,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     refreshUser().finally(() => setIsLoading(false));
   }, [refreshUser]);
 
+  // Proactive token refresh every 9 minutes (to stay ahead of 10m expiry)
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken) return;
+
+      try {
+        const res = await authApi.refreshToken(refreshToken);
+        localStorage.setItem('accessToken', res.accessToken);
+        localStorage.setItem('refreshToken', res.refreshToken);
+        console.log('Token proactively refreshed');
+      } catch (err) {
+        console.error('Proactive refresh failed:', err);
+        // If refresh fails, we'll let the next API call handle logout or the user will expire naturally
+      }
+    }, 9 * 60 * 1000); // 9 minutes
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = async (email: string, password: string) => {
     const res = await authApi.login(email, password);
-    localStorage.setItem('authToken', res.token);
+    localStorage.setItem('accessToken', res.accessToken);
+    localStorage.setItem('refreshToken', res.refreshToken);
     localStorage.setItem('userRole', res.user.role);
     setUser({
       id: res.user.id,
@@ -73,10 +98,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
-  const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userRole');
-    setUser(null);
+  const googleLogin = async (data: { idToken?: string; accessToken?: string }) => {
+    const res = await authApi.googleLogin(data);
+    localStorage.setItem('accessToken', res.accessToken);
+    localStorage.setItem('refreshToken', res.refreshToken);
+    localStorage.setItem('userRole', res.user.role);
+    setUser({
+      id: res.user.id,
+      email: res.user.email,
+      fullName: res.user.fullName,
+      phone: res.user.phone,
+      role: res.user.role,
+      status: res.user.status,
+    });
+  };
+
+  const logout = async () => {
+    const refreshToken = localStorage.getItem('refreshToken');
+    try {
+      if (refreshToken) {
+        await authApi.logout(refreshToken);
+      }
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userRole');
+      setUser(null);
+    }
   };
 
   return (
@@ -86,6 +136,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         isAuthenticated: !!user,
         isLoading,
         login,
+        googleLogin,
         logout,
         refreshUser,
       }}

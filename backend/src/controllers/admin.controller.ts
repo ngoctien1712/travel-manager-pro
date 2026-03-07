@@ -310,7 +310,7 @@ export async function listProviders(req: Request, res: Response) {
     const offsetParam = whereParams.length + 2;
 
     const { rows } = await pool.query(
-      `SELECT p.id_provider, p.name, p.phone, p.image, p.status,
+      `SELECT p.id_provider, p.name, p.phone, p.legal_documents, p.status,
               u.email, u.full_name,
               a.name AS area_name, c.name AS city_name, co.name AS country_name
        FROM provider p
@@ -329,7 +329,7 @@ export async function listProviders(req: Request, res: Response) {
         id: r.id_provider,
         name: r.name,
         phone: r.phone,
-        image: r.image,
+        legalDocuments: r.legal_documents,
         status: r.status,
         ownerEmail: r.email,
         ownerName: r.full_name,
@@ -349,24 +349,144 @@ export async function listProviders(req: Request, res: Response) {
 }
 
 export async function updateProviderStatus(req: Request, res: Response) {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { status } = req.body;
     if (!['pending', 'active', 'inactive'].includes(status)) {
       return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     }
-    const { rows } = await pool.query(
-      'UPDATE provider SET status = $1 WHERE id_provider = $2 RETURNING id_provider, name, status',
+
+    await client.query('BEGIN');
+
+    const { rows: providerRows } = await client.query(
+      'UPDATE provider SET status = $1 WHERE id_provider = $2 RETURNING id_provider, name, status, id_user',
       [status, id]
     );
-    if (rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp' });
+
+    if (providerRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Không tìm thấy nhà cung cấp' });
+    }
+
+    const provider = providerRows[0];
+
+    if (status === 'active') {
+      const userId = provider.id_user;
+
+      // Ensure user has owner role
+      const { rows: roleRows } = await client.query(
+        "SELECT id_role FROM roles WHERE code = 'AREA_OWNER'"
+      );
+      if (roleRows.length > 0) {
+        // Check if already has role
+        const { rows: hasRole } = await client.query(
+          "SELECT 1 FROM role_detail WHERE id_user = $1 AND id_role = $2",
+          [userId, roleRows[0].id_role]
+        );
+        if (hasRole.length === 0) {
+          await client.query(
+            'INSERT INTO role_detail (id_role, id_user) VALUES ($1, $2)',
+            [roleRows[0].id_role, userId]
+          );
+        }
+      }
+
+      // Ensure area_owner_profile exists
+      await client.query(
+        `INSERT INTO area_owner_profile (id_user, business_name)
+         VALUES ($1, $2)
+         ON CONFLICT (id_user) DO NOTHING`,
+        [userId, provider.name]
+      );
+    }
+
+    await client.query('COMMIT');
+
     res.json({
-      id: rows[0].id_provider,
-      name: rows[0].name,
-      status: rows[0].status,
+      id: provider.id_provider,
+      name: provider.name,
+      status: provider.status,
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('Update provider status error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });
+  } finally {
+    client.release();
+  }
+}
+
+export async function listPendingBusinessRegistrations(req: Request, res: Response) {
+  try {
+    const { rows } = await pool.query(
+      `SELECT u.id_user, u.email, u.full_name, u.phone, u.status AS user_status, u.created_at,
+              p.id_provider, p.name AS business_name, p.service_type, p.legal_documents, p.status AS provider_status,
+              p.bank_name, p.bank_account_number, p.bank_account_name,
+              a.name AS area_name, c.name AS city_name
+       FROM users u
+       JOIN provider p ON u.id_user = p.id_user
+       LEFT JOIN area a ON p.id_area = a.id_area
+       LEFT JOIN cities c ON a.id_city = c.id_city
+       WHERE u.status = 'pending'
+       ORDER BY u.created_at DESC`
+    );
+    res.json({ data: rows });
+  } catch (err) {
+    console.error('List pending business error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  }
+}
+
+export async function approveBusinessAccount(req: Request, res: Response) {
+  const client = await pool.connect();
+  try {
+    const { userId } = req.params;
+
+    await client.query('BEGIN');
+
+    // 1. Update user status
+    const { rows: userRows } = await client.query(
+      "UPDATE users SET status = 'active', updated_at = NOW() WHERE id_user = $1 AND status = 'pending' RETURNING id_user, email",
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản chờ duyệt hoặc tài khoản đã được duyệt' });
+    }
+
+    // 2. Upgrade role to AREA_OWNER
+    const { rows: roleRows } = await client.query("SELECT id_role FROM roles WHERE code = 'AREA_OWNER'");
+    if (roleRows.length > 0) {
+      await client.query(
+        "INSERT INTO role_detail (id_role, id_user) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [roleRows[0].id_role, userId]
+      );
+    }
+
+    // 3. Ensure area_owner_profile exists
+    const { rows: providerRows } = await client.query(
+      "SELECT name FROM provider WHERE id_user = $1 LIMIT 1",
+      [userId]
+    );
+    const businessName = providerRows[0]?.name || 'Doanh nghiệp mới';
+
+    await client.query(
+      `INSERT INTO area_owner_profile (id_user, business_name)
+       VALUES ($1, $2)
+       ON CONFLICT (id_user) DO UPDATE SET business_name = EXCLUDED.business_name`,
+      [userId, businessName]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: 'Đã duyệt tài khoản đối tác thành công. Người dùng hiện có thể đăng nhập.' });
+
+  } catch (err) {
+    if (client) await client.query('ROLLBACK');
+    console.error('Approve business account error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ' });
+  } finally {
+    if (client) client.release();
   }
 }

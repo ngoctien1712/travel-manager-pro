@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import * as authController from '../controllers/auth.controller.js';
+import { upload } from '../utils/upload.js';
 
 const router = Router();
 
@@ -11,9 +12,14 @@ router.post(
     body('password').isLength({ min: 6 }).withMessage('Mật khẩu tối thiểu 6 ký tự'),
     body('fullName').optional().trim(),
     body('phone').optional().trim(),
-    body('role').isIn(['admin', 'customer', 'owner']).withMessage('Vai trò không hợp lệ'),
   ],
   authController.register
+);
+
+router.post(
+  '/register-business',
+  upload.array('images', 10),
+  authController.registerBusiness
 );
 
 router.post(
@@ -26,6 +32,10 @@ router.post(
 );
 
 router.post('/logout', authController.logout);
+
+router.post('/google-login', authController.googleLogin);
+
+router.post('/refresh-token', authController.refreshToken);
 
 router.post(
   '/forgot-password',

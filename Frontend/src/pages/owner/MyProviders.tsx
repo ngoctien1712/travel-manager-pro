@@ -200,9 +200,9 @@ export const MyProviders = () => {
                       >
                         {expandedProviders[p.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       </Button>
-                      {p.image && (
+                      {p.legalDocuments && p.legalDocuments.length > 0 && (
                         <img
-                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${p.image}`}
+                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${p.legalDocuments[0]}`}
                           alt={p.name}
                           className="h-10 w-10 rounded-md object-cover"
                         />
@@ -391,7 +391,7 @@ export const MyProviders = () => {
                   formData.append('bankName', bankName);
                   formData.append('bankAccountNumber', bankAccountNumber);
                   formData.append('bankAccountName', bankAccountName);
-                  if (imageFile) formData.append('image', imageFile);
+                  if (imageFile) formData.append('images', imageFile);
                   createMut.mutate(formData);
                 }
               }}

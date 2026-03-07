@@ -33,6 +33,7 @@ const sidebarItems = [
   { icon: LayoutDashboard, label: 'Tổng quan', path: '/admin/dashboard' },
   { icon: Users, label: 'Người dùng', path: '/admin/users' },
   { icon: Globe, label: 'Địa điểm', path: '/admin/geography' },
+  { icon: Users, label: 'Duyệt đăng ký đối tác', path: '/admin/business-registrations' },
   { icon: Building2, label: 'Duyệt nhà cung cấp', path: '/admin/providers' },
   { icon: Map, label: 'Dịch vụ', path: '/admin/services' },
   { icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },

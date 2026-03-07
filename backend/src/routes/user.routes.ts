@@ -3,6 +3,8 @@ import { body } from 'express-validator';
 import { auth, requireRole } from '../middleware/auth.js';
 import * as userController from '../controllers/user.controller.js';
 
+import { upload } from '../utils/upload.js';
+
 const router = Router();
 
 router.use(auth);
@@ -29,6 +31,17 @@ router.post(
     body('newPassword').isLength({ min: 6 }).withMessage('Mật khẩu mới tối thiểu 6 ký tự'),
   ],
   userController.changePassword
+);
+
+router.post(
+  '/request-business',
+  upload.array('images', 5),
+  [
+    body('name').trim().notEmpty().withMessage('Tên doanh nghiệp bắt buộc'),
+    body('areaId').isUUID().withMessage('areaId không hợp lệ'),
+    body('phone').trim().notEmpty().withMessage('Số điện thoại bắt buộc'),
+  ],
+  userController.requestBusiness
 );
 
 export default router;

@@ -4,46 +4,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Map, Loader2, ArrowRight } from 'lucide-react';
 import { authApi } from '@/api/auth.api';
-import type { UserRole } from '@/types/dto';
 
 export const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<UserRole>('customer');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  const roleRedirects: Record<UserRole, string> = {
-    admin: '/admin/dashboard',
-    customer: '/',
-    owner: '/owner/dashboard',
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await authApi.register({ email, password, fullName, phone, role });
-      // Redirect based on the role the user just registered with
-      navigate(roleRedirects[role], { replace: true });
+      await authApi.register({ email, password, fullName, phone });
+      navigate('/login', { replace: true, state: { message: 'Đăng ký thành công. Vui lòng xác thực email.' } });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng ký thất bại');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleLogin = () => {
+    console.log('Google login clicked');
+    // Integration logic will be implemented later
   };
 
   return (
@@ -117,19 +106,7 @@ export const Register = () => {
                   className="bg-background"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Vai trò</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
-                  <SelectTrigger className="bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">Khách hàng</SelectItem>
-                    <SelectItem value="owner">Nhà cung cấp</SelectItem>
-                    <SelectItem value="admin">Quản trị viên</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+
               <Button type="submit" className="w-full" size="lg" disabled={loading}>
                 {loading ? (
                   <>
@@ -145,12 +122,20 @@ export const Register = () => {
               </Button>
             </form>
 
-            <p className="text-center text-sm text-muted-foreground mt-6">
-              Đã có tài khoản?{' '}
-              <Link to="/login" className="text-primary font-medium hover:underline">
-                Đăng nhập
-              </Link>
-            </p>
+            <div className="mt-6 space-y-2">
+              <p className="text-center text-sm text-muted-foreground">
+                Bạn muốn trở thành đối tác?{' '}
+                <Link to="/register-business" className="text-primary font-medium hover:underline">
+                  Đăng ký tài khoản doanh nghiệp
+                </Link>
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                Đã có tài khoản?{' '}
+                <Link to="/login" className="text-primary font-medium hover:underline">
+                  Đăng nhập
+                </Link>
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

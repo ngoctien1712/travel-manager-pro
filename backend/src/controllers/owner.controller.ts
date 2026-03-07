@@ -82,7 +82,7 @@ export async function getMyProviders(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { rows } = await pool.query(
-      `SELECT p.id_provider, p.name, p.id_area, p.id_user, p.phone, p.email, p.fanpage, p.service_type, p.image, p.status,
+      `SELECT p.id_provider, p.name, p.id_area, p.id_user, p.phone, p.email, p.fanpage, p.service_type, p.legal_documents, p.status,
               p.bank_name, p.bank_account_number, p.bank_account_name,
               a.name AS area_name, c.name AS city_name, co.name AS country_name
        FROM provider p
@@ -108,7 +108,7 @@ export async function getMyProviders(req: Request, res: Response) {
         bankName: r.bank_name,
         bankAccountNumber: r.bank_account_number,
         bankAccountName: r.bank_account_name,
-        image: r.image,
+        legalDocuments: r.legal_documents,
         status: r.status,
       })),
     });
@@ -618,13 +618,15 @@ export async function createProvider(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { name, areaId, phone, email, fanpage, serviceType, bankName, bankAccountNumber, bankAccountName } = req.body;
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
+    const files = req.files as Express.Multer.File[];
+    const legalDocuments = files ? files.map(file => `/uploads/${file.filename}`) : [];
 
     const { rows } = await pool.query(
-      `INSERT INTO provider (name, id_area, id_user, phone, email, fanpage, service_type, image, status, bank_name, bank_account_number, bank_account_name) 
+      `INSERT INTO provider (name, id_area, id_user, phone, email, fanpage, service_type, legal_documents, status, bank_name, bank_account_number, bank_account_name) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11)
-       RETURNING id_provider, name, id_area, id_user, phone, email, fanpage, service_type, image, status, bank_name, bank_account_number, bank_account_name`,
-      [name, areaId, userId, phone, email, fanpage, serviceType, imageUrl, bankName, bankAccountNumber, bankAccountName]
+       RETURNING id_provider, name, id_area, id_user, phone, email, fanpage, service_type, legal_documents, status, bank_name, bank_account_number, bank_account_name`,
+      [name, areaId, userId, phone, email, fanpage, serviceType, legalDocuments, bankName, bankAccountNumber, bankAccountName]
     );
     res.status(201).json(toCamel(rows[0] as Record<string, unknown>));
   } catch (err) {

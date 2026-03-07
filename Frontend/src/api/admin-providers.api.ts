@@ -4,7 +4,7 @@ export interface AdminProviderRow {
     id: string;
     name: string;
     phone: string;
-    image: string | null;
+    legalDocuments: string[] | null;
     status: string;
     ownerEmail: string;
     ownerName: string;
@@ -36,5 +36,13 @@ export const adminProvidersApi = {
             `/admin/providers/${id}/status`,
             { status }
         );
+    },
+
+    listPendingBusiness() {
+        return httpClient.get<{ data: any[] }>('/admin/pending-business');
+    },
+
+    approveAccount(userId: string) {
+        return httpClient.post<{ message: string }>(`/admin/approve-business-account/${userId}`, {});
     },
 };

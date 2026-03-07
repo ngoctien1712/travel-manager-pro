@@ -7,6 +7,7 @@ interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   headers?: Record<string, string>;
   body?: unknown;
+  isRetry?: boolean;
 }
 
 class HttpClient {
@@ -16,14 +17,45 @@ class HttpClient {
     this.baseURL = baseURL;
   }
 
-  private getAuthToken(): string | null {
-    return localStorage.getItem('authToken');
+  private getAccessToken(): string | null {
+    return localStorage.getItem('accessToken');
+  }
+
+  private getRefreshToken(): string | null {
+    return localStorage.getItem('refreshToken');
+  }
+
+  private async refreshToken(): Promise<boolean> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) return false;
+
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) throw new Error('Refresh failed');
+
+      const data = await response.json();
+      localStorage.setItem('accessToken', data.accessToken);
+      localStorage.setItem('refreshToken', data.refreshToken);
+      return true;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('userRole');
+      window.location.href = '/login'; // Redirect to login
+      return false;
+    }
   }
 
   private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
     const { method = 'GET', headers = {}, body } = config;
 
-    const token = this.getAuthToken();
+    const token = this.getAccessToken();
     const defaultHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -42,6 +74,13 @@ class HttpClient {
       headers: { ...defaultHeaders, ...headers },
       body: isFormData ? (body as any) : (body ? JSON.stringify(body) : undefined),
     });
+
+    if (response.status === 401 && !config.isRetry && !endpoint.includes('/auth/login')) {
+      const refreshed = await this.refreshToken();
+      if (refreshed) {
+        return this.request<T>(endpoint, { ...config, isRetry: true });
+      }
+    }
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {

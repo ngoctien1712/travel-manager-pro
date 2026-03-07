@@ -99,11 +99,24 @@ export default function OrderDetail() {
   const handleSimulateSuccess = async () => {
     try {
       setLoading(true);
+
+      // Get stored guest info to send to backend on success
+      const orderContacts = JSON.parse(localStorage.getItem('order_pending_contacts') || '{}');
+      const guestInfo = orderContacts[id!] || order.details.guest_info;
+
       await httpClient.post('/customer/webhook/project', {
         order_code: order.order_code,
         amount: order.total_amount,
-        transaction_id: 'TRANS_' + Math.random().toString(36).substring(7).toUpperCase()
+        transaction_id: 'TRANS_' + Math.random().toString(36).substring(7).toUpperCase(),
+        guest_info: guestInfo // Send guest info to be saved in DB on success
       });
+
+      // Cleanup
+      if (orderContacts[id!]) {
+        delete orderContacts[id!];
+        localStorage.setItem('order_pending_contacts', JSON.stringify(orderContacts));
+      }
+
       alert('Demo Thành Công: Hệ thống đã nhận được tiền và xác nhận đơn hàng!');
       window.location.reload();
     } catch (err) {
@@ -289,20 +302,35 @@ export default function OrderDetail() {
                       <Info size={18} className="text-gray-400" />
                       <h5 className="font-black text-xs uppercase tracking-widest text-gray-500">Thông tin hành khách liên hệ</h5>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                      <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Họ và tên</p>
-                        <p className="font-black text-gray-900">{order.details.guest_info?.fullName || order.details.travelerInfo?.fullName || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Số điện thoại</p>
-                        <p className="font-black text-gray-900">{order.details.guest_info?.phone || order.details.travelerInfo?.phone || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Email</p>
-                        <p className="font-black text-gray-900">{order.details.guest_info?.email || order.details.travelerInfo?.email || 'N/A'}</p>
-                      </div>
-                    </div>
+                    {(() => {
+                      // Priority: Order details from DB -> LocalStorage (for pending orders)
+                      const dbGuestInfo = order.details.guest_info || order.details.travelerInfo;
+                      let displayInfo = dbGuestInfo;
+
+                      if (!dbGuestInfo || !dbGuestInfo.fullName) {
+                        const orderContacts = JSON.parse(localStorage.getItem('order_pending_contacts') || '{}');
+                        if (orderContacts[id!]) {
+                          displayInfo = orderContacts[id!];
+                        }
+                      }
+
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          <div>
+                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Họ và tên</p>
+                            <p className="font-black text-gray-900 uppercase">{displayInfo?.fullName || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Số điện thoại</p>
+                            <p className="font-black text-gray-900">{displayInfo?.phone || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Email</p>
+                            <p className="font-black text-gray-900">{displayInfo?.email || 'N/A'}</p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

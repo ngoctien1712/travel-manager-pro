@@ -27,7 +27,7 @@ export interface OwnerProvider {
   bankName?: string;
   bankAccountNumber?: string;
   bankAccountName?: string;
-  image?: string;
+  legalDocuments?: string[];
   status: string;
 }
 

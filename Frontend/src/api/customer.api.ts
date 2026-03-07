@@ -146,6 +146,11 @@ export const customerApi = {
     return httpClient.get<any[]>(`/customer/vouchers/applicable?id_item=${id_item}`);
   },
 
+  async getBookedSeats(idTrip?: string, idItem?: string): Promise<string[]> {
+    const tripId = idTrip || 'null';
+    return httpClient.get<string[]>(`/customer/trips/${tripId}/booked-seats${idItem ? `?idItem=${idItem}` : ''}`);
+  },
+
   // ---- Orders & Payments ----
   async createOrder(_payload: {
     travelerInfo: { fullName: string; email: string; phone: string };

@@ -21,6 +21,9 @@ export const geographyApi = {
   listWards(areaId: string): Promise<GeographyListResponse<{ id: string; name: string }>> {
     return httpClient.get(`/geography/wards?areaId=${encodeURIComponent(areaId)}`);
   },
+  getAreas(): Promise<GeographyListResponse<Area & { city_name?: string }>> {
+    return httpClient.get('/geography/areas');
+  },
 };
 
 interface AdminCountryBody {

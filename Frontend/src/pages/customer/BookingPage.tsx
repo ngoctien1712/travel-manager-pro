@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { customerApi } from '@/api/customer.api';
-import { MapPin, Calendar, Users, ChevronLeft, ChevronRight, CheckCircle2, CreditCard, ShieldCheck, Ticket, Tag } from 'lucide-react';
+import { MapPin, Calendar, Users, ChevronLeft, ChevronRight, CheckCircle2, CreditCard, ShieldCheck, Ticket, Tag, Armchair, Car } from 'lucide-react';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import ErrorState from '@/components/ErrorState';
 
@@ -36,6 +36,7 @@ export default function BookingPage() {
     });
     const [vouchers, setVouchers] = useState<any[]>([]);
     const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+    const [bookedSeats, setBookedSeats] = useState<string[]>([]);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -77,6 +78,39 @@ export default function BookingPage() {
         if (id) fetchService();
     }, [id]);
 
+    useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const profile = await customerApi.getProfile();
+                if (profile && profile.fullName) {
+                    setFormData(prev => ({
+                        ...prev,
+                        guestInfo: {
+                            fullName: profile.fullName || '',
+                            email: profile.email || '',
+                            phone: profile.phone || ''
+                        }
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching profile:', err);
+            }
+        };
+        fetchUserData();
+    }, []);
+
+    useEffect(() => {
+        const fetchBookedSeats = async () => {
+            try {
+                const booked = await customerApi.getBookedSeats(formData.id_trip, id);
+                setBookedSeats(booked);
+            } catch (err) {
+                console.error('Error fetching booked seats:', err);
+            }
+        };
+        if (id) fetchBookedSeats();
+    }, [id, formData.id_trip]);
+
     const handleNext = () => {
         // Basic validation
         if (service.item_type === 'tour' || service.item_type === 'ticket') {
@@ -85,11 +119,23 @@ export default function BookingPage() {
         if (service.item_type === 'accommodation') {
             if (!formData.checkInDate || !formData.checkOutDate) return alert('Vui lòng chọn ngày nhận/trả phòng');
         }
+        if (service.item_type === 'vehicle') {
+            if (!formData.selectedSeats || formData.selectedSeats.length === 0) return alert('Vui lòng chọn ít nhất một chỗ ngồi');
+        }
         if (!formData.guestInfo.fullName || !formData.guestInfo.phone) return alert('Vui lòng điền thông tin liên hệ');
+
+        // Store guest info in browser storage temporarily
+        const storedContacts = JSON.parse(localStorage.getItem('temp_booking_contacts') || '{}');
+        storedContacts[id!] = {
+            ...formData.guestInfo,
+            timestamp: Date.now()
+        };
+        localStorage.setItem('temp_booking_contacts', JSON.stringify(storedContacts));
 
         setStep(2);
         window.scrollTo(0, 0);
     };
+
 
     const getEffectivePrice = () => {
         if (!service) return 0;
@@ -208,6 +254,11 @@ export default function BookingPage() {
             });
 
             if (result.success) {
+                // Also store contact info indexed by the NEW order ID so OrderDetail can find it
+                const orderContacts = JSON.parse(localStorage.getItem('order_pending_contacts') || '{}');
+                orderContacts[result.id_order] = formData.guestInfo;
+                localStorage.setItem('order_pending_contacts', JSON.stringify(orderContacts));
+
                 navigate(`/my-orders/${result.id_order}`);
             }
         } catch (error) {
@@ -215,12 +266,12 @@ export default function BookingPage() {
         }
     };
 
-    const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
-    const getImageUrl = (url: string | null) => {
-        if (!url) return 'https://images.unsplash.com/photo-1544225058-c98af409584b?w=800';
-        if (url.startsWith('http')) return url;
-        const cleanUrl = url.startsWith('/') ? url : `/${url}`;
-        return `${backendUrl}${cleanUrl}`;
+    const getImageUrl = (path?: string | null) => {
+        if (!path) return 'https://images.unsplash.com/photo-1544225058-c98af409584b?w=800';
+        if (path.startsWith('http')) return path;
+        const baseUrl = (import.meta as any).env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+        const cleanPath = path.startsWith('/') ? path : `/${path}`;
+        return `${baseUrl}${cleanPath}`;
     };
 
     if (loading) return <LoadingSkeleton />;
@@ -336,20 +387,156 @@ export default function BookingPage() {
                                         )}
 
                                         {service.item_type === 'vehicle' && (
-                                            <div className="col-span-full p-8 rounded-[2rem] bg-blue-50/50 border border-blue-100 flex items-center justify-between group shadow-sm">
-                                                <div className="space-y-2">
-                                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Thông tin phương tiện</p>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg">
-                                                            <CheckCircle2 size={20} />
+                                            <div className="col-span-full space-y-10">
+                                                <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                                                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest pl-2 border-l-4 border-blue-600">
+                                                        Sơ đồ chỗ ngồi khởi hành
+                                                    </h4>
+                                                    <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                                                        <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-lg bg-white border border-gray-100" /> Trống</span>
+                                                        <span className="flex items-center gap-2 text-blue-600"><div className="w-4 h-4 rounded-lg bg-blue-600 shadow-sm" /> Đang chọn</span>
+                                                        <span className="flex items-center gap-2 text-gray-500"><div className="w-4 h-4 rounded-lg bg-gray-200" /> Đã đặt</span>
+                                                    </div>
+                                                </div>
+
+                                                {service.positions && service.positions.length > 0 ? (
+                                                    <div className="max-w-md mx-auto bg-white rounded-[3rem] border-8 border-gray-100 p-8 relative shadow-2xl shadow-blue-900/5">
+                                                        {/* Front of Bus */}
+                                                        <div className="flex justify-between items-center mb-10 pb-6 border-b-2 border-dashed border-gray-100">
+                                                            <div className="w-14 h-16 rounded-2xl bg-gray-50 flex items-center justify-center border-2 border-gray-200">
+                                                                <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                                    <div className="w-5 h-5 rounded-full border-4 border-blue-200"></div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Phía trước xe</div>
                                                         </div>
-                                                        <div>
-                                                            <span className="font-black text-gray-900 text-lg">Đã chọn {formData.selectedSeats?.length || 0} chỗ</span>
-                                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{formData.selectedSeats?.join(', ')}</p>
+
+                                                        {/* Seats Grid (Bus Layout) */}
+                                                        <div className="space-y-6">
+                                                            {(() => {
+                                                                const rows: Record<string, any[]> = {};
+                                                                (service.positions || []).forEach((p: any) => {
+                                                                    const rowMatch = p.code_position?.match(/^([a-zA-Z]+)/);
+                                                                    const rowKey = rowMatch ? rowMatch[1] : 'Other';
+                                                                    if (!rows[rowKey]) rows[rowKey] = [];
+                                                                    rows[rowKey].push(p);
+                                                                });
+
+                                                                return Object.keys(rows).sort().map(rowKey => (
+                                                                    <div key={rowKey} className="flex justify-between items-center gap-4">
+                                                                        {/* Left Side (2 seats) */}
+                                                                        <div className="flex gap-3">
+                                                                            {[0, 1].map(idx => {
+                                                                                const pos = rows[rowKey].sort((a, b) => (a.code_position || '').localeCompare(b.code_position || ''))[idx];
+                                                                                if (!pos) return <div key={`empty-l-${idx}`} className="w-14 h-14 border-2 border-dashed border-gray-50 rounded-2xl opacity-40"></div>;
+
+                                                                                const isSelected = formData.selectedSeats.some((sid: any) => String(sid) === String(pos.id_position));
+                                                                                const isBooked = bookedSeats.some((sid: any) => String(sid) === String(pos.id_position)) || pos.is_booked;
+
+                                                                                return (
+                                                                                    <button
+                                                                                        key={pos.id_position}
+                                                                                        disabled={isBooked}
+                                                                                        onClick={() => {
+                                                                                            if (isSelected) {
+                                                                                                setFormData({ ...formData, selectedSeats: formData.selectedSeats.filter((sid: any) => String(sid) !== String(pos.id_position)) });
+                                                                                            } else {
+                                                                                                setFormData({ ...formData, selectedSeats: [...formData.selectedSeats, pos.id_position] });
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-all transform active:scale-95 ${isBooked
+                                                                                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-none'
+                                                                                            : isSelected
+                                                                                                ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-110 border-none'
+                                                                                                : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-blue-600 hover:text-blue-600 hover:shadow-lg'
+                                                                                            }`}
+                                                                                    >
+                                                                                        <Armchair size={18} className={isSelected ? 'text-white' : isBooked ? 'text-gray-200' : 'text-gray-400'} />
+                                                                                        <span className="text-[9px] font-black mt-1">{pos.code_position}</span>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+
+                                                                        {/* Aisle */}
+                                                                        <div className="flex-1 h-12 flex items-center justify-center">
+                                                                            <div className="w-full h-px bg-gray-100"></div>
+                                                                        </div>
+
+                                                                        {/* Right Side (2 seats) */}
+                                                                        <div className="flex gap-3">
+                                                                            {[2, 3].map(idx => {
+                                                                                const pos = rows[rowKey].sort((a, b) => (a.code_position || '').localeCompare(b.code_position || ''))[idx];
+                                                                                if (!pos) return <div key={`empty-r-${idx}`} className="w-14 h-14 border-2 border-dashed border-gray-50 rounded-2xl opacity-40"></div>;
+
+                                                                                const isSelected = formData.selectedSeats.some((sid: any) => String(sid) === String(pos.id_position));
+                                                                                const isBooked = bookedSeats.some((sid: any) => String(sid) === String(pos.id_position)) || pos.is_booked;
+
+                                                                                return (
+                                                                                    <button
+                                                                                        key={pos.id_position}
+                                                                                        disabled={isBooked}
+                                                                                        onClick={() => {
+                                                                                            if (isSelected) {
+                                                                                                setFormData({ ...formData, selectedSeats: formData.selectedSeats.filter((sid: any) => String(sid) !== String(pos.id_position)) });
+                                                                                            } else {
+                                                                                                setFormData({ ...formData, selectedSeats: [...formData.selectedSeats, pos.id_position] });
+                                                                                            }
+                                                                                        }}
+                                                                                        className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-all transform active:scale-95 ${isBooked
+                                                                                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-none'
+                                                                                            : isSelected
+                                                                                                ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-110 border-none'
+                                                                                                : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-blue-600 hover:text-blue-600 hover:shadow-lg'
+                                                                                            }`}
+                                                                                    >
+                                                                                        <Armchair size={18} className={isSelected ? 'text-white' : isBooked ? 'text-gray-200' : 'text-gray-400'} />
+                                                                                        <span className="text-[9px] font-black mt-1">{pos.code_position}</span>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                ));
+                                                            })()}
+                                                        </div>
+
+                                                        {/* Rear of Bus */}
+                                                        <div className="mt-10 pt-6 border-t-2 border-dashed border-gray-100 text-center">
+                                                            <div className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em]">Phía sau xe</div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="p-12 rounded-[3.5rem] bg-gray-50/50 border-2 border-dashed border-gray-200 text-center space-y-4">
+                                                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-gray-300 shadow-sm">
+                                                            <Car size={32} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Sơ đồ chỗ ngồi đang được cập nhật</p>
+                                                            <p className="text-xs text-gray-400 max-w-xs mx-auto">Chưa tìm thấy dữ liệu vị trí ghế cho phương tiện này.</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="p-8 rounded-[2rem] bg-blue-50/50 border border-blue-100 flex items-center justify-between group shadow-sm">
+                                                    <div className="space-y-2">
+                                                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Thông tin phương tiện</p>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg">
+                                                                <CheckCircle2 size={20} />
+                                                            </div>
+                                                            <div>
+                                                                <span className="font-black text-gray-900 text-lg">Đã chọn {formData.selectedSeats?.length || 0} chỗ</span>
+                                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                                                    {formData.selectedSeats?.map((sid: any) => {
+                                                                        const pos = service.positions?.find((p: any) => String(p.id_position) === String(sid));
+                                                                        return pos?.code_position || sid;
+                                                                    }).join(', ')}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <Button variant="outline" onClick={() => navigate(-1)} className="rounded-xl border-blue-200 text-blue-600 font-black hover:bg-blue-600 hover:text-white transition-all">THAY ĐỔI</Button>
                                             </div>
                                         )}
                                     </div>
@@ -594,7 +781,12 @@ export default function BookingPage() {
                                         {service.item_type === 'vehicle' ? (
                                             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
                                                 <span>Số ghế ({formData.selectedSeats?.length || 0})</span>
-                                                <span className="text-gray-900">{formData.selectedSeats?.join(', ')}</span>
+                                                <span className="text-gray-900 truncate ml-4">
+                                                    {formData.selectedSeats?.map((sid: any) => {
+                                                        const pos = service.positions?.find((p: any) => String(p.id_position) === String(sid));
+                                                        return pos?.code_position || sid;
+                                                    }).join(', ')}
+                                                </span>
                                             </div>
                                         ) : (
                                             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">

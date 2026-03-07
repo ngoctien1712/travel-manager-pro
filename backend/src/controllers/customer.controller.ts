@@ -291,7 +291,7 @@ export const getService = async (req: Request, res: Response) => {
         bi.*, 
         p.name AS provider_name, 
         p.phone AS provider_phone,
-        p.image AS provider_image,
+        p.legal_documents AS provider_legal_documents,
         p.description AS provider_description,
         p.address AS provider_address,
         p.email AS provider_email,
@@ -473,19 +473,43 @@ export const createBooking = async (req: Request, res: Response) => {
       const days = Math.ceil((new Date(end_date).getTime() - new Date(start_date).getTime()) / (1000 * 60 * 60 * 24));
       subtotal = price * totalItemQuantity * (days || 1);
     } else if (item_type === 'vehicle') {
-      const { id_position, id_trip } = details;
-      totalItemQuantity = 1; // One position = 1 item
-      // Check if seat is booked for this trip
-      const { rows: booked } = await query(
-        'SELECT 1 FROM order_pos_vehicle_detail WHERE id_position = $1 AND id_trip = $2',
-        [id_position, id_trip]
-      );
-      if (booked.length > 0) {
-        return res.status(400).json({ message: 'Chỗ ngồi này đã được đặt.' });
+      const { id_position, seats, id_trip } = details;
+      const seatIds = seats || (id_position ? [id_position] : []);
+
+      if (seatIds.length === 0) {
+        return res.status(400).json({ message: 'Vui lòng chọn ít nhất một chỗ ngồi.' });
       }
-      const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
-      const finalPrice = Number(tripRows[0]?.price_override || price);
-      subtotal = finalPrice;
+
+      totalItemQuantity = seatIds.length;
+
+      // Check availability: if id_trip is provided, use it. Otherwise use id_item context.
+      if (id_trip) {
+        const { rows: booked } = await query(
+          'SELECT id_position FROM order_pos_vehicle_detail WHERE id_trip = $1 AND id_position = ANY($2::uuid[])',
+          [id_trip, seatIds]
+        );
+        if (booked.length > 0) {
+          return res.status(400).json({ message: 'Một hoặc nhiều chỗ ngồi đã được đặt cho chuyến này.' });
+        }
+        const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
+        const finalPrice = Number(tripRows[0]?.price_override || price);
+        subtotal = finalPrice * totalItemQuantity;
+      } else {
+        // Fallback to id_item context if no trip specified
+        const { rows: booked } = await query(
+          `SELECT opvd.id_position 
+           FROM order_pos_vehicle_detail opvd
+           JOIN "order" o ON o.id_order = opvd.id_order
+           JOIN positions p ON p.id_position = opvd.id_position
+           JOIN vehicle v ON v.id_vehicle = p.id_vehicle
+           WHERE v.id_item = $1 AND o.status != 'cancelled' AND opvd.id_position = ANY($2::uuid[])`,
+          [id_item, seatIds]
+        );
+        if (booked.length > 0) {
+          return res.status(400).json({ message: 'Một hoặc nhiều chỗ ngồi đã được đặt.' });
+        }
+        subtotal = price * totalItemQuantity;
+      }
     } else if (item_type === 'ticket') {
       const { quantity } = details;
       totalItemQuantity = Number(quantity || 1);
@@ -577,14 +601,22 @@ export const createBooking = async (req: Request, res: Response) => {
         [idOrder, id_room, start_date, end_date, quantity || 1, price]
       );
     } else if (item_type === 'vehicle') {
-      const { id_position, id_trip } = details;
-      const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
-      const finalPrice = Number(tripRows[0]?.price_override || price);
-      await query(
-        `INSERT INTO order_pos_vehicle_detail (id_order, id_position, id_trip, price) 
-         VALUES ($1, $2, $3, $4)`,
-        [idOrder, id_position, id_trip, finalPrice]
-      );
+      const { id_position, seats, id_trip } = details;
+      const seatIds = seats || (id_position ? [id_position] : []);
+
+      let finalPrice = price;
+      if (id_trip) {
+        const { rows: tripRows } = await query('SELECT price_override FROM vehicle_trips WHERE id_trip = $1', [id_trip]);
+        finalPrice = Number(tripRows[0]?.price_override || price);
+      }
+
+      for (const seatId of seatIds) {
+        await query(
+          `INSERT INTO order_pos_vehicle_detail (id_order, id_position, id_trip, price) 
+           VALUES ($1, $2, $3, $4)`,
+          [idOrder, seatId, id_trip || null, finalPrice]
+        );
+      }
     } else if (item_type === 'ticket') {
       const { visit_date, quantity, guest_info } = details;
       await query(
@@ -612,6 +644,37 @@ export const createBooking = async (req: Request, res: Response) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi đặt chỗ' });
+  }
+};
+
+export const getBookedSeats = async (req: Request, res: Response) => {
+  try {
+    const { idTrip } = req.params;
+    const { idItem } = req.query;
+
+    if (idTrip && idTrip !== 'null' && idTrip !== 'undefined') {
+      const { rows } = await query(
+        'SELECT id_position FROM order_pos_vehicle_detail WHERE id_trip = $1',
+        [idTrip]
+      );
+      return res.json(rows.map((r: any) => r.id_position));
+    } else if (idItem) {
+      const { rows } = await query(
+        `SELECT opvd.id_position 
+         FROM order_pos_vehicle_detail opvd
+         JOIN "order" o ON o.id_order = opvd.id_order
+         JOIN positions p ON p.id_position = opvd.id_position
+         JOIN vehicle v ON v.id_vehicle = p.id_vehicle
+         WHERE v.id_item = $1 AND o.status != 'cancelled'`,
+        [idItem]
+      );
+      return res.json(rows.map((r: any) => r.id_position));
+    }
+
+    res.json([]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi khi lấy danh sách chỗ đã đặt' });
   }
 };
 
@@ -1022,4 +1085,5 @@ export default {
   listTripPlans,
   deleteTripPlan,
   getApplicableVouchers,
+  getBookedSeats,
 };

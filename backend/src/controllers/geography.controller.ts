@@ -60,15 +60,29 @@ export async function listAreas(req: Request, res: Response) {
   try {
     const cityId = req.query.cityId as string | undefined;
     const status = (req.query.status as string) || 'active';
-    if (!cityId) {
-      return res.status(400).json({ message: 'Thiếu cityId' });
+
+    let query = `
+      SELECT a.id_area, a.id_city, a.name, a.attribute, a.status, c.name as city_name 
+      FROM area a
+      JOIN cities c ON c.id_city = a.id_city
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    if (cityId) {
+      query += ` AND a.id_city = $${paramIdx++}`;
+      params.push(cityId);
     }
-    const { rows } = await pool.query(
-      status === 'all'
-        ? 'SELECT id_area, id_city, name, attribute, status FROM area WHERE id_city = $1 ORDER BY name'
-        : 'SELECT id_area, id_city, name, attribute, status FROM area WHERE id_city = $1 AND status = $2 ORDER BY name',
-      status === 'all' ? [cityId] : [cityId, status]
-    );
+
+    if (status !== 'all') {
+      query += ` AND a.status = $${paramIdx++}`;
+      params.push(status);
+    }
+
+    query += ' ORDER BY a.name';
+
+    const { rows } = await pool.query(query, params);
     res.json({ data: rows.map((r) => toCamel(r as Record<string, unknown>)) });
   } catch (err) {
     console.error('List areas error:', err);

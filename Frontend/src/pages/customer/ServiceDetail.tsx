@@ -5,6 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import ErrorState from '@/components/ErrorState';
 import { customerApi } from '@/api/customer.api';
@@ -31,7 +32,8 @@ import {
   Sparkles,
   ShieldCheck,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  Armchair
 } from 'lucide-react';
 import ChatWidget from '@/components/chat/ChatWidget';
 
@@ -50,6 +52,7 @@ interface ServiceDetail {
   provider_name?: string;
   provider_phone?: string;
   provider_image?: string;
+  provider_legal_documents?: string[];
 
   // Location
   area_name?: string;
@@ -102,6 +105,12 @@ interface ServiceDetail {
     media?: any[];
     description?: string;
   }>;
+  positions?: Array<{
+    id_position: string;
+    code_position: string;
+    price: number;
+    is_booked: boolean;
+  }>;
   trips?: Array<{
     id_trip: string;
     id_vehicle: string;
@@ -129,18 +138,14 @@ interface ServiceDetail {
   id_vehicle?: string;
   code_vehicle?: string;
   max_guest?: number;
-  departureTime?: string;
-  departurePoint?: string;
-  arrivalTime?: string;
-  arrivalPoint?: string;
+  departure_time?: string;
+  departure_point?: string;
+  arrival_time?: string;
+  arrival_point?: string;
+  departure_date?: string;
+  arrival_date?: string;
   estimatedDuration?: string;
   vehicle_attribute?: any;
-  positions?: Array<{
-    id_position: string;
-    code_position: string;
-    price: number;
-    is_booked: boolean;
-  }>;
 
   // Expanded Provider Info
   provider_description?: string;
@@ -157,12 +162,12 @@ export default function ServiceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [selectedSeats, setSelectedSeats] = useState<any[]>([]);
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
   const [bookingDate, setBookingDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [vouchers, setVouchers] = useState<any[]>([]);
+  const [relatedServices, setRelatedServices] = useState<any[]>([]);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [stickyStyle, setStickyStyle] = useState<React.CSSProperties>({ position: 'sticky', top: '96px' });
 
@@ -214,9 +219,22 @@ export default function ServiceDetail() {
         ]);
         setService(data);
         setVouchers(vData);
+
+        // Fetch related services in the same city
+        if (data.city_name) {
+          try {
+            const related = await customerApi.listServices({ city: data.city_name });
+            setRelatedServices(related.items.filter((item: any) => item.id_item !== id).slice(0, 4));
+          } catch (relErr) {
+            console.error('Error fetching related services:', relErr);
+          }
+        }
+
         if (data.media && data.media.length > 0) {
           setActiveImage(data.media[0].url);
         }
+
+        // No longer auto-selecting trip as we use service base schedule
         setError(null);
       } catch (err) {
         setError('Không tìm thấy dịch vụ');
@@ -228,12 +246,14 @@ export default function ServiceDetail() {
     if (id) fetchService();
   }, [id]);
 
+  // No need to fetch booked seats here anymore as it is done in BookingPage.tsx
+
   const handleBookingRedirect = () => {
     let query = `?quantity=${quantity}`;
     if (service.item_type === 'accommodation' && selectedRoom) {
       query += `&id_room=${selectedRoom.id_room}`;
-    } else if (service.item_type === 'vehicle' && selectedTrip) {
-      query += `&id_trip=${selectedTrip.id_trip}&seats=${selectedSeats.map(s => s.id_position).join(',')}`;
+    } else if (service.item_type === 'vehicle') {
+      if (selectedTrip) query += `&id_trip=${selectedTrip.id_trip}`;
     } else if (service.item_type === 'tour') {
       query += `&booking_date=${bookingDate}`;
     }
@@ -587,147 +607,274 @@ export default function ServiceDetail() {
 
             {/* ACCOMMODATION SPECIFIC */}
             {service.item_type === 'accommodation' && (
-              <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-12">
-                <div className="flex justify-between items-center">
+              <div className="space-y-12">
+                <section className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-12">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Home size={24} />
+                      </div>
+                      <h3 className="text-2xl font-black text-gray-900">Dịch vụ & Tiện nghi</h3>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} size={20} className={i < (service.attribute?.stars || service.acc_attribute?.stars || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-8">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-5 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
+                        <Home size={20} className="text-blue-500 mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Loại hình</p>
+                        <p className="font-black text-gray-900 text-sm whitespace-nowrap">{service.hotel_type || 'Khách sạn'}</p>
+                      </div>
+                      <div className="p-5 rounded-3xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center text-center">
+                        <Clock size={20} className="text-emerald-500 mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-in</p>
+                        <p className="font-black text-gray-900 text-sm">{service.checkin_time || '14:00'}</p>
+                      </div>
+                      <div className="p-5 rounded-3xl bg-orange-50/50 border border-orange-100/50 flex flex-col items-center text-center">
+                        <Clock size={20} className="text-orange-500 mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-out</p>
+                        <p className="font-black text-gray-900 text-sm">{service.checkout_time || '12:00'}</p>
+                      </div>
+                      <div className="p-5 rounded-3xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center text-center">
+                        <Star size={20} className="text-purple-500 mb-2" />
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Xếp hạng</p>
+                        <p className="font-black text-gray-900 text-sm">{service.star_rating || '4.5'} Sao</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                      <div className="space-y-4">
+                        <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                          <ShieldCheck size={14} className="text-blue-500" /> Chính sách & Quy định
+                        </h4>
+                        <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100">
+                          {service.policies ? (
+                            Object.entries(typeof service.policies === 'string' ? JSON.parse(service.policies) : service.policies).map(([k, v]: [string, any]) => (
+                              <div key={k} className="flex items-start gap-4">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
+                                <div>
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{k}</p>
+                                  <p className="text-sm font-bold text-gray-700">{v}</p>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                <p className="text-sm font-bold text-gray-700">Hủy phòng: Hoàn tiền trước 24h</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                <p className="text-sm font-bold text-gray-700">Trẻ em: Miễn phí dưới 6 tuổi</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                <p className="text-sm font-bold text-gray-700">Thú cưng: Không được phép</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                          <Utensils size={14} className="text-orange-500" /> Tiện ích khách sạn
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {(service.attribute?.amenities || service.acc_attribute?.amenities || []).map((f: string) => (
+                            <div key={f} className="px-4 py-2 rounded-xl bg-white border border-gray-100 text-xs font-bold text-gray-600 shadow-sm hover:border-blue-200 transition-all flex items-center gap-2">
+                              <CheckCircle2 size={12} className="text-emerald-500" /> {f}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-12">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                      <Home size={24} />
-                    </div>
-                    <h3 className="text-2xl font-black text-gray-900">Dịch vụ & Tiện nghi</h3>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} size={20} className={i < (service.attribute?.stars || service.acc_attribute?.stars || 0) ? "fill-yellow-400 text-yellow-400" : "text-gray-200"} />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-8">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-5 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
-                      <Home size={20} className="text-blue-500 mb-2" />
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Loại hình</p>
-                      <p className="font-black text-gray-900 text-sm whitespace-nowrap">{service.hotel_type || 'Khách sạn'}</p>
-                    </div>
-                    <div className="p-5 rounded-3xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center text-center">
-                      <Clock size={20} className="text-emerald-500 mb-2" />
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-in</p>
-                      <p className="font-black text-gray-900 text-sm">{service.checkin_time || '14:00'}</p>
-                    </div>
-                    <div className="p-5 rounded-3xl bg-orange-50/50 border border-orange-100/50 flex flex-col items-center text-center">
-                      <Clock size={20} className="text-orange-500 mb-2" />
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-out</p>
-                      <p className="font-black text-gray-900 text-sm">{service.checkout_time || '12:00'}</p>
-                    </div>
-                    <div className="p-5 rounded-3xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center text-center">
-                      <Star size={20} className="text-purple-500 mb-2" />
-                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Xếp hạng</p>
-                      <p className="font-black text-gray-900 text-sm">{service.star_rating || '4.5'} Sao</p>
-                    </div>
+                    <div className="w-2 h-10 bg-[#0094FF] rounded-full" />
+                    <h2 className="text-3xl font-black text-[#1A2B48] uppercase tracking-tighter">Hạng phòng hiện có</h2>
                   </div>
 
-                  {/* Policies & Amenities */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                    <div className="space-y-4">
-                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <ShieldCheck size={14} className="text-blue-500" /> Chính sách & Quy định
-                      </h4>
-                      <div className="space-y-4 bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100">
-                        {service.policies ? (
-                          Object.entries(typeof service.policies === 'string' ? JSON.parse(service.policies) : service.policies).map(([k, v]: [string, any]) => (
-                            <div key={k} className="flex items-start gap-4">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2 shrink-0" />
-                              <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">{k}</p>
-                                <p className="text-sm font-bold text-gray-700">{v}</p>
+                  <div className="space-y-10">
+                    {service.rooms?.map((room) => {
+                      const isSelected = selectedRoom?.id_room === room.id_room;
+                      const roomSize = room.attribute?.room_size || '32.0 m²';
+                      const facilities = room.attribute?.facilities || [];
+
+                      return (
+                        <div
+                          key={room.id_room}
+                          className={`bg-white rounded-[1.5rem] border border-gray-200 overflow-hidden transition-all duration-300 shadow-sm ${isSelected ? 'ring-4 ring-blue-100 border-blue-400' : 'hover:shadow-md'
+                            }`}
+                        >
+                          {/* Header: Room Name */}
+                          <div className="bg-[#EBF5FF] px-8 py-5 border-b border-gray-100">
+                            <h4 className="text-xl font-black text-[#1A2B48]">{room.name_room}</h4>
+                          </div>
+
+                          <div className="flex flex-col lg:flex-row p-0">
+                            {/* Left: Image and Features */}
+                            <div className="lg:w-1/4 p-8 border-r border-gray-100 bg-white">
+                              <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-inner mb-6">
+                                <img
+                                  src={getImageUrl(room.media?.[0]?.url || room.attribute?.images?.[0])}
+                                  className="w-full h-full object-cover"
+                                  alt={room.name_room}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-y-4 mb-6">
+                                <div className="flex items-center gap-3 text-gray-500">
+                                  <Sparkles size={18} className="text-gray-400" />
+                                  <span className="text-xs font-bold leading-none">{roomSize}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-500">
+                                  <MessageCircle size={18} className="text-gray-400" />
+                                  <span className="text-xs font-bold leading-none">Vòi tắm đứng</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-500">
+                                  <CloudSun size={18} className="text-gray-400" />
+                                  <span className="text-xs font-bold leading-none">Máy lạnh</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-gray-500">
+                                  <ExternalLink size={18} className="text-gray-400" />
+                                  <span className="text-xs font-bold leading-none">WiFi miễn phí</span>
+                                </div>
+                              </div>
+
+                              <button className="text-[#0094FF] font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:underline">
+                                <Eye size={16} /> Xem chi tiết phòng
+                              </button>
+                            </div>
+
+                            {/* Right: Options Table */}
+                            <div className="flex-1 flex flex-col">
+                              {/* Table Headers */}
+                              <div className="grid grid-cols-12 bg-[#F7F9FB] border-b border-gray-100 px-6 py-4 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                                <div className="col-span-5 font-black text-[#1A2B48]">Lựa chọn phòng</div>
+                                <div className="col-span-2 text-center">Khách</div>
+                                <div className="col-span-3 text-center">Giá/phòng/đêm</div>
+                                <div className="col-span-1 text-center">Phòng</div>
+                                <div className="col-span-1"></div>
+                              </div>
+
+                              {/* Table Row */}
+                              <div className="grid grid-cols-12 flex-1 items-center px-6 py-8 divide-x divide-gray-50">
+                                <div className="col-span-5 pr-8 space-y-3">
+                                  <p className="text-[10px] font-bold text-gray-400 leading-tight">Deluxe Room - Breakfast Included</p>
+                                  <h5 className="text-base font-black text-[#1A2B48]">Bữa sáng cho {room.max_guest} người</h5>
+                                  <div className="space-y-1.5 pt-1">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
+                                      <Armchair size={14} /> 1 giường đôi
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
+                                      <CheckCircle2 size={14} /> Miễn phí hủy phòng
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="col-span-2 px-4 flex justify-center items-center gap-1">
+                                  {Array.from({ length: room.max_guest }).map((_, i) => (
+                                    <User key={i} size={20} className="text-gray-400" />
+                                  ))}
+                                </div>
+
+                                <div className="col-span-3 px-4 text-center space-y-1">
+                                  <p className="text-[12px] font-bold text-gray-400 line-through">{(room.price * 1.2).toLocaleString()} VND</p>
+                                  <p className="text-2xl font-black text-[#FF5E1F] tracking-tighter">{(room.price).toLocaleString()} VND</p>
+                                  <p className="text-[10px] font-bold text-gray-400">Chưa bao gồm thuế và phí</p>
+                                </div>
+
+                                <div className="col-span-1 px-4 text-center font-black text-gray-800 text-sm">
+                                  x1
+                                </div>
+
+                                <div className="col-span-1 pl-4 flex justify-end">
+                                  <Button
+                                    onClick={() => {
+                                      setSelectedRoom(room);
+                                      setTimeout(() => document.getElementById('accommodation-booking-confirm')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                    }}
+                                    className={`h-11 px-8 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${isSelected
+                                      ? 'bg-gray-900 text-white'
+                                      : 'bg-[#0094FF] text-white hover:bg-blue-600 shadow-blue-100 hover:-translate-y-0.5'
+                                      }`}
+                                  >
+                                    {isSelected ? 'ĐÃ CHỌN' : 'CHỌN'}
+                                  </Button>
+                                </div>
                               </div>
                             </div>
-                          ))
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              <p className="text-sm font-bold text-gray-700">Hủy phòng: Hoàn tiền trước 24h</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              <p className="text-sm font-bold text-gray-700">Trẻ em: Miễn phí dưới 6 tuổi</p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                              <p className="text-sm font-bold text-gray-700">Thú cưng: Không được phép</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                        <Utensils size={14} className="text-orange-500" /> Tiện ích khách sạn
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {(service.attribute?.amenities || service.acc_attribute?.amenities || []).map((f: string) => (
-                          <div key={f} className="px-4 py-2 rounded-xl bg-white border border-gray-100 text-xs font-bold text-gray-600 shadow-sm hover:border-blue-200 transition-all flex items-center gap-2">
-                            <CheckCircle2 size={12} className="text-emerald-500" /> {f}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                      <Eye size={14} className="text-purple-500" /> Tầm nhìn & Cảnh quan
-                    </h4>
-                    <div className="flex flex-wrap gap-3">
-                      {(service.attribute?.views || service.acc_attribute?.views || []).map((v: string) => (
-                        <div key={v} className="flex items-center gap-2 px-5 py-3 rounded-2xl border-2 border-gray-50 text-sm font-bold text-gray-600 hover:border-blue-200 hover:text-blue-600 transition-all bg-white">
-                          <Eye size={16} /> View {v}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                </div>
+                </section>
 
-                {service.rooms && service.rooms.length > 0 && (
-                  <div className="pt-8 border-t border-gray-50 space-y-6">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">Các hạng phòng hiện có</h4>
-                    <div className="grid grid-cols-1 gap-4">
-                      {service.rooms.map(room => (
-                        <div key={room.id_room} className={`p-6 rounded-[2rem] border-2 transition-all flex flex-col md:flex-row justify-between items-center gap-6 ${selectedRoom?.id_room === room.id_room ? 'border-blue-600 bg-blue-50/30' : 'bg-gray-50 border-transparent hover:border-blue-200'}`}>
-                          <div className="flex-1">
-                            <h5 className="text-xl font-black text-gray-900 mb-2">{room.name_room}</h5>
-                            <div className="flex items-center gap-4 text-xs font-bold text-gray-500 uppercase tracking-widest">
-                              <span className="flex items-center gap-1.5"><Users size={14} /> {room.max_guest} Người</span>
-                              <span className="w-1 h-1 rounded-full bg-gray-300" />
-                              <span className="flex flex-wrap gap-2">
-                                {(room.attribute?.facilities || []).slice(0, 3).map((f: string) => (
-                                  <span key={f} className="text-blue-600 font-black">{f}</span>
-                                ))}
-                              </span>
+                {/* Booking Confirmation Section for Accommodation */}
+                {selectedRoom && (
+                  <section id="accommodation-booking-confirm" className="animate-in fade-in slide-in-from-bottom-10 duration-700">
+                    <div className="bg-gradient-to-br from-gray-900 via-blue-950 to-black rounded-[2.5rem] p-1 md:p-1.5 shadow-2xl shadow-blue-900/40 relative overflow-hidden group">
+                      {/* Interactive background shine */}
+                      <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" />
+                      <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-600/20 rounded-full blur-[80px]" />
+
+                      <div className="bg-white/5 backdrop-blur-sm rounded-[2.3rem] p-8 md:p-10 flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10 border border-white/10">
+                        <div className="flex items-center gap-8">
+                          <div className="w-24 h-24 rounded-3xl overflow-hidden border-4 border-white/10 shadow-2xl relative">
+                            <img
+                              src={getImageUrl(selectedRoom.media?.[0]?.url || selectedRoom.attribute?.images?.[0])}
+                              className="w-full h-full object-cover"
+                              alt="selected"
+                            />
+                            <div className="absolute top-2 right-2 flex gap-1">
+                              <Star size={10} className="text-yellow-400 fill-yellow-400" />
                             </div>
-                            <p className="text-xs text-gray-500 mt-2 line-clamp-2">{room.description}</p>
                           </div>
-                          <div className="text-center md:text-right shrink-0">
-                            <p className="text-3xl font-black text-blue-600 tracking-tight">{room.price.toLocaleString()}đ</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">/ đêm / phòng</p>
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em]">Phòng bạn đang chọn</p>
+                            <h4 className="text-2xl font-black text-white uppercase tracking-tight italic">{selectedRoom.name_room}</h4>
+                            <div className="flex items-center gap-4">
+                              <span className="flex items-center gap-2 text-xs font-black text-white/60"><Users size={14} className="text-blue-500" /> {selectedRoom.max_guest} Khách</span>
+                              <span className="flex items-center gap-2 text-xs font-black text-white/60"><Clock size={14} className="text-blue-500" /> Nhận phòng 14:00</span>
+                            </div>
                           </div>
+                        </div>
+
+                        <div className="flex flex-col md:flex-row items-center gap-8 lg:gap-12 w-full lg:w-auto">
+                          <div className="text-center lg:text-right space-y-1">
+                            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Giá tạm tính (1 đêm)</p>
+                            <div className="flex items-baseline gap-2 justify-center lg:justify-end">
+                              <span className="text-4xl font-black text-white tracking-tighter">{(selectedRoom.price).toLocaleString()}đ</span>
+                            </div>
+                            <p className="text-[9px] font-black text-emerald-400 uppercase tracking-tighter">Miễn phí hủy phòng trước 24h</p>
+                          </div>
+
                           <Button
-                            onClick={() => {
-                              setSelectedRoom(room);
-                              document.getElementById('booking-card')?.scrollIntoView({ behavior: 'smooth' });
-                            }}
-                            className={`rounded-xl h-12 px-8 font-black ${selectedRoom?.id_room === room.id_room ? 'bg-blue-600 text-white' : 'bg-gray-900 hover:bg-black text-white'}`}
+                            onClick={handleBookingRedirect}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-12 h-16 rounded-2xl font-black text-lg shadow-xl shadow-blue-900/50 hover:shadow-blue-600/40 transition-all hover:scale-105 active:scale-95 group uppercase tracking-tight flex items-center gap-4"
                           >
-                            {selectedRoom?.id_room === room.id_room ? 'Đã chọn' : 'Chọn phòng'}
+                            Xác nhận & Đặt phòng ngay
+                            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center group-hover:translate-x-1 transition-transform">
+                              <ChevronRight size={20} />
+                            </div>
                           </Button>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
+                  </section>
                 )}
-              </section>
+              </div>
             )}
 
             {/* VEHICLE / TICKET SHARED */}
@@ -746,12 +893,12 @@ export default function ServiceDetail() {
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <Clock size={20} className="text-blue-500 mx-auto mb-2" />
                         <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Giờ khởi hành</p>
-                        <p className="font-black text-gray-900 text-base">{service.departureTime || service.attribute?.departureTime || '08:00'}</p>
+                        <p className="font-black text-gray-900 text-base">{service.departure_time || service.attribute?.departure_time || '08:00'}</p>
                       </div>
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <MapPin size={20} className="text-blue-500 mx-auto mb-2" />
                         <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Điểm đón</p>
-                        <p className="font-black text-gray-900 text-sm line-clamp-1">{service.departurePoint || service.attribute?.departurePoint || 'Bến xe trung tâm'}</p>
+                        <p className="font-black text-gray-900 text-sm line-clamp-1">{service.departure_point || service.attribute?.departure_point || 'Bến xe trung tâm'}</p>
                       </div>
                       <div className="p-5 rounded-3xl bg-gray-50 border border-gray-100 text-center">
                         <Users size={20} className="text-blue-500 mx-auto mb-2" />
@@ -770,8 +917,8 @@ export default function ServiceDetail() {
                       <div className="flex flex-col md:flex-row items-center justify-between gap-12">
                         <div className="text-center md:text-left flex-1">
                           <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] mb-3">Khởi hành</p>
-                          <p className="text-4xl font-black text-gray-900 mb-2">{service.departureTime || service.attribute?.departureTime || '08:00'}</p>
-                          <p className="font-black text-blue-600 text-sm">{service.departurePoint || service.attribute?.departurePoint || 'Ga Hà Nội'}</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.departure_time || service.attribute?.departure_time || '08:00'}</p>
+                          <p className="font-black text-blue-600 text-sm">{service.departure_point || service.attribute?.departure_point || 'Ga Hà Nội'}</p>
                         </div>
 
                         <div className="flex-[1.5] w-full flex flex-col items-center gap-3">
@@ -787,8 +934,8 @@ export default function ServiceDetail() {
 
                         <div className="text-center md:text-right flex-1">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Điểm đến</p>
-                          <p className="text-4xl font-black text-gray-900 mb-2">{service.arrivalTime || service.attribute?.arrivalTime || '12:30'}</p>
-                          <p className="font-black text-gray-500 text-sm">{service.arrivalPoint || service.attribute?.arrivalPoint || 'Ga Đà Nẵng'}</p>
+                          <p className="text-4xl font-black text-gray-900 mb-2">{service.arrival_time || service.attribute?.arrival_time || '12:30'}</p>
+                          <p className="font-black text-gray-500 text-sm">{service.arrival_point || service.attribute?.arrival_point || 'Ga Đà Nẵng'}</p>
                         </div>
                       </div>
                     </div>
@@ -797,72 +944,11 @@ export default function ServiceDetail() {
 
                 {/* TICKET / POI INFO ... existing code ... */}
 
-                {service.item_type === 'vehicle' && service.trips && service.trips.length > 0 && (
-                  <div className="pt-8 border-t border-gray-50 space-y-6">
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Lịch khởi hành hiện có</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {service.trips.map(trip => (
-                        <div
-                          key={trip.id_trip}
-                          onClick={() => setSelectedTrip(trip)}
-                          className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all ${selectedTrip?.id_trip === trip.id_trip ? 'border-blue-600 bg-blue-50/30' : 'bg-gray-50 border-transparent hover:border-blue-200'}`}
-                        >
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Giờ đi</p>
-                              <p className="text-2xl font-black text-gray-900">{new Date(trip.departure_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                              <p className="text-xs text-gray-500 font-bold">{new Date(trip.departure_time).toLocaleDateString('vi-VN')}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Giá từ</p>
-                              <p className="text-xl font-black text-gray-900">{(Number(trip.price_override) || Number(service.price)).toLocaleString()}đ</p>
-                            </div>
-                          </div>
-                          <p className="text-[10px] font-bold text-gray-400 italic">Dự kiến đến: {trip.arrival_time ? new Date(trip.arrival_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {service.item_type === 'vehicle' && selectedTrip && service.positions && service.positions.length > 0 && (
-                  <div className="pt-8 space-y-8">
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest pl-2 border-l-4 border-blue-600">Sơ đồ chỗ ngồi chuyến {new Date(selectedTrip.departure_time).toLocaleTimeString()}</h4>
-                      <div className="flex gap-6 text-[10px] font-black uppercase tracking-widest">
-                        <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-gray-100" /> Trống</span>
-                        <span className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-blue-600 shadow-lg shadow-blue-200" /> Đang chọn</span>
-                        <span className="flex items-center gap-2 opacity-30"><div className="w-3 h-3 rounded bg-gray-900" /> Đã đặt</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center gap-8 bg-gray-50/50 p-10 rounded-[3rem] border-2 border-dashed border-gray-200">
-                      <div className="grid grid-cols-4 gap-4">
-                        {service.positions?.map(pos => {
-                          const isSelected = selectedSeats.some(s => s.id_position === pos.id_position);
-                          return (
-                            <button
-                              key={pos.id_position}
-                              disabled={pos.is_booked}
-                              onClick={() => {
-                                if (isSelected) {
-                                  setSelectedSeats(prev => prev.filter(s => s.id_position !== pos.id_position));
-                                } else {
-                                  setSelectedSeats(prev => [...prev, pos]);
-                                }
-                              }}
-                              className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black transition-all transform active:scale-95 ${pos.is_booked
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                : isSelected
-                                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-110 border-none'
-                                  : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-blue-600 hover:text-blue-600 hover:shadow-xl'
-                                }`}
-                            >
-                              {pos.code_position}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                {service.item_type === 'vehicle' && (
+                  <div className="pt-8 border-t border-gray-50 flex flex-col items-center justify-center p-12 bg-blue-50/20 rounded-[3rem] border border-dashed border-blue-100">
+                    <Car size={48} className="text-blue-500 mb-4 opacity-50" />
+                    <h4 className="text-lg font-black text-blue-900 uppercase tracking-widest mb-2">Thông tin vị trí ghế</h4>
+                    <p className="text-sm text-blue-600/70 font-medium text-center max-w-xs">Sơ đồ ghế trống và lựa chọn vị trí sẽ hiển thị ở bước tiếp theo khi bạn nhấn đặt chỗ.</p>
                   </div>
                 )}
               </section>
@@ -946,8 +1032,79 @@ export default function ServiceDetail() {
           <div className="lg:col-span-4">
             <div ref={sidebarRef} style={stickyStyle} className="space-y-8">
 
-              {/* Card đặt chỗ - Traveloka Style (White with heavy shadow) */}
-              <div id="booking-card" className="bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative">
+              {/* Accommodation Specific Sidebar Content */}
+              {service.item_type === 'accommodation' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-700">
+                  {/* Property Quick Overview */}
+                  <Card className="bg-white rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06)] border border-gray-50">
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <Badge className="bg-blue-600 text-white border-none font-black text-[9px] uppercase tracking-[0.2em] px-3 py-1.5 rounded-full">
+                          {service.acc_attribute?.type || 'Luxury Resort'}
+                        </Badge>
+                        <div className="flex items-center gap-1 text-yellow-400">
+                          {Array.from({ length: Math.round(service.star_rating || 4) }).map((_, i) => (
+                            <Star key={i} size={12} fill="currentColor" />
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 font-black italic">Vị trí đắc địa</h4>
+                        <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100 group cursor-pointer hover:border-blue-200 transition-all">
+                          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
+                            <MapPin size={18} />
+                          </div>
+                          <p className="text-xs font-black text-gray-700 leading-snug line-clamp-3 uppercase italic">
+                            {service.address || service.city_name || 'Hội An, Quảng Nam'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white space-y-4">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck size={20} className="text-white/80" />
+                          <p className="text-[10px] font-black uppercase tracking-widest">Đặc quyền Premium</p>
+                        </div>
+                        <p className="text-xs font-medium text-white/90 leading-relaxed italic">Nhận ngay ưu đãi nâng hạng phòng khi đặt qua App TravelPro.</p>
+                        <Button className="w-full bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TẢI APP NGAY</Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Nearby Activities (Real Data) */}
+                  {relatedServices.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2 pl-4">
+                        <Sparkles size={14} className="text-blue-500" /> Hoạt động lân cận
+                      </h4>
+                      <div className="space-y-4">
+                        {relatedServices.map((rel: any) => (
+                          <Card
+                            key={rel.id_item}
+                            onClick={() => navigate(`/services/${rel.id_item}`)}
+                            className="bg-white rounded-3xl p-3 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer group"
+                          >
+                            <div className="flex gap-4">
+                              <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 shadow-sm">
+                                <img src={getImageUrl(rel.media?.[0]?.url || rel.thumbnail)} alt={rel.title} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                              </div>
+                              <div className="flex flex-col justify-center py-1">
+                                <Badge className="w-fit bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase mb-1 border-none">{rel.item_type}</Badge>
+                                <h5 className="font-black text-gray-900 text-[11px] uppercase tracking-tight line-clamp-2 leading-tight mb-1">{rel.title}</h5>
+                                <p className="text-[11px] font-black text-blue-600 tracking-tighter">{(rel.price || 0).toLocaleString()}đ</p>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Standard Booking Card (for tours/vehicles) */}
+              <div id="booking-card" className={`bg-white rounded-[2.5rem] p-10 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.08)] border border-gray-50 overflow-hidden relative ${service.item_type === 'accommodation' ? 'hidden' : ''}`}>
                 <div className="absolute top-0 right-0 p-6 flex flex-col gap-2 items-end">
                   <Badge className="bg-emerald-50 text-emerald-600 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">Xác nhận tức thì</Badge>
                 </div>
@@ -957,7 +1114,7 @@ export default function ServiceDetail() {
                   <div className="flex items-baseline gap-2 mb-2">
                     <span className="text-4xl font-black tracking-tighter text-gray-900">
                       {service.item_type === 'vehicle'
-                        ? selectedSeats.reduce((sum, s) => sum + Number(s.price || 0), 0).toLocaleString()
+                        ? (Number(service.price || 0)).toLocaleString() // Just show base price in card, actual total shown in booking page
                         : (quantity * (service.price || 0)).toLocaleString()
                       }đ
                     </span>
@@ -1024,7 +1181,9 @@ export default function ServiceDetail() {
               <div className="bg-white rounded-[2.5rem] p-8 border border-gray-50 shadow-sm space-y-8">
                 <div className="flex items-center gap-5">
                   <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50 border-4 border-white shadow-xl relative">
-                    {service.provider_image ? (
+                    {service.provider_legal_documents && service.provider_legal_documents.length > 0 ? (
+                      <img src={getImageUrl(service.provider_legal_documents[0])} alt={service.provider_name} className="w-full h-full object-cover" />
+                    ) : service.provider_image ? (
                       <img src={getImageUrl(service.provider_image)} alt={service.provider_name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-gray-200"><User size={32} /></div>
