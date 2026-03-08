@@ -49,19 +49,20 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <ScrollToTop />
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/verify-account" element={<VerifyAccount />} />
+    <GoogleOAuthProvider clientId="287665958911-30lsmete8rqu3ga6h0e226h9mh0medls.apps.googleusercontent.com">
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <ScrollToTop />
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-account" element={<VerifyAccount />} />
 
               {/* Customer Routes */}
               <Route element={<CustomerLayout />}>

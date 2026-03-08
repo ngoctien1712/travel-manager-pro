@@ -14,6 +14,9 @@ const momoService = new MomoService({
   ipnUrl: process.env.MOMO_IPN_URL || ''
 });
 
+import { addPaymentCheckJob, removePaymentJob } from '../queues/payment.queue.js';
+import { redisConnection, REDIS_KEYS } from '../config/redis.js';
+
 const toIso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
 export const listServices = async (req: Request, res: Response) => {
@@ -449,7 +452,10 @@ export const createBooking = async (req: Request, res: Response) => {
         const dateParams = tour.tour_type === 'daily' ? [id_item, booking_date] : [id_item];
 
         const { rows: bookedRows } = await query(
-          `SELECT SUM(quantity) as total FROM order_tour_detail WHERE id_item = $1 ${dateFilter}`,
+          `SELECT SUM(quantity) as total 
+           FROM order_tour_detail d
+           JOIN "order" o ON o.id_order = d.id_order
+           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') ${dateFilter}`,
           dateParams
         );
         const alreadyBooked = Number(bookedRows[0].total || 0);
@@ -463,8 +469,9 @@ export const createBooking = async (req: Request, res: Response) => {
       totalItemQuantity = Number(quantity || 1);
       // Check availability
       const { rows: booked } = await query(
-        `SELECT 1 FROM order_accommodations_detail 
-         WHERE id_room = $1 AND NOT (end_date <= $2 OR start_date >= $3)`,
+        `SELECT 1 FROM order_accommodations_detail d
+         JOIN "order" o ON o.id_order = d.id_order
+         WHERE d.id_room = $1 AND o.status NOT IN ('cancelled', 'failed') AND NOT (end_date <= $2 OR start_date >= $3)`,
         [id_room, start_date, end_date]
       );
       if (booked.length > 0) {
@@ -485,7 +492,10 @@ export const createBooking = async (req: Request, res: Response) => {
       // Check availability: if id_trip is provided, use it. Otherwise use id_item context.
       if (id_trip) {
         const { rows: booked } = await query(
-          'SELECT id_position FROM order_pos_vehicle_detail WHERE id_trip = $1 AND id_position = ANY($2::uuid[])',
+          `SELECT d.id_position 
+           FROM order_pos_vehicle_detail d
+           JOIN "order" o ON o.id_order = d.id_order
+           WHERE d.id_trip = $1 AND o.status NOT IN ('cancelled', 'failed') AND d.id_position = ANY($2::uuid[])`,
           [id_trip, seatIds]
         );
         if (booked.length > 0) {
@@ -497,12 +507,12 @@ export const createBooking = async (req: Request, res: Response) => {
       } else {
         // Fallback to id_item context if no trip specified
         const { rows: booked } = await query(
-          `SELECT opvd.id_position 
+          `SELECT opvd.id_position
            FROM order_pos_vehicle_detail opvd
            JOIN "order" o ON o.id_order = opvd.id_order
            JOIN positions p ON p.id_position = opvd.id_position
            JOIN vehicle v ON v.id_vehicle = p.id_vehicle
-           WHERE v.id_item = $1 AND o.status != 'cancelled' AND opvd.id_position = ANY($2::uuid[])`,
+           WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') AND opvd.id_position = ANY($2::uuid[])`,
           [id_item, seatIds]
         );
         if (booked.length > 0) {
@@ -641,6 +651,12 @@ export const createBooking = async (req: Request, res: Response) => {
       discount_amount: discountAmount,
       payment_method
     });
+
+    // 7. Add job to Payment Queue for monitoring (3 minutes timeout)
+    await addPaymentCheckJob(idOrder, 3 * 60 * 1000);
+
+    // 8. Cache status in Redis for fast access (TTL slightly longer than job delay)
+    await redisConnection.set(REDIS_KEYS.ORDER_STATUS(idOrder), 'pending', 'EX', 5 * 60);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi đặt chỗ' });
@@ -665,7 +681,7 @@ export const getBookedSeats = async (req: Request, res: Response) => {
          JOIN "order" o ON o.id_order = opvd.id_order
          JOIN positions p ON p.id_position = opvd.id_position
          JOIN vehicle v ON v.id_vehicle = p.id_vehicle
-         WHERE v.id_item = $1 AND o.status != 'cancelled'`,
+         WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed')`,
         [idItem]
       );
       return res.json(rows.map((r: any) => r.id_position));
@@ -838,11 +854,20 @@ export const handleMomoIPN = async (req: Request, res: Response) => {
 
     if (resultCode === 0) {
       // Payment success
-      const orderRes = await query(`SELECT id_order FROM "order" WHERE order_code = $1`, [orderId]);
+      const orderRes = await query(`SELECT id_order, status FROM "order" WHERE order_code = $1`, [orderId]);
       if (orderRes.rows[0]) {
-        const idOrder = orderRes.rows[0].id_order;
+        const order = orderRes.rows[0];
+        if (order.status !== 'pending') {
+          console.warn(`[Momo IPN] Order ${orderId} is not in pending state (current: ${order.status}). Ignoring payment.`);
+          return res.status(204).send();
+        }
+        const idOrder = order.id_order;
         await query(`UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`, [transId, idOrder]);
         await query(`UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`, [idOrder]);
+
+        // optimization: update Redis status and remove the monitoring job immediately
+        await redisConnection.set(REDIS_KEYS.ORDER_STATUS(idOrder), 'paid', 'EX', 60);
+        await removePaymentJob(idOrder);
       }
     } else {
       // Payment failed or cancelled
@@ -898,6 +923,12 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
 
     const order = orderRes.rows[0];
 
+    // Check if order is still pending
+    if (order.status !== 'pending') {
+      console.warn(`[Webhook] Đơn hàng ${codeToFind} không ở trạng thái chờ (Hiện tại: ${order.status}).`);
+      return res.status(400).json({ message: 'Đơn hàng đã được xử lý hoặc đã hết hạn' });
+    }
+
     // 3. Kiểm tra số tiền
     if (Number(finalAmount) < Number(order.total_amount)) {
       console.warn(`[Webhook] Đơn ${codeToFind} thanh toán thiếu tiền: ${finalAmount}/${order.total_amount}`);
@@ -913,6 +944,10 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
       `UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`,
       [order.id_order]
     );
+
+    // optimization: update Redis status and remove the monitoring job immediately
+    await redisConnection.set(REDIS_KEYS.ORDER_STATUS(order.id_order), 'paid', 'EX', 60);
+    await removePaymentJob(order.id_order);
 
     console.log(`[Webhook] Đơn hàng ${codeToFind} đã được xác nhận tự động!`);
     res.json({ success: true, message: 'Xác nhận đơn hàng thành công' });
