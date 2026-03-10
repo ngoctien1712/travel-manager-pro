@@ -61,6 +61,8 @@ export const MyServices = () => {
     const [arrivalTime, setArrivalTime] = useState('');
     const [departurePoint, setDeparturePoint] = useState('');
     const [arrivalPoint, setArrivalPoint] = useState('');
+    const [tourType, setTourType] = useState<'group' | 'private' | 'daily'>('group');
+    const [maxSlots, setMaxSlots] = useState<string>('20');
     const [error, setError] = useState('');
 
     const [provinces, setProvinces] = useState<any[]>([]);
@@ -143,6 +145,8 @@ export const MyServices = () => {
             setArrivalTime('');
             setDeparturePoint('');
             setArrivalPoint('');
+            setTourType('group');
+            setMaxSlots('20');
             setError('');
         },
         onError: (err: any) => {
@@ -321,6 +325,23 @@ export const MyServices = () => {
 
                             {itemType === 'tour' && (
                                 <div className="grid gap-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Loại hình tour</Label>
+                                            <Select value={tourType} onValueChange={(v) => setTourType(v as any)}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="group">Tour ghép (Group)</SelectItem>
+                                                    <SelectItem value="private">Tour riêng (Private)</SelectItem>
+                                                    <SelectItem value="daily">Tour hàng ngày (Daily)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Số chỗ tối đa</Label>
+                                            <Input type="number" value={maxSlots} onChange={(e) => setMaxSlots(e.target.value)} />
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label>Ngôn ngữ hướng dẫn viên</Label>
                                         <Input value={tourGuideLang} onChange={(e) => setTourGuideLang(e.target.value)} />
@@ -335,6 +356,9 @@ export const MyServices = () => {
                                             <Input type="datetime-local" value={tourEnd} onChange={(e) => setTourEnd(e.target.value)} />
                                         </div>
                                     </div>
+                                    {tourType === 'daily' && (
+                                        <p className="text-[10px] text-blue-600 italic">Lưu ý: Tour hàng ngày sẽ tạo ra nhiều bản ghi tương ứng với số ngày trong khoảng thời gian đã chọn.</p>
+                                    )}
                                 </div>
                             )}
 
@@ -421,7 +445,7 @@ export const MyServices = () => {
                                     let extraData = {};
                                     let attributeData = {};
                                     if (itemType === 'tour') {
-                                        extraData = { guideLanguage: tourGuideLang, startAt: tourStart, endAt: tourEnd };
+                                        extraData = { guideLanguage: tourGuideLang, startAt: tourStart, endAt: tourEnd, tourType, maxSlots };
                                     } else if (itemType === 'accommodation') {
                                         extraData = {
                                             address: specificAddress,

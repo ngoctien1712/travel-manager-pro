@@ -207,7 +207,7 @@ export async function googleLogin(req: Request, res: Response) {
 
     // Check if user exists
     let { rows } = await pool.query(
-      'SELECT id_user, email, full_name, status, auth_provider FROM users WHERE email = $1',
+      'SELECT id_user, email, full_name, status, auth_provider, google_id FROM users WHERE email = $1',
       [email]
     );
 

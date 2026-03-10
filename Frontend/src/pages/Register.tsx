@@ -31,7 +31,6 @@ export const Register = () => {
   };
 
   const handleGoogleLogin = () => {
-    console.log('Google login clicked');
     // Integration logic will be implemented later
   };
 

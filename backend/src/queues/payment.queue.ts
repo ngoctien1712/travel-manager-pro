@@ -26,7 +26,6 @@ export const addPaymentCheckJob = async (orderId: string, delayMs: number = 3 * 
                 jobId: orderId // Direct mapping for easy removal
             }
         );
-        console.log(`[Queue] Added payment monitoring for Order: ${orderId} (delay: ${delayMs / 1000}s)`);
     } catch (error) {
         console.error(`[Queue] Failed to add payment monitoring for Order: ${orderId}`, error);
     }
@@ -37,7 +36,6 @@ export const removePaymentJob = async (orderId: string) => {
         const job = await paymentQueue.getJob(orderId);
         if (job) {
             await job.remove();
-            console.log(`[Queue] Removed monitoring job for Order: ${orderId} (Payment confirmed)`);
         }
     } catch (error) {
         console.error(`[Queue] Error removing job for Order: ${orderId}`, error);

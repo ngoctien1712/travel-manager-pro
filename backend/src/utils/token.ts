@@ -18,6 +18,9 @@ export const generateAccessToken = (payload: TokenPayload): string => {
 };
 
 export const generateRefreshToken = async (userId: string): Promise<string> => {
+    // Ensure only one active refresh token per user
+    await revokeAllUserRefreshTokens(userId);
+
     const secret = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
     const token = jwt.sign({ userId }, secret, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 
@@ -43,4 +46,12 @@ export const revokeRefreshToken = async (token: string) => {
 
 export const revokeAllUserRefreshTokens = async (userId: string) => {
     await pool.query('DELETE FROM user_refresh_tokens WHERE id_user = $1', [userId]);
+};
+
+export const cleanupAllTokens = async () => {
+    try {
+        await pool.query('DELETE FROM user_refresh_tokens');
+    } catch (error) {
+        console.error('[Auth] Failed to cleanup tokens:', error);
+    }
 };

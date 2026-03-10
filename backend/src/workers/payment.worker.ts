@@ -8,7 +8,6 @@ interface PaymentJobData {
 }
 
 export const startPaymentWorker = () => {
-    console.log(`[Worker] Starting Payment Monitoring Worker (Concurrency: 5)...`);
 
     const worker = new Worker<PaymentJobData>(
         PAYMENT_QUEUE_NAME,
@@ -18,11 +17,10 @@ export const startPaymentWorker = () => {
             // 1. Fast Check via Redis (Optimization for High Throughput)
             const redisStatus = await redisConnection.get(REDIS_KEYS.ORDER_STATUS(orderId));
             if (redisStatus === 'paid') {
-                console.log(`[Worker] Order ${orderId} already paid (confirmed by Redis). Skipping DB check.`);
                 return;
             }
 
-            console.log(`[Worker] Checking payment status for Order: ${orderId}...`);
+
 
             const client = await pool.connect();
             try {
@@ -35,7 +33,6 @@ export const startPaymentWorker = () => {
                 );
 
                 if (rows.length === 0) {
-                    console.log(`[Worker] Order ${orderId} not found, ignoring.`);
                     return;
                 }
 
@@ -44,7 +41,6 @@ export const startPaymentWorker = () => {
                 // Only rollback if status is still 'pending'
                 // If the user already paid, status will be 'confirmed' or 'paid'
                 if (order.status === 'pending') {
-                    console.log(`[Worker] Order ${order.order_code} (${orderId}) still pending after timeout. Rolling back...`);
 
                     // 2. Rollback Voucher quantity if exists
                     if (order.id_voucher) {
@@ -54,7 +50,6 @@ export const startPaymentWorker = () => {
                                 quantity_pay = COALESCE(quantity_pay, 0) - 1
                             WHERE id_voucher = $1
                         `, [order.id_voucher]);
-                        console.log(`[Worker] Rolled back voucher for order ${order.order_code}`);
                     }
 
                     // 3. Mark the order as 'failed' (timeout)
@@ -68,12 +63,7 @@ export const startPaymentWorker = () => {
                         'UPDATE payments SET status = $1 WHERE id_order = $2 AND status = $3',
                         ['failed', orderId, 'pending']
                     );
-
-                    console.log(`[Worker] Order ${order.order_code} has been cancelled due to payment timeout.`);
-                } else {
-                    console.log(`[Worker] Order ${order.order_code} is already in state: ${order.status}. No rollback needed.`);
                 }
-
                 await client.query('COMMIT');
             } catch (error) {
                 await client.query('ROLLBACK');
@@ -94,7 +84,6 @@ export const startPaymentWorker = () => {
     });
 
     worker.on('completed', (job) => {
-        console.log(`[Worker] Job ${job.id} completed successfully.`);
     });
 
     return worker;

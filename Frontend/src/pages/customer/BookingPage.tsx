@@ -64,6 +64,18 @@ export default function BookingPage() {
                 const data = await customerApi.getServiceDetail(id!);
                 setService(data);
 
+                // Set fixed booking date for Group/Daily tours
+                const tType = data.tour_type || data.tour_attribute?.tour_type;
+                if (data.item_type === 'tour' && (tType === 'group' || tType === 'daily') && data.start_at) {
+                    const fixedDate = new Date(data.start_at).toISOString().split('T')[0];
+                    setFormData(prev => ({ ...prev, bookingDate: fixedDate }));
+                }
+
+                // For Private Tours, set quantity fixed to max_slots
+                if (data.item_type === 'tour' && tType === 'private') {
+                    setFormData(prev => ({ ...prev, quantity: data.tour_attribute?.max_slots || 1 }));
+                }
+
                 // Fetch applicable vouchers
                 const vData = await customerApi.getApplicableVouchers(id!);
                 setVouchers(vData);
@@ -147,6 +159,10 @@ export default function BookingPage() {
             const trip = service.trips?.find((t: any) => String(t.id_trip || t.idTrip) === String(formData.id_trip));
             return Number(trip?.price_override) || Number(service.price) || 0;
         }
+        // For Private tours, price is for the whole tour, so we treat it as unit price where quantity=1 effectively for subtotal if we don't multiply, 
+        // but our subtotal logic multiplies price * quantity. 
+        // If user says "price for 2 people", and they book 1 "private tour", it's simpler to keep price as is and quantity as 1 or show price per tour.
+        // BUT the user says for private tour for 2 people, customer books and quantity defaults to 2.
         return Number(service.price) || 0;
     };
 
@@ -176,6 +192,12 @@ export default function BookingPage() {
         }
 
         const quantity = Number(formData.quantity || 1);
+
+        // For Private tours, the price is flat for the whole tour (e.g. 1.000.000đ for 2 guests)
+        if (service?.item_type === 'tour' && service.tour_attribute?.tour_type === 'private') {
+            return price;
+        }
+
         let total = price * quantity;
 
         if (service?.item_type === 'accommodation' && formData.checkInDate && formData.checkOutDate) {
@@ -261,8 +283,10 @@ export default function BookingPage() {
 
                 navigate(`/my-orders/${result.id_order}?type=${service.item_type}`);
             }
-        } catch (error) {
-            alert('Đã có lỗi xảy ra khi tạo đơn hàng');
+        } catch (error: any) {
+            console.error('Lỗi đặt hàng:', error);
+            const message = error.message || 'Đã có lỗi xảy ra khi tạo đơn hàng';
+            alert(message);
         }
     };
 
@@ -324,17 +348,29 @@ export default function BookingPage() {
                                         {(service.item_type === 'tour' || service.item_type === 'ticket') && (
                                             <div className="space-y-3 col-span-full">
                                                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">
-                                                    {service.item_type === 'tour' ? 'Ngày khởi hành mong muốn' : 'Ngày sử dụng dịch vụ'}
+                                                    {service.item_type === 'tour' ? 'Ngày khởi hành' : 'Ngày sử dụng dịch vụ'}
                                                 </label>
-                                                <div className="relative group">
-                                                    <Input
-                                                        type="date"
-                                                        className="h-16 rounded-2xl bg-gray-50 border-transparent font-black text-lg focus:bg-white focus:ring-2 focus:ring-blue-600 transition-all pl-14 shadow-sm"
-                                                        value={formData.bookingDate}
-                                                        onChange={(e) => setFormData({ ...formData, bookingDate: e.target.value })}
-                                                    />
-                                                    <Calendar className="absolute left-5 top-5 text-blue-500 group-hover:scale-110 transition-transform" size={24} />
-                                                </div>
+
+                                                {(service.item_type === 'tour' && (service.tour_type === 'group' || service.tour_type === 'daily' || service.tour_attribute?.tour_type === 'group' || service.tour_attribute?.tour_type === 'daily')) ? (
+                                                    <div className="h-16 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-center px-6 gap-4">
+                                                        <Calendar className="text-blue-600" size={24} />
+                                                        <span className="font-black text-lg text-blue-900">
+                                                            {new Date(formData.bookingDate).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                                        </span>
+                                                        <Badge className="bg-blue-600 text-white ml-auto border-none font-black text-[10px] uppercase">Ngày cố định</Badge>
+                                                    </div>
+                                                ) : (
+                                                    <div className="relative group">
+                                                        <Input
+                                                            type="date"
+                                                            className="h-16 rounded-2xl bg-gray-50 border-transparent font-black text-lg focus:bg-white focus:ring-2 focus:ring-blue-600 transition-all pl-14 shadow-sm"
+                                                            value={formData.bookingDate}
+                                                            onChange={(e) => setFormData({ ...formData, bookingDate: e.target.value })}
+                                                            min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]}
+                                                        />
+                                                        <Calendar className="absolute left-5 top-5 text-blue-500 group-hover:scale-110 transition-transform" size={24} />
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 
@@ -372,17 +408,31 @@ export default function BookingPage() {
                                                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] text-center block">
                                                     Số lượng {service.item_type === 'accommodation' ? 'phòng đặt' : 'khách tham gia'}
                                                 </label>
-                                                <div className="flex items-center gap-6 bg-gray-50 p-3 rounded-3xl border border-gray-100 max-w-sm mx-auto shadow-inner">
+                                                <div className={`flex items-center gap-6 bg-gray-50 p-3 rounded-3xl border border-gray-100 max-w-sm mx-auto shadow-inner ${service.tour_attribute?.tour_type === 'private' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                                                     <button
-                                                        onClick={() => setFormData({ ...formData, quantity: Math.max(1, formData.quantity - 1) })}
+                                                        onClick={() => setFormData({ ...formData, quantity: Math.max(1, (formData.quantity || 1) - 1) })}
                                                         className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                                    >-</button>
-                                                    <div className="flex-1 text-center font-black text-3xl text-gray-900">{formData.quantity}</div>
+                                                        disabled={formData.quantity <= 1}
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <div className="flex-1 text-center">
+                                                        <span className="text-4xl font-black text-gray-900">{formData.quantity}</span>
+                                                    </div>
                                                     <button
-                                                        onClick={() => setFormData({ ...formData, quantity: formData.quantity + 1 })}
+                                                        onClick={() => {
+                                                            const limit = service?.remaining_slots || (service?.max_slots) || 99;
+                                                            setFormData({ ...formData, quantity: Math.min(limit, (formData.quantity || 1) + 1) });
+                                                        }}
                                                         className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                                    >+</button>
+                                                        disabled={formData.quantity >= (service?.remaining_slots || (service?.max_slots) || 99)}
+                                                    >
+                                                        +
+                                                    </button>
                                                 </div>
+                                                {service.tour_attribute?.tour_type === 'private' && (
+                                                    <p className="text-[10px] text-blue-600 font-bold text-center mt-2 italic">* Tour riêng trọn gói cho {formData.quantity} người</p>
+                                                )}
                                             </div>
                                         )}
 

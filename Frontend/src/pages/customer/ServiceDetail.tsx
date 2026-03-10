@@ -67,6 +67,7 @@ interface ServiceDetail {
   };
 
   // Tour specific
+  tour_type?: string;
   guide_language?: string;
   start_at?: string;
   end_at?: string;
@@ -81,6 +82,13 @@ interface ServiceDetail {
     meals?: { breakfast: number; lunch: number; dinner: number };
     tour_highlights?: string[];
   };
+  instances?: Array<{
+    id_item: string;
+    start_at: string;
+    end_at: string;
+    max_slots: number;
+    remaining_slots: number;
+  }>;
 
   // Accommodation specific
   address?: string;
@@ -160,6 +168,7 @@ export default function ServiceDetail() {
   const navigate = useNavigate();
   const [service, setService] = useState<ServiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string | null>(null);
@@ -209,46 +218,71 @@ export default function ServiceDetail() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const fetchService = async () => {
-      try {
+  const loadService = async (serviceId: string) => {
+    try {
+      if (!service) {
         setLoading(true);
-        const [data, vData] = await Promise.all([
-          customerApi.getServiceDetail(id!),
-          customerApi.getApplicableVouchers(id!)
-        ]);
-        setService(data);
-        setVouchers(vData);
-
-        // Fetch related services in the same city
-        if (data.city_name) {
-          try {
-            const related = await customerApi.listServices({ city: data.city_name });
-            setRelatedServices(related.items.filter((item: any) => item.id_item !== id).slice(0, 4));
-          } catch (relErr) {
-            console.error('Error fetching related services:', relErr);
-          }
-        }
-
-        if (data.media && data.media.length > 0) {
-          setActiveImage(data.media[0].url);
-        }
-
-        // No longer auto-selecting trip as we use service base schedule
-        setError(null);
-      } catch (err) {
-        setError('Không tìm thấy dịch vụ');
-        console.error(err);
-      } finally {
-        setLoading(false);
+      } else {
+        setIsFetching(true);
       }
-    };
-    if (id) fetchService();
+
+      const [data, vData] = await Promise.all([
+        customerApi.getServiceDetail(serviceId),
+        customerApi.getApplicableVouchers(serviceId)
+      ]);
+
+      setService(data);
+      setVouchers(vData);
+
+      // Fetch related services in the same city
+      if (data.city_name) {
+        try {
+          const related = await customerApi.listServices({ city: data.city_name });
+          setRelatedServices(related.items.filter((item: any) => item.id_item !== serviceId).slice(0, 4));
+        } catch (relErr) {
+          console.error('Error fetching related services:', relErr);
+        }
+      }
+
+      // Chỉ cập nhật activeImage nếu URL khác nhau để tránh nháy ảnh
+      if (data.media && data.media.length > 0 && data.media[0].url !== activeImage) {
+        setActiveImage(data.media[0].url);
+      }
+
+      // Set default booking date for fixed-date tours
+      const tType = data.tour_type || data.tour_attribute?.tour_type;
+      if (data.item_type === 'tour' && (tType === 'group' || tType === 'daily') && data.start_at) {
+        setBookingDate(new Date(data.start_at).toISOString().split('T')[0]);
+      } else if (data.item_type === 'tour' && tType === 'private') {
+        // Tomorrow as default for private
+        setBookingDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]);
+      }
+
+      setError(null);
+    } catch (err) {
+      if (!service) setError('Không tìm thấy dịch vụ');
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setIsFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    // Chỉ fetch lại nếu id thực sự khác id hiện tại của service (tránh gọi dư thừa khi quay lại trang)
+    if (id && (!service || service.id_item !== id)) {
+      loadService(id);
+    }
   }, [id]);
 
   // No need to fetch booked seats here anymore as it is done in BookingPage.tsx
 
   const handleBookingRedirect = () => {
+    if (service.item_type === 'tour' && service.remaining_slots !== undefined && quantity > service.remaining_slots) {
+      alert(`Xin lỗi, chỉ còn ${service.remaining_slots} chỗ trống.`);
+      return;
+    }
+
     let query = `?quantity=${quantity}`;
     if (service.item_type === 'accommodation' && selectedRoom) {
       query += `&id_room=${selectedRoom.id_room}`;
@@ -263,7 +297,7 @@ export default function ServiceDetail() {
 
 
   if (error) return <ErrorState message={error} />;
-  if (loading) return <LoadingSkeleton />;
+  if (loading && !service) return <LoadingSkeleton />;
   if (!service) return <ErrorState message="Không tìm thấy dịch vụ" />;
 
   const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
@@ -275,7 +309,7 @@ export default function ServiceDetail() {
   };
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans relative">
+    <div className={`bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans relative transition-all duration-500 ${isFetching ? 'opacity-60 grayscale-[0.2] pointer-events-none' : 'opacity-100'}`}>
 
 
       <div className="container mx-auto px-4 lg:px-20 py-8">
@@ -484,11 +518,28 @@ export default function ServiceDetail() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-6 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center group transition-all hover:bg-blue-100/50 shadow-sm">
+                    <Calendar size={24} className="text-blue-600 mb-3" />
+                    <span className="text-[10px] font-black text-gray-400 uppercase mb-1 tracking-widest leading-none italic">Khởi hành</span>
+                    <span className="font-bold text-gray-900 text-sm whitespace-nowrap">
+                      {service.start_at
+                        ? new Date(service.start_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+                        : service.tour_attribute?.tour_type === 'daily'
+                          ? Array.from({ length: 7 }).map((_, i) => {
+                            const date = new Date();
+                            date.setDate(date.getDate() + i);
+                            return date.toLocaleDateString('vi-VN', { weekday: 'short' });
+                          }).join(', ')
+                          : 'Sắp diễn ra'}
+                    </span>
+                  </div>
                   <div className="p-6 rounded-3xl bg-gray-50 flex flex-col items-center text-center">
                     <Tag size={24} className="text-blue-500 mb-3" />
                     <span className="text-[10px] font-black text-gray-400 uppercase mb-1">Loại / Còn trống</span>
                     <span className="font-bold text-gray-900 capitalize">
-                      {service.attribute?.tourType || service.tour_attribute?.tour_type || 'Trọn gói'}
+                      {(service.tour_type || service.tour_attribute?.tour_type || 'Trọn gói') === 'private' ? 'Tour riêng' :
+                        (service.tour_type || service.tour_attribute?.tour_type) === 'group' ? 'Tour ghép đoàn' :
+                          (service.tour_type || service.tour_attribute?.tour_type) === 'daily' ? 'Tour hằng ngày' : 'Trọn gói'}
                       {service.remaining_slots !== undefined && ` (${service.remaining_slots} chỗ)`}
                     </span>
                   </div>
@@ -595,30 +646,30 @@ export default function ServiceDetail() {
                     </div>
                   </div>
 
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="p-5 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
-                        <Home size={20} className="text-blue-500 mb-2" />
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Loại hình</p>
-                        <p className="font-black text-gray-900 text-sm whitespace-nowrap">{service.hotel_type || 'Khách sạn'}</p>
-                      </div>
-                      <div className="p-5 rounded-3xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center text-center">
-                        <Clock size={20} className="text-emerald-500 mb-2" />
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-in</p>
-                        <p className="font-black text-gray-900 text-sm">{service.checkin_time || '14:00'}</p>
-                      </div>
-                      <div className="p-5 rounded-3xl bg-orange-50/50 border border-orange-100/50 flex flex-col items-center text-center">
-                        <Clock size={20} className="text-orange-500 mb-2" />
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-out</p>
-                        <p className="font-black text-gray-900 text-sm">{service.checkout_time || '12:00'}</p>
-                      </div>
-                      <div className="p-5 rounded-3xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center text-center">
-                        <Star size={20} className="text-purple-500 mb-2" />
-                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Xếp hạng</p>
-                        <p className="font-black text-gray-900 text-sm">{service.star_rating || '4.5'} Sao</p>
-                      </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-5 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center text-center">
+                      <Home size={20} className="text-blue-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Loại hình</p>
+                      <p className="font-black text-gray-900 text-sm whitespace-nowrap leading-none">{service.hotel_type || 'Khách sạn'}</p>
                     </div>
+                    <div className="p-5 rounded-3xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center text-center">
+                      <Clock size={20} className="text-emerald-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-in</p>
+                      <p className="font-black text-gray-900 text-sm">{service.checkin_time || '14:00'}</p>
+                    </div>
+                    <div className="p-5 rounded-3xl bg-orange-50/50 border border-orange-100/50 flex flex-col items-center text-center">
+                      <Clock size={20} className="text-orange-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Check-out</p>
+                      <p className="font-black text-gray-900 text-sm">{service.checkout_time || '12:00'}</p>
+                    </div>
+                    <div className="p-5 rounded-3xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center text-center">
+                      <Star size={20} className="text-purple-500 mb-2" />
+                      <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Xếp hạng</p>
+                      <p className="font-black text-gray-900 text-sm">{service.star_rating || '4.5'} Sao</p>
+                    </div>
+                  </div>
 
+                  <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
                       <div className="space-y-4">
                         <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -636,24 +687,10 @@ export default function ServiceDetail() {
                               </div>
                             ))
                           ) : (
-                            <>
-                              <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                <p className="text-sm font-bold text-gray-700">Hủy phòng: Hoàn tiền trước 24h</p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                <p className="text-sm font-bold text-gray-700">Trẻ em: Miễn phí dưới 6 tuổi</p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                                <p className="text-sm font-bold text-gray-700">Thú cưng: Không được phép</p>
-                              </div>
-                            </>
+                            <p className="text-sm font-bold text-gray-700">Chính sách linh hoạt</p>
                           )}
                         </div>
                       </div>
-
                       <div className="space-y-4">
                         <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
                           <Utensils size={14} className="text-orange-500" /> Tiện ích khách sạn
@@ -949,7 +986,7 @@ export default function ServiceDetail() {
                   <h4 className="text-lg font-black text-blue-900 mb-1">Chương trình Khách hàng Thân thiết</h4>
                   <p className="text-sm text-blue-700 font-medium">Tích lũy điểm thưởng cho mỗi giao dịch và đổi lấy vé máy bay miễn phí.</p>
                 </div>
-                <Button className="bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-black text-[10px] uppercase tracking-widest h-12 px-8 shrink-0 shadow-lg shadow-blue-200">Tìm hiểu thêm</Button>
+                <Button className="w-full bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-black text-[10px] uppercase tracking-widest h-12 px-8 shrink-0 shadow-lg shadow-blue-200">Tìm hiểu thêm</Button>
               </div>
             </section>
 
@@ -988,17 +1025,14 @@ export default function ServiceDetail() {
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* CỘT PHẢI: Card đặt chỗ & Nhà cung cấp */}
           <div className="lg:col-span-4">
             <div ref={sidebarRef} style={stickyStyle} className="space-y-8">
-
               {/* Accommodation Specific Sidebar Content */}
               {service.item_type === 'accommodation' && (
                 <div className="space-y-8 animate-in fade-in slide-in-from-right-10 duration-700">
-                  {/* Property Quick Overview */}
                   <Card className="bg-white rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.06)] border border-gray-50">
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
@@ -1011,7 +1045,6 @@ export default function ServiceDetail() {
                           ))}
                         </div>
                       </div>
-
                       <div>
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 font-black italic">Vị trí đắc địa</h4>
                         <div className="flex items-start gap-4 p-4 rounded-2xl bg-gray-50/50 border border-gray-100 group cursor-pointer hover:border-blue-200 transition-all">
@@ -1023,7 +1056,6 @@ export default function ServiceDetail() {
                           </p>
                         </div>
                       </div>
-
                       <div className="p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white space-y-4">
                         <div className="flex items-center gap-3">
                           <ShieldCheck size={20} className="text-white/80" />
@@ -1035,7 +1067,6 @@ export default function ServiceDetail() {
                     </div>
                   </Card>
 
-                  {/* Nearby Activities (Real Data) */}
                   {relatedServices.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em] flex items-center gap-2 pl-4">
@@ -1055,7 +1086,7 @@ export default function ServiceDetail() {
                               <div className="flex flex-col justify-center py-1">
                                 <Badge className="w-fit bg-emerald-50 text-emerald-600 text-[8px] font-black uppercase mb-1 border-none">{rel.item_type}</Badge>
                                 <h5 className="font-black text-gray-900 text-[11px] uppercase tracking-tight line-clamp-2 leading-tight mb-1">{rel.title}</h5>
-                                <p className="text-[11px] font-black text-blue-600 tracking-tighter">{(rel.price || 0).toLocaleString()}đ</p>
+                                <p className="font-black text-blue-600 text-[11px] tracking-tighter">{(rel.price || 0).toLocaleString()}đ</p>
                               </div>
                             </div>
                           </Card>
@@ -1077,7 +1108,7 @@ export default function ServiceDetail() {
                   <div className="flex items-baseline gap-2 mb-2">
                     <span className="text-4xl font-black tracking-tighter text-gray-900">
                       {service.item_type === 'vehicle'
-                        ? (Number(service.price || 0)).toLocaleString() // Just show base price in card, actual total shown in booking page
+                        ? (Number(service.price || 0)).toLocaleString()
                         : (quantity * (service.price || 0)).toLocaleString()
                       }đ
                     </span>
@@ -1087,26 +1118,100 @@ export default function ServiceDetail() {
 
                 <div className="space-y-6">
                   {(service.item_type === 'tour' || service.item_type === 'ticket') && (
-                    <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-3">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Chọn ngày khởi hành</label>
-                      <div className="relative group">
-                        <Input
-                          type="date"
-                          className="h-14 rounded-2xl bg-white border-gray-200 font-bold text-sm focus:ring-2 focus:ring-blue-600 transition-all pl-12"
-                          value={bookingDate}
-                          onChange={(e) => setBookingDate(e.target.value)}
-                          min={new Date().toISOString().split('T')[0]}
-                        />
-                        <Calendar className="absolute left-4 top-4 text-blue-500" size={20} />
+                    <>
+                      <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-4">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                          {(service.tour_type || service.tour_attribute?.tour_type) === 'daily' ? 'Lịch khởi hành' : 'Thời gian trải nghiệm'}
+                        </label>
+
+                        {(service.tour_type || service.tour_attribute?.tour_type) === 'daily' && service.instances && service.instances.length > 0 ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              {service.instances.map((inst) => {
+                                const date = new Date(inst.start_at);
+                                const isSelected = service.id_item === inst.id_item;
+                                const dayName = date.toLocaleDateString('vi-VN', { weekday: 'short' }).replace('.', '').toUpperCase();
+                                const isPast = new Date(inst.start_at) < new Date(new Date().setHours(0, 0, 0, 0));
+
+                                if (isPast) return null;
+
+                                return (
+                                  <button
+                                    key={inst.id_item}
+                                    onClick={() => {
+                                      loadService(inst.id_item);
+                                      window.history.pushState({}, '', `/services/${inst.id_item}`);
+                                    }}
+                                    className={`flex flex-col items-center justify-center min-w-[60px] p-3 rounded-2xl border-2 transition-all ${isSelected
+                                      ? 'border-blue-600 bg-blue-600 text-white shadow-lg scale-105 z-10'
+                                      : 'border-white bg-white text-gray-900 hover:border-blue-200 shadow-sm'
+                                      } ${inst.remaining_slots <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    disabled={inst.remaining_slots <= 0}
+                                  >
+                                    <span className={`text-[8px] font-black mb-1 ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
+                                      {dayName}
+                                    </span>
+                                    <span className="font-black text-sm">{date.getDate()}/{date.getMonth() + 1}</span>
+                                    <span className={`text-[7px] font-bold mt-1 ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                                      {inst.remaining_slots} chỗ
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <p className="text-[10px] font-bold text-blue-600 italic">* Các ngày đã qua hoặc hết chỗ sẽ không hiển thị</p>
+                          </div>
+                        ) : (service.tour_type || service.tour_attribute?.tour_type) === 'group' ? (
+                          <div className="p-5 rounded-2xl bg-white border border-gray-100 flex items-center gap-4 group">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                              <Calendar size={24} />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 italic">Ngày khởi hành cố định</p>
+                              <p className="font-black text-gray-900 text-base leading-none">
+                                {service.start_at
+                                  ? new Date(service.start_at).toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })
+                                  : 'Vui lòng liên hệ'}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative group">
+                            <Input
+                              type="date"
+                              className="h-14 rounded-2xl bg-white border-gray-200 font-bold text-sm focus:ring-2 focus:ring-blue-600 transition-all pl-12 shadow-sm"
+                              value={bookingDate}
+                              onChange={(e) => setBookingDate(e.target.value)}
+                              min={new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]}
+                            />
+                            <Calendar className="absolute left-4 top-4 text-blue-500" size={20} />
+                          </div>
+                        )}
                       </div>
-                    </div>
+
+                      {/* Quantity selector removed as per user request */}
+                    </>
                   )}
 
-                  <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-2">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái dịch vụ</p>
-                    <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                      <CheckCircle2 size={16} /> <span>Còn chỗ trống</span>
+                  <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Trạng thái</p>
+                      <div className="flex items-center gap-2 text-emerald-600 font-black text-xs">
+                        <CheckCircle2 size={16} />
+                        <span>
+                          {service.remaining_slots !== undefined
+                            ? (service.remaining_slots > 0 ? `Còn ${service.remaining_slots} chỗ` : 'Hết chỗ')
+                            : 'Đang mở bán'}
+                        </span>
+                      </div>
                     </div>
+                    {(service.tour_type || service.tour_attribute?.tour_type) === 'private' && (
+                      <div className="pt-4 border-t border-gray-100">
+                        <p className="text-[10px] text-blue-600 font-bold italic">
+                          * Tour riêng: Đặt trọn gói cho nhóm bạn. Giá đã bao gồm tất cả các khách.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-6">
@@ -1130,7 +1235,6 @@ export default function ServiceDetail() {
                   </div>
                 </div>
 
-                {/* Travel Guarantee Badge */}
                 <div className="p-6 bg-blue-50 border-t border-blue-100 flex items-center gap-4">
                   <ShieldCheck className="text-blue-600 shrink-0" size={24} />
                   <div>
@@ -1156,13 +1260,11 @@ export default function ServiceDetail() {
                     <h4 className="font-black text-lg text-gray-900 leading-tight">{service.provider_name || 'VietTravel Premium'}</h4>
                   </div>
                 </div>
-
                 {service.provider_description && (
                   <p className="text-sm text-gray-600 leading-relaxed italic border-l-2 border-blue-200 pl-4">
                     {service.provider_description}
                   </p>
                 )}
-
                 <div className="space-y-3 pt-2">
                   {service.provider_address && (
                     <div className="flex items-start gap-3 text-xs text-gray-500">
@@ -1185,7 +1287,6 @@ export default function ServiceDetail() {
                     </div>
                   )}
                 </div>
-
                 <div className="space-y-4 pt-4 border-t border-gray-50">
                   <a href={`tel:${service.provider_phone}`} className="flex items-center gap-4 p-4 rounded-2xl bg-gray-50 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all group">
                     <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">
@@ -1196,7 +1297,6 @@ export default function ServiceDetail() {
                       <p className="font-bold text-gray-900 text-sm">{service.provider_phone || '1900 1234'}</p>
                     </div>
                   </a>
-
                   <Button
                     onClick={() => {
                       const chatBtn = document.getElementById('chat-widget-trigger') as HTMLButtonElement;
@@ -1215,7 +1315,7 @@ export default function ServiceDetail() {
                 </div>
               </div>
 
-              {/* Additional Sidebar Ads */}
+              {/* Ads */}
               <div className="space-y-4">
                 <div className="rounded-[2.5rem] overflow-hidden bg-orange-600 relative h-64 group shadow-xl">
                   <img src={getImageUrl('/uploads/ads/resort-special.jpg')} className="w-full h-full object-cover opacity-50 transition-transform duration-1000 group-hover:scale-110" alt="Resort Ad" />
@@ -1226,18 +1326,16 @@ export default function ServiceDetail() {
                     <Button className="w-full bg-white text-orange-600 hover:bg-orange-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">NHẬN NGAY</Button>
                   </div>
                 </div>
-
                 <div className="rounded-[2.5rem] overflow-hidden bg-emerald-600 relative h-64 group shadow-xl">
                   <img src={getImageUrl('/uploads/ads/global-insurance.jpg')} className="w-full h-full object-cover opacity-50 transition-transform duration-1000 group-hover:scale-110" alt="Insurance Ad" />
                   <div className="absolute inset-0 p-8 flex flex-col justify-end text-white text-right items-end">
                     <Badge className="w-fit bg-white text-emerald-600 mb-4 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">MIỄN PHÍ</Badge>
                     <h4 className="text-xl font-black mb-1 leading-tight uppercase tracking-tighter italic">Bảo hiểm <br /> Du lịch Toàn cầu</h4>
                     <p className="text-[10px] font-medium opacity-80 mb-4">An tâm tận hưởng mọi hành trình cùng TravelPro Care</p>
-                    <Button className="w-full bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TÌM HIỂU THÊM</Button>
+                    <Button className="w-full bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TÌM HIỂM THÊM</Button>
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -1258,31 +1356,34 @@ export default function ServiceDetail() {
             <span className="px-6 py-3 rounded-full bg-white border border-gray-100 text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-blue-600 hover:border-blue-100 hover:bg-blue-50/30 transition-all cursor-pointer shadow-sm">#{service.item_type} giá rẻ</span>
           </div>
         </div>
-      </div>
 
-      {/* Mobile Floating Booking Bar */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex items-center justify-between shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
-        <div>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Giá chỉ từ</p>
-          <p className="text-xl font-black text-blue-600">
-            {service.price?.toLocaleString() || 0}đ
-          </p>
+        {/* Mobile Floating Booking Bar */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-4 z-50 flex items-center justify-between shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.05)]">
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Giá chỉ từ</p>
+            <p className="text-xl font-black text-blue-600">
+              {(service.price || 0).toLocaleString()}đ
+            </p>
+          </div>
+          <Button
+            onClick={handleBookingRedirect}
+            className="rounded-2xl h-12 px-8 bg-blue-600 text-white font-black text-sm shadow-lg shadow-blue-200"
+          >
+            ĐẶT CHỖ
+          </Button>
         </div>
-        <Button
-          onClick={handleBookingRedirect}
-          className="rounded-2xl h-12 px-8 bg-blue-600 text-white font-black text-sm shadow-lg shadow-blue-200"
-        >
-          ĐẶT CHỖ
-        </Button>
+
+        {
+          service.id_provider && (
+            <ChatWidget
+              providerId={service.id_provider}
+              providerName={service.provider_name || 'Nhà cung cấp'}
+              itemId={service.id_item}
+              itemName={service.title}
+            />
+          )
+        }
       </div>
-      {service.id_provider && (
-        <ChatWidget
-          providerId={service.id_provider}
-          providerName={service.provider_name || 'Nhà cung cấp'}
-          itemId={service.id_item}
-          itemName={service.title}
-        />
-      )}
     </div>
   );
 }

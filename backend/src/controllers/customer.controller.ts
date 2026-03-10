@@ -125,7 +125,7 @@ export const listServices = async (req: Request, res: Response) => {
     }
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sql = `
-      SELECT
+      SELECT DISTINCT ON (COALESCE(bi.attribute->>'group_id', bi.id_item::text))
         bi.id_item,
         bi.id_provider,
         bi.id_area,
@@ -133,6 +133,7 @@ export const listServices = async (req: Request, res: Response) => {
         bi.title,
         bi.attribute,
         bi.price,
+        bi.attribute->>'group_id' as group_id,
         a.name AS area_name,
         c.id_city,
         c.name AS city_name,
@@ -154,7 +155,7 @@ export const listServices = async (req: Request, res: Response) => {
       LEFT JOIN accommodations acc ON acc.id_item = bi.id_item
       LEFT JOIN vehicle v ON v.id_item = bi.id_item
       ${where}
-      ORDER BY bi.created_at DESC NULLS LAST, bi.title
+      ORDER BY (COALESCE(bi.attribute->>'group_id', bi.id_item::text)), bi.created_at DESC NULLS LAST, bi.title
       LIMIT 200
     `;
     const result = await query(sql, params);
@@ -330,6 +331,27 @@ export const getService = async (req: Request, res: Response) => {
       );
       details = tourRows[0] || {};
       details.remaining_slots = Math.max(0, (details.max_slots || 0) - Number(details.booked_slots || 0));
+
+      // Handle daily tours: join with other instances in the same group
+      const groupId = item.attribute?.group_id;
+      if (groupId) {
+        const { rows: instances } = await query(
+          `SELECT bi.id_item, t.start_at, t.end_at, t.max_slots,
+                  (SELECT COALESCE(SUM(quantity), 0) FROM order_tour_detail WHERE id_item = bi.id_item) as booked_slots
+           FROM bookable_items bi
+           JOIN tours t ON t.id_item = bi.id_item
+           WHERE bi.attribute->>'group_id' = $1 AND bi.status = 'active'
+           ORDER BY t.start_at ASC`,
+          [groupId]
+        );
+        details.instances = instances.map(i => ({
+          id_item: i.id_item,
+          start_at: i.start_at,
+          end_at: i.end_at,
+          max_slots: i.max_slots,
+          remaining_slots: Math.max(0, (i.max_slots || 0) - Number(i.booked_slots || 0))
+        }));
+      }
     } else if (itemType === 'accommodation') {
       const { rows: accDetails } = await query(
         'SELECT address, hotel_type, star_rating, checkin_time, checkout_time, policies FROM accommodations WHERE id_item = $1',
@@ -446,6 +468,10 @@ export const createBooking = async (req: Request, res: Response) => {
       // Check constraints
       const { rows: tourRows } = await query('SELECT tour_type, max_slots FROM tours WHERE id_item = $1', [id_item]);
       const tour = tourRows[0];
+
+      if (!tour) {
+        return res.status(404).json({ message: 'Không tìm thấy thông tin chi tiết tour.' });
+      }
 
       if (tour.tour_type === 'group' || tour.tour_type === 'daily') {
         const dateFilter = tour.tour_type === 'daily' ? 'AND booking_date = $2' : '';
@@ -621,10 +647,21 @@ export const createBooking = async (req: Request, res: Response) => {
       }
 
       for (const seatId of seatIds) {
+        const columns = ['id_order', 'id_position', 'price'];
+        const values = [idOrder, seatId, finalPrice];
+
+        // Chỉ thêm id_trip vào câu lệnh nếu nó hợp lệ
+        if (id_trip && id_trip !== 'null' && id_trip !== 'undefined') {
+          columns.push('id_trip');
+          values.push(id_trip);
+        }
+
+        const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
+
         await query(
-          `INSERT INTO order_pos_vehicle_detail (id_order, id_position, id_trip, price) 
-           VALUES ($1, $2, $3, $4)`,
-          [idOrder, seatId, id_trip || null, finalPrice]
+          `INSERT INTO order_pos_vehicle_detail (${columns.join(', ')}) 
+           VALUES (${placeholders})`,
+          values
         );
       }
     } else if (item_type === 'ticket') {
@@ -642,6 +679,13 @@ export const createBooking = async (req: Request, res: Response) => {
       [idOrder, 'pending', totalAmount, payment_method || 'bank']
     );
 
+    // 7. Add job to Payment Queue for monitoring (3 minutes timeout)
+    await addPaymentCheckJob(idOrder, 3 * 60 * 1000);
+
+    // 8. Cache status in Redis for fast access (TTL slightly longer than job delay)
+    await redisConnection.set(REDIS_KEYS.ORDER_STATUS(idOrder), 'pending', 'EX', 5 * 60);
+
+    // 9. Send success response only after all operations succeed
     res.json({
       success: true,
       id_order: idOrder,
@@ -651,15 +695,14 @@ export const createBooking = async (req: Request, res: Response) => {
       discount_amount: discountAmount,
       payment_method
     });
-
-    // 7. Add job to Payment Queue for monitoring (3 minutes timeout)
-    await addPaymentCheckJob(idOrder, 3 * 60 * 1000);
-
-    // 8. Cache status in Redis for fast access (TTL slightly longer than job delay)
-    await redisConnection.set(REDIS_KEYS.ORDER_STATUS(idOrder), 'pending', 'EX', 5 * 60);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi khi đặt chỗ' });
+  } catch (err: any) {
+    // Ensure we only send one error response
+    if (!res.headersSent) {
+      res.status(500).json({
+        message: 'Lỗi khi đặt chỗ: ' + (err.message || 'Lỗi hệ thống'),
+        detail: err.detail
+      });
+    }
   }
 };
 
@@ -854,8 +897,6 @@ export const initMomoPayment = async (req: Request, res: Response) => {
 export const handleMomoIPN = async (req: Request, res: Response) => {
   try {
     const params = req.body;
-    console.log('Momo IPN received:', params);
-
     const isValid = momoService.verifySignature(params);
     if (!isValid) {
       console.error('Invalid Momo signature');
@@ -870,7 +911,6 @@ export const handleMomoIPN = async (req: Request, res: Response) => {
       if (orderRes.rows[0]) {
         const order = orderRes.rows[0];
         if (order.status !== 'pending') {
-          console.warn(`[Momo IPN] Order ${orderId} is not in pending state (current: ${order.status}). Ignoring payment.`);
           return res.status(204).send();
         }
         const idOrder = order.id_order;
@@ -883,7 +923,6 @@ export const handleMomoIPN = async (req: Request, res: Response) => {
       }
     } else {
       // Payment failed or cancelled
-      console.log(`Payment failed for order ${orderId} with code ${resultCode}`);
     }
 
     res.status(204).send();
@@ -907,9 +946,6 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
     const finalContent = content || order_code;
     const finalAmount = transferAmount || amount;
     const finalTransId = id || transaction_id;
-
-    console.log(`[Webhook] Nhận thông báo giao dịch: ${finalTransId} - Nội dung: ${finalContent}`);
-
     if (!finalContent) return res.status(400).json({ message: 'Nội dung chuyển khoản trống' });
 
     // 1. Tìm mã đơn hàng từ nội dung (Xử lý cả trường hợp mất dấu gạch ngang)
@@ -919,9 +955,6 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
 
     // Loại bỏ dấu gạch ngang để so sánh chuẩn hơn
     const cleanCode = codeToFind.replace(/-/g, '');
-
-    console.log(`[Webhook] Đang tìm đơn hàng khớp với mã "sạch": ${cleanCode}`);
-
     // 2. Kiểm tra đơn hàng trong DB - Sử dụng REPLACE để bỏ dấu gạch ngang khi so sánh
     const orderRes = await query(
       `SELECT * FROM "order" WHERE REPLACE(order_code, '-', '') = $1 OR order_code = $1`,
@@ -929,7 +962,6 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
     );
 
     if (orderRes.rows.length === 0) {
-      console.warn(`[Webhook] Không tìm thấy đơn hàng nào khớp với: ${cleanCode}`);
       return res.status(404).json({ message: 'Không tìm thấy mã đơn hàng' });
     }
 
@@ -937,13 +969,11 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
 
     // Check if order is still pending
     if (order.status !== 'pending') {
-      console.warn(`[Webhook] Đơn hàng ${codeToFind} không ở trạng thái chờ (Hiện tại: ${order.status}).`);
       return res.status(400).json({ message: 'Đơn hàng đã được xử lý hoặc đã hết hạn' });
     }
 
     // 3. Kiểm tra số tiền
     if (Number(finalAmount) < Number(order.total_amount)) {
-      console.warn(`[Webhook] Đơn ${codeToFind} thanh toán thiếu tiền: ${finalAmount}/${order.total_amount}`);
       return res.status(400).json({ message: 'Số tiền không đủ' });
     }
 
@@ -960,8 +990,6 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
     // optimization: update Redis status and remove the monitoring job immediately
     await redisConnection.set(REDIS_KEYS.ORDER_STATUS(order.id_order), 'paid', 'EX', 60);
     await removePaymentJob(order.id_order);
-
-    console.log(`[Webhook] Đơn hàng ${codeToFind} đã được xác nhận tự động!`);
     res.json({ success: true, message: 'Xác nhận đơn hàng thành công' });
   } catch (err) {
     console.error('[Webhook Error]:', err);

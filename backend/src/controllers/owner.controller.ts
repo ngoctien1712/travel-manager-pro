@@ -17,13 +17,14 @@ export async function getMyBookableItems(req: Request, res: Response) {
   try {
     const userId = req.user!.userId;
     const { rows } = await pool.query(
-      `SELECT bi.id_item, bi.id_provider, bi.id_area, bi.item_type, bi.title, bi.attribute, bi.price, bi.created_at,
-              p.name AS provider_name, a.name AS area_name
+      `SELECT DISTINCT ON (COALESCE(bi.attribute->>'group_id', bi.id_item::text)) 
+               bi.id_item, bi.id_provider, bi.id_area, bi.item_type, bi.title, bi.attribute, bi.price, bi.created_at,
+               p.name AS provider_name, a.name AS area_name
        FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
        LEFT JOIN area a ON a.id_area = bi.id_area
        WHERE p.id_user = $1
-       ORDER BY bi.created_at DESC`,
+       ORDER BY (COALESCE(bi.attribute->>'group_id', bi.id_item::text)), bi.created_at DESC`,
       [userId]
     );
     res.json({
@@ -248,7 +249,7 @@ export async function updateServiceDetail(req: Request, res: Response) {
 
     // Check ownership
     const { rows: itemRows } = await client.query(
-      `SELECT bi.id_item, bi.item_type FROM bookable_items bi
+      `SELECT bi.id_item, bi.item_type, bi.attribute FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
        WHERE bi.id_item = $1 AND p.id_user = $2`,
       [idItem, userId]
@@ -259,41 +260,82 @@ export async function updateServiceDetail(req: Request, res: Response) {
     }
 
     const itemType = itemRows[0].item_type;
+    const existingAttr = itemRows[0].attribute || {};
+    const groupId = existingAttr.group_id;
 
     await client.query('BEGIN');
 
     // Update base item
-    await client.query(
-      `UPDATE bookable_items 
-       SET title = $1, price = $2, attribute = $3, description = $4, star_rating = $5 
-       WHERE id_item = $6`,
-      [
-        title,
-        price,
-        attribute ? JSON.stringify(attribute) : null,
-        req.body.description || null,
-        extraData?.starRating || 0,
-        idItem
-      ]
-    );
+    if (groupId) {
+      // Update all instances in the group for common fields
+      // Preserve specific instance's attribute keys like departureDate, arrivalDate if they exist
+      await client.query(
+        `UPDATE bookable_items bi
+         SET title = $1, 
+             price = $2, 
+             description = $3, 
+             star_rating = $4,
+             attribute = jsonb_set(COALESCE(bi.attribute, '{}'::jsonb), '{group_attribute}', $5::jsonb, true)
+         FROM bookable_items bi_group
+         WHERE bi.id_item = bi_group.id_item AND bi_group.attribute->>'group_id' = $6`,
+        [
+          title,
+          price,
+          req.body.description || null,
+          extraData?.starRating || 0,
+          attribute ? JSON.stringify(attribute) : null,
+          groupId
+        ]
+      );
+    } else {
+      await client.query(
+        `UPDATE bookable_items 
+         SET title = $1, price = $2, attribute = $3, description = $4, star_rating = $5 
+         WHERE id_item = $6`,
+        [
+          title,
+          price,
+          attribute ? JSON.stringify(attribute) : null,
+          req.body.description || null,
+          extraData?.starRating || 0,
+          idItem
+        ]
+      );
+    }
 
     // Update type-specific details
     if (itemType === 'tour' && extraData) {
       const startAt = extraData.startAt && extraData.startAt !== '' ? extraData.startAt : null;
       const endAt = extraData.endAt && extraData.endAt !== '' ? extraData.endAt : null;
 
-      await client.query(
-        `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute, tour_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (id_item) DO UPDATE 
-         SET guide_language = EXCLUDED.guide_language, 
-             start_at = EXCLUDED.start_at, 
-             end_at = EXCLUDED.end_at, 
-             max_slots = EXCLUDED.max_slots,
-             attribute = EXCLUDED.attribute,
-             tour_type = EXCLUDED.tour_type`,
-        [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null, extraData.tourType || 'group']
-      );
+      if (groupId) {
+        // Update all instances in the group
+        // Sync everything except start_at/end_at if it's a daily tour group
+        await client.query(
+          `UPDATE tours t
+           SET guide_language = $1, 
+               max_slots = $2,
+               tour_type = $3
+           FROM bookable_items bi
+           WHERE t.id_item = bi.id_item AND bi.attribute->>'group_id' = $4`,
+          [extraData.guideLanguage || '', Number(extraData.maxSlots) || 0, extraData.tourType || 'group', groupId]
+        );
+        // Also update the specific instance's dates if it was edited directly (though usually daily tours stay on their date)
+        await client.query(`UPDATE tours SET start_at = $1, end_at = $2 WHERE id_item = $3`, [startAt, endAt, idItem]);
+      } else {
+        await client.query(
+          `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute, tour_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT (id_item) DO UPDATE 
+           SET guide_language = EXCLUDED.guide_language, 
+               start_at = EXCLUDED.start_at, 
+               end_at = EXCLUDED.end_at, 
+               max_slots = EXCLUDED.max_slots,
+               attribute = EXCLUDED.attribute,
+               tour_type = EXCLUDED.tour_type`,
+          [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null, extraData.tourType || 'group']
+        );
+      }
     } else if (itemType === 'accommodation' && extraData) {
       await client.query(
         `INSERT INTO accommodations (
@@ -941,14 +983,64 @@ export async function createBookableItem(req: Request, res: Response) {
     const effectiveItemType = finalItemType;
 
     if (effectiveItemType === 'tour') {
-      const startAt = extraData?.startAt && extraData.startAt !== '' ? extraData.startAt : null;
-      const endAt = extraData?.endAt && extraData.endAt !== '' ? extraData.endAt : null;
+      const tourType = extraData?.tourType || 'group';
+      const startAt = extraData?.startAt && extraData.startAt !== '' ? new Date(extraData.startAt) : null;
+      const endAt = extraData?.endAt && extraData.endAt !== '' ? new Date(extraData.endAt) : null;
 
-      await client.query(
-        `INSERT INTO tours (id_item, guide_language, attribute, start_at, end_at, price)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [itemId, extraData?.guideLanguage, attribute ? JSON.stringify(attribute) : null, startAt, endAt, price]
-      );
+      if (tourType === 'daily' && startAt && endAt) {
+        // We already created one item above, let's treat it as the first day instance
+        // Update its start/end to just that day
+        const firstDayStart = new Date(startAt);
+        const firstDayEnd = new Date(startAt);
+        firstDayEnd.setHours(23, 59, 59, 999);
+
+        const groupId = itemId; // Or generate a new one, but itemId is stable
+        const updatedAttr = { ...(attribute || {}), group_id: groupId };
+
+        await client.query(
+          `UPDATE bookable_items SET attribute = $1 WHERE id_item = $2`,
+          [JSON.stringify(updatedAttr), itemId]
+        );
+
+        await client.query(
+          `INSERT INTO tours (id_item, guide_language, attribute, start_at, end_at, price, tour_type, max_slots)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [itemId, extraData?.guideLanguage, JSON.stringify(updatedAttr), startAt.toISOString(), firstDayEnd.toISOString(), price, tourType, Number(extraData?.maxSlots) || 0]
+        );
+
+        // Create instances for subsequent days
+        const currentDate = new Date(startAt);
+        currentDate.setDate(currentDate.getDate() + 1);
+
+        while (currentDate <= endAt) {
+          const dayStart = new Date(currentDate);
+          const dayEnd = new Date(currentDate);
+          dayEnd.setHours(23, 59, 59, 999);
+
+          const { rows: subItemRows } = await client.query(
+            `INSERT INTO bookable_items (id_provider, id_area, item_type, title, attribute, price)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id_item`,
+            [providerId, areaIdToUse, effectiveItemType, title, JSON.stringify(updatedAttr), price ?? null]
+          );
+          const subItemId = subItemRows[0].id_item;
+
+          await client.query(
+            `INSERT INTO tours (id_item, guide_language, attribute, start_at, end_at, price, tour_type, max_slots)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [subItemId, extraData?.guideLanguage, JSON.stringify(updatedAttr), dayStart.toISOString(), dayEnd.toISOString(), price, tourType, Number(extraData?.maxSlots) || 0]
+          );
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      } else {
+        // Original logic for group/private tours
+        await client.query(
+          `INSERT INTO tours (id_item, guide_language, attribute, start_at, end_at, price, tour_type, max_slots)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [itemId, extraData?.guideLanguage, attribute ? JSON.stringify(attribute) : null, startAt ? startAt.toISOString() : null, endAt ? endAt.toISOString() : null, price, tourType, Number(extraData?.maxSlots) || 0]
+        );
+      }
     } else if (effectiveItemType === 'accommodation') {
       await client.query(
         `INSERT INTO accommodations (

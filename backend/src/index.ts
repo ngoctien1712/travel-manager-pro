@@ -12,9 +12,13 @@ import chatRoutes from './routes/chat.routes.js';
 import planningRoutes from './routes/planning.routes.js';
 import { startOrderMonitor } from './services/order-monitor.service.js';
 import { startPaymentWorker } from './workers/payment.worker.js';
+import { cleanupAllTokens } from './utils/token.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Revoke all tokens on startup (Disabled for better UX/session persistence)
+// cleanupAllTokens();
 
 // Start the periodic order monitor (SQL Polling) - (Keep as backup if needed, but the worker is preferred)
 // startOrderMonitor();
@@ -22,6 +26,9 @@ startPaymentWorker();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:8080', credentials: true }));
 app.use(express.json());
+app.use((req, res, next) => {
+  next();
+});
 app.use('/uploads', express.static('uploads'));
 
 app.use('/api/chat', chatRoutes);
@@ -37,5 +44,4 @@ app.use('/api/planning', planningRoutes);
 app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.listen(PORT, () => {
-  console.log(`VietTravel API running at http://localhost:${PORT}`);
 });

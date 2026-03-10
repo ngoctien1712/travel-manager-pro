@@ -72,15 +72,6 @@ export const VehicleLanding = () => {
             alert('Vui lòng chọn ngày về cho chuyến khứ hồi');
             return;
         }
-
-        console.log('Searching for vehicles...', {
-            fromProvinceId,
-            toProvinceId,
-            departureDate,
-            returnDate: isRoundTrip ? returnDate : null,
-            departureTime,
-            isRoundTrip
-        });
     };
 
     return (

@@ -73,7 +73,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const res = await authApi.refreshToken(refreshToken);
         localStorage.setItem('accessToken', res.accessToken);
         localStorage.setItem('refreshToken', res.refreshToken);
-        console.log('Token proactively refreshed');
       } catch (err) {
         console.error('Proactive refresh failed:', err);
         // If refresh fails, we'll let the next API call handle logout or the user will expire naturally

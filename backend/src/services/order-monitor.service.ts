@@ -5,7 +5,6 @@ import pool from '../config/db.js';
  * This replaces the Redis-based BullMQ implementation to avoid external dependencies.
  */
 export function startOrderMonitor() {
-    console.log('Order Monitor Service started (Polling every 1 minute)...');
 
     // Run immediately on start, then every 1 minute
     checkExpiredOrders();
@@ -31,10 +30,7 @@ async function checkExpiredOrders() {
     `);
 
         if (expiredOrders.length > 0) {
-            console.log(`[Order Monitor] Found ${expiredOrders.length} expired orders.`);
-
             for (const order of expiredOrders) {
-                console.log(`[Order Monitor] Order ${order.order_code} (${order.id_order}) timed out. Rolling back...`);
 
                 // 2. Rollback Voucher if exists
                 if (order.id_voucher) {
@@ -44,7 +40,6 @@ async function checkExpiredOrders() {
                 quantity_pay = COALESCE(quantity_pay, 0) - 1
             WHERE id_voucher = $1
           `, [order.id_voucher]);
-                    console.log(`[Order Monitor] Rolled back voucher for order ${order.order_code}`);
                 }
 
                 // 3. Mark pending payments for this order as 'failed'

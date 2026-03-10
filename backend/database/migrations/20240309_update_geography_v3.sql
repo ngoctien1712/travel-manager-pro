@@ -1,7 +1,7 @@
 -- Migration: Update Geography Data (Restructured to 34 Provinces & Direct Wards)
 -- Formatted Area.attribute strictly for Weather data (as per exampleJSON.md)
 -- Source: sapnhap.bando.com.vn (Nghị quyết sáp nhập 2025)
--- Generated on: 2026-03-08T19:23:58.009Z
+-- Generated on: 2026-03-09T08:03:40.165Z
 
 -- 1. Cập nhật cấu trúc bảng
 ALTER TABLE cities ADD COLUMN IF NOT EXISTS gso_code VARCHAR(10);

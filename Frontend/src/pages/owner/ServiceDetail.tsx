@@ -709,6 +709,16 @@ export const ServiceDetail = () => {
                                                     variant="outline"
                                                     className="w-full border-dashed"
                                                     onClick={() => {
+                                                        const start = extraData.startAt ? new Date(extraData.startAt) : null;
+                                                        const end = extraData.endAt ? new Date(extraData.endAt) : null;
+                                                        const maxDays = (start && end) ? Math.floor((end.getTime() - start.getTime()) / 86400000) + 1 : 999;
+                                                        const currentDays = (attribute.itinerary?.length || 0);
+
+                                                        if (currentDays >= maxDays) {
+                                                            toast({ title: 'Cảnh báo', description: `Số ngày lịch trình không được vượt quá số ngày dự kiến (${maxDays} ngày)`, variant: 'destructive' });
+                                                            return;
+                                                        }
+
                                                         const nextDay = (attribute.itinerary?.length || 0) + 1;
                                                         setAttribute({ ...attribute, itinerary: [...(attribute.itinerary || []), { day: nextDay, title: 'Ngày mới', activities: [] }] });
                                                     }}
