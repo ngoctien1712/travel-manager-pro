@@ -976,54 +976,34 @@ export const createTripPlan = async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: 'Chưa đăng nhập' });
 
-    const { destination, startDate, endDate, budget, style } = req.body;
+    const { destination, startDate, endDate, budget, style, plan } = req.body;
     if (!destination || !startDate || !endDate) {
       return res.status(400).json({ message: 'Thiếu thông tin chuyến đi' });
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const daysCount =
-      Math.ceil(
-        (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
+    let finalPlan = plan;
+    if (!finalPlan) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const daysCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-    const days = Array.from({ length: daysCount }, (_, i) => ({
-      dayNumber: i + 1,
-      activities: [
-        {
-          time: '08:00',
-          title: 'Ăn sáng',
-          description: 'Thưởng thức đặc sản địa phương',
-        },
-        {
-          time: '10:00',
-          title: 'Tham quan',
-          description: 'Khám phá địa điểm nổi tiếng trong khu vực',
-        },
-        {
-          time: '12:00',
-          title: 'Ăn trưa',
-          description: 'Nghỉ ngơi và thưởng thức ẩm thực',
-        },
-        {
-          time: '15:00',
-          title: 'Hoạt động tự do',
-          description: 'Mua sắm hoặc thư giãn theo sở thích',
-        },
-        {
-          time: '19:00',
-          title: 'Ăn tối',
-          description: 'Trải nghiệm ẩm thực đêm',
-        },
-      ],
-    }));
+      const days = Array.from({ length: daysCount }, (_, i) => ({
+        dayNumber: i + 1,
+        activities: [
+          { time: '08:00', title: 'Ăn sáng', description: 'Thưởng thức đặc sản địa phương' },
+          { time: '10:00', title: 'Tham quan', description: 'Khám phá địa điểm nổi tiếng' },
+          { time: '12:00', title: 'Ăn trưa', description: 'Nghỉ ngơi' },
+          { time: '19:00', title: 'Ăn tối', description: 'Trải nghiệm ẩm thực đêm' },
+        ],
+      }));
+      finalPlan = { days };
+    }
 
     const insert = await query(
       `INSERT INTO trip_plans (id_user, destination, start_date, end_date, budget, plan)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id_trip_plan`,
-      [userId, destination, startDate, endDate, budget || null, JSON.stringify({ days })]
+      [userId, destination, startDate, endDate, budget || null, JSON.stringify(finalPlan)]
     );
 
     res.json({
@@ -1032,7 +1012,7 @@ export const createTripPlan = async (req: Request, res: Response) => {
       startDate,
       endDate,
       budget,
-      days,
+      plan: finalPlan,
     });
   } catch (err) {
     console.error(err);
@@ -1053,14 +1033,26 @@ export const listTripPlans = async (req: Request, res: Response) => {
       [userId]
     );
 
-    const plans = rows.map((r: any) => ({
-      id_trip_plan: r.id_trip_plan,
-      destination: r.destination,
-      startDate: r.start_date,
-      endDate: r.end_date,
-      budget: r.budget,
-      days: r.plan?.days || [],
-    }));
+    const plans = rows.map((r: any) => {
+      let planObj = r.plan;
+      if (typeof planObj === 'string') {
+        try {
+          planObj = JSON.parse(planObj);
+        } catch (e) {
+          planObj = {};
+        }
+      }
+
+      return {
+        id_trip_plan: r.id_trip_plan,
+        destination: r.destination,
+        startDate: r.start_date,
+        endDate: r.end_date,
+        budget: r.budget,
+        plan: planObj,
+        coordinates: planObj?.coordinates || null
+      };
+    });
 
     res.json(plans);
   } catch (err) {

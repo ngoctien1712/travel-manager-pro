@@ -197,9 +197,9 @@ export interface TripPlanInput {
   destination: string;
   startDate: string;
   endDate: string;
-  budget: number;
-  travelers: number;
-  interests: string[];
+  budget?: number;
+  style?: string;
+  plan?: any;
 }
 
 export interface TripActivity {

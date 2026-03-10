@@ -9,6 +9,7 @@ import geographyRoutes from './routes/geography.routes.js';
 import ownerRoutes from './routes/owner.routes.js';
 import customerRoutes from './routes/customer.routes.js';
 import chatRoutes from './routes/chat.routes.js';
+import planningRoutes from './routes/planning.routes.js';
 import { startOrderMonitor } from './services/order-monitor.service.js';
 import { startPaymentWorker } from './workers/payment.worker.js';
 
@@ -31,6 +32,7 @@ app.use('/api/admin/geography', adminGeographyRoutes);
 app.use('/api/geography', geographyRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/customer', customerRoutes);
+app.use('/api/planning', planningRoutes);
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

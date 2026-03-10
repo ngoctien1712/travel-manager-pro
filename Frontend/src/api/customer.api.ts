@@ -207,6 +207,7 @@ export const customerApi = {
     endDate: string;
     budget?: number;
     style?: string;
+    plan?: any;
   }): Promise<any> {
     const res = await httpClient.post<{
       id_trip_plan: string;
@@ -221,6 +222,7 @@ export const customerApi = {
       endDate: input.endDate,
       budget: input.budget,
       style: input.style,
+      plan: input.plan
     });
 
     // TripPlanner.tsx dùng trực tiếp các field này
