@@ -1,153 +1,138 @@
-# VietTravel - Hệ thống quản lý du lịch
+# 🚀 VietTravel - Giải Pháp Quản Lý Du Lịch Toàn Diện (Travel Management System)
 
-Ứng dụng quản lý du lịch với 3 quyền: Admin, Customer, Area Owner.
+[![React](https://img.shields.io/badge/Frontend-React%2018-blue?logo=react)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Backend-Node.js%20Express-green?logo=node.js)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791?logo=postgresql)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Cache%2FQueue-Redis%20%26%20BullMQ-red?logo=redis)](https://redis.io/)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-## Cấu trúc dự án
+---
 
+## 🌟 Tổng Quan Dự Án (Project Overview)
+
+**VietTravel** không chỉ là một trang web đặt tour, mà là một **Hệ sinh thái quản lý du lịch** đa vai trò (Multi-role). Dự án được thiết kế để giải quyết bài toán kết nối giữa **Khách du lịch (Customer)**, **Chủ cơ sở dịch vụ (Area Owner)** và **Quản trị viên (Admin)** một cách mượt mà và an toàn.
+
+Dự án tập trung vào trải nghiệm người dùng hiện đại, hiệu suất cao và khả năng mở rộng với sự kết hợp của AI và Interactive Maps.
+
+---
+
+## ✨ Các Tính Năng Trọng Tâm (Key Features)
+
+### 👤 1. Cho Khách Hàng (Customer)
+- **Lập kế hoạch du lịch thông minh (AI Trip Planning):** Tích hợp OpenAI để gợi ý lịch trình cá nhân hóa.
+- **Bản đồ tương tác (Interactive Maps):** Tìm kiếm và xem địa điểm qua Leaflet & OpenStreetMap.
+- **Đặt dịch vụ (Booking System):** Đặt Tour, Khách sạn, Vé xe với quy trình thanh toán minh bạch.
+- **Hệ thống Chat:** Chat trực tiếp với chủ dịch vụ để nhận hỗ trợ thời gian thực.
+
+### 🏨 2. Cho Chủ Cơ Sở (Area Owner)
+- **Quản lý dịch vụ:** Đăng tải và cập nhật thông tin tour, phòng khách sạn, vé xe.
+- **Dashboard quản lý đơn hàng:** Theo dõi doanh thu, trạng thái đặt chỗ (Pending, Paid, Failed).
+- **Hệ thống Voucher:** Tự động điều chỉnh số lượng Voucher khi có đơn hàng mới hoặc hủy đơn.
+
+### 🛡️ 3. Cho Quản Trị Viên (Admin)
+- **Quản trị người dùng & Phân quyền (RBAC):** Kiểm soát truy cập dựa trên vai trò (Admin, Owner, Customer).
+- **Quản trị địa lý:** Quản lý cơ sở dữ liệu quốc gia, tỉnh thành, khu vực một cách động.
+- **Hệ thống giám sát:** Theo dõi sức khỏe hệ thống qua API Health Check.
+
+---
+
+## 🛠️ Công Nghệ Sử Dụng (Tech Stack)
+
+### **Frontend**
+- **Library:** `React 18` + `TypeScript` + `Vite` (Tốc độ build cực nhanh).
+- **Styling:** `TailwindCSS` + `shadcn/ui` (Giao diện chuẩn hiện đại).
+- **State Management:** `TanStack Query` (Xử lý caching và đồng bộ dữ liệu server).
+- **Maps:** `Leaflet` & `React Leaflet`.
+
+### **Backend**
+- **Core:** `Node.js` (`Express.js`) viết bằng `TypeScript`.
+- **Database:** `PostgreSQL` (Dữ liệu quan hệ chặt chẽ).
+- **Queue & Worker:** `BullMQ` + `Redis` (Xử lý các tác vụ nền như kiểm tra trạng thái thanh toán, gửi mail).
+- **Auth:** `JWT` (JSON Web Token) kết hợp với `bcryptjs` và xác thực `Google OAuth`.
+
+---
+
+## 📐 Kiến Trúc Hệ Thống (Architecture)
+
+```mermaid
+graph TD
+    User((Customer/Owner/Admin)) -->|React + Vite| Frontend[Frontend - Client Side]
+    Frontend -->|API Requests| Backend[Backend - Node.js/Express]
+    Backend -->|Queries| DB[(PostgreSQL)]
+    Backend -->|Message Queue| Redis[(Redis + BullMQ)]
+    Redis -->|Process Job| Worker[Payment Worker]
+    Worker -->|Update Status| DB
+    Backend -->|AI Suggestions| OpenAI[OpenAI API]
+    Frontend -->|Map Tiles| Leaflet[Leaflet + OSM]
 ```
-travel-manager-pro/
-├── Frontend/        # React + Vite + TypeScript (giao diện người dùng)
-├── backend/         # Node.js + Express + PostgreSQL (API)
-├── package.json     # Root - scripts để chạy cả frontend & backend
-└── README.md
-```
 
-## Tech Stack
+---
 
-- **Frontend**: React, TypeScript, Vite, shadcn/ui, TailwindCSS, TanStack Query
-- **Backend**: Node.js, Express, TypeScript, PostgreSQL
-- **Auth**: JWT, bcrypt
+## 🏗️ Highlights Kỹ Thuật (Technical Highlights)
 
-## Yêu cầu
+### **1. Worker & Background Jobs**
+Dự án sử dụng **BullMQ (Redis-based)** để xử lý các tác vụ bất đồng bộ.
+- **Payment Worker:** Tự động roll-back số lượng Voucher và cập nhật trạng thái đơn hàng khi quá hạn thanh toán (timeout logic).
+- **Concurrency:** Xử lý song song nhiều job để đảm bảo hệ thống không bị "nghẽn".
 
+### **2. Database Schema**
+Hệ thống được thiết kế với cơ sở dữ liệu quan hệ tối ưu, bao gồm các bảng: `users`, `orders`, `vouchers`, `geography`, `tour`, `accommodation`,... với các liên kết chặt chẽ đảm bảo tính toàn vẹn dữ liệu.
+
+---
+
+## 🚀 Hướng Dẫn Cài Đặt (Getting Started)
+
+### **Yêu cầu (Prerequisites)**
 - Node.js 18+
 - PostgreSQL 14+
-- npm hoặc bun
+- Redis Server (Đang chạy tại cổng 6379)
 
-## Hướng dẫn chạy dự án
+### **Các bước thực hiện**
 
-### Bước 1: Cài đặt dependencies
-
+**1. Clone & Cài đặt dependencies**
 ```bash
-# Từ thư mục gốc travel-manager-pro
+git clone https://github.com/ngoctien1712/travel-manager-pro.git
+cd travel-manager-pro
 npm install
-
-cd Frontend
-npm install
-
-cd ../backend
-npm install
-cd ..
+npm run install:all # Script tự động cài cho Frontend & Backend
 ```
 
-### Bước 2: Thiết lập PostgreSQL
+**2. Thiết lập Database & Redis**
+- Tạo database `travel_manager` trong PostgreSQL.
+- Chạy file schema: `psql -U postgres -d travel_manager -f backend/database/schema.sql`
+- Khởi động Redis server: `redis-server`
 
-1. Đảm bảo PostgreSQL đã cài đặt và chạy trên máy.
-
-2. Tạo database:
-
-```bash
-psql -U postgres -c "CREATE DATABASE travel_manager;"
-```
-
-3. Chạy schema (tạo bảng):
-
-```bash
-psql -U postgres -d travel_manager -f backend/database/schema.sql
-```
-
-### Bước 3: Cấu hình Backend
-
-1. Tạo file `backend/.env` (copy từ `backend/.env.example` hoặc tạo mới):
-
+**3. Cấu hình Biến môi trường (.env)**
+Tạo file `.env` tại thư mục `/backend`:
 ```env
 PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/travel_manager
-JWT_SECRET=travel-manager-jwt-secret-key-2024
-JWT_EXPIRES_IN=7d
-FRONTEND_URL=http://localhost:8080
+DATABASE_URL=postgresql://user:password@localhost:5432/travel_manager
+REDIS_URL=redis://localhost:6379
+JWT_SECRET=your_secret_key
+OPENAI_API_KEY=your_key_here
 ```
 
-2. Thay `YOUR_PASSWORD` bằng mật khẩu PostgreSQL của bạn.
-
-### Bước 4: Tạo tài khoản admin mặc định (tùy chọn)
-
-```bash
-cd backend
-npm run db:seed-admin
-cd ..
-```
-
-Tài khoản: **admin@travel.vn** / **Admin123!**
-
-### Bước 5: Chạy ứng dụng
-
-Từ thư mục gốc `travel-manager-pro`:
-
+**4. Khởi chạy ứng dụng**
+Tại thư mục gốc:
 ```bash
 npm run dev
 ```
+- **Frontend:** http://localhost:8080
+- **Backend:** http://localhost:3000
 
-- **Frontend**: http://localhost:8080
-- **Backend API**: http://localhost:3000
+---
 
-Hoặc chạy riêng từng phần:
-- Chỉ Frontend: `npm run dev:frontend`
-- Chỉ Backend: `npm run dev:backend`
+## 🎯 Case Study: Technical Challenge
+**Vấn đề:** Làm sao để cập nhật trạng thái đơn hàng và hoàn trả Voucher khi khách hàng không thanh toán đúng hạn mà không làm treo hệ thống chính?
+**Giải pháp:** Tôi đã triển khai một **Payment Worker** sử dụng **BullMQ**. Khi một đơn hàng được tạo, một Job sẽ được đưa vào hàng đợi với độ trễ 15-30 phút. Worker sẽ kiểm tra trạng thái trong Redis trước khi truy vấn PostgreSQL, giúp giảm tải Database và đảm bảo độ chính xác tuyệt đối.
 
-### Lưu ý
+---
 
-- Backend cần chạy để đăng nhập thực tế (email/password). Nếu chỉ chạy Frontend, màn hình đăng nhập sẽ báo lỗi khi gọi API.
-- Frontend proxy `/api` sang Backend (localhost:3000) khi chạy dev.
+## 📬 Liên Hệ (Contact)
+- **Họ tên:** [Tên của bạn]
+- **Email:** [Email của bạn]
+- **LinkedIn:** [Link LinkedIn của bạn]
+- **Portfolio:** [Link Portfolio nếu có]
 
-## Module User
-
-### Chức năng đã triển khai
-
-1. **Đăng nhập / Đăng xuất**
-   - Đăng nhập bằng email và mật khẩu
-   - JWT authentication
-   - Đăng xuất xóa token
-
-2. **Quên mật khẩu**
-   - Gửi link đặt lại mật khẩu qua email (hoặc trả về link trong môi trường dev)
-   - Đặt lại mật khẩu qua token
-
-3. **Xác thực tài khoản**
-   - Verify email qua link `/verify-account?token=...`
-
-4. **Đăng ký**
-   - Tạo tài khoản mới với vai trò: admin, customer, owner
-
-5. **Quản lý thông tin theo vai trò**
-   - **Admin**: department (phòng ban)
-   - **Customer**: travel_style (phong cách du lịch)
-   - **Area Owner**: business_name (tên doanh nghiệp)
-
-6. **Admin quản lý người dùng**
-   - Danh sách người dùng (lọc theo role, status)
-   - Tạo / Sửa / Xóa người dùng
-   - Cập nhật thông tin profile theo vai trò
-
-### API Endpoints
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| POST | /api/auth/login | Đăng nhập |
-| POST | /api/auth/register | Đăng ký |
-| POST | /api/auth/forgot-password | Quên mật khẩu |
-| POST | /api/auth/reset-password | Đặt lại mật khẩu |
-| POST | /api/auth/verify-account | Xác thực tài khoản |
-| GET | /api/users/profile | Lấy thông tin profile (auth) |
-| PATCH | /api/users/profile | Cập nhật profile (auth) |
-| GET | /api/admin/users | Danh sách người dùng (admin) |
-| POST | /api/admin/users | Tạo người dùng (admin) |
-| PATCH | /api/admin/users/:id | Cập nhật người dùng (admin) |
-| DELETE | /api/admin/users/:id | Xóa người dùng (admin) |
-
-## Giao diện
-
-Các giao diện mới (ForgotPassword, ResetPassword, VerifyAccount, Register, Profile, Admin Users) đều tuân theo:
-- Form và màu sắc của giao diện hiện có (theme ocean blue)
-- Card elevated, gradient-ocean, các component shadcn/ui
+---
+⭐ *Nếu bạn thấy dự án này thú vị, hãy tặng tôi 1 ngôi sao trên GitHub nhé!*
