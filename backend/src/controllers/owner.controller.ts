@@ -228,9 +228,34 @@ export async function getServiceDetail(req: Request, res: Response) {
     const { rows: media } = await pool.query('SELECT id_media, url, type FROM item_media WHERE id_item = $1', [idItem]);
     item.media = media.map(m => toCamel(m as Record<string, unknown>));
 
+    // Handle Daily Tour Grouping for Owner Edit
+    const itemAttr = item.attribute as any;
+    const groupId = itemAttr?.group_id;
+    if (itemType === 'tour' && groupId) {
+      const { rows: groupRows } = await pool.query(
+        `SELECT MIN(t.start_at) as min_start, MAX(t.end_at) as max_end, ARRAY_AGG(bi.id_item) as item_ids
+         FROM bookable_items bi
+         JOIN tours t ON t.id_item = bi.id_item
+         WHERE bi.attribute->>'group_id' = $1`,
+        [groupId]
+      );
+      if (groupRows.length > 0 && groupRows[0].min_start) {
+        details.startAt = groupRows[0].min_start;
+        details.endAt = groupRows[0].max_end;
+        item.groupIds = groupRows[0].item_ids;
+      }
+    }
+
     // Intelligently merge attributes: prioritize specific item type's attribute if it's not null, 
     // otherwise fallback to base item's attribute.
-    const finalAttribute = details.attribute || item.attribute || {};
+    const finalAttribute = { ...(details.attribute || itemAttr || {}) };
+    
+    // Clean for UI
+    if (finalAttribute.group_id) {
+        finalAttribute['Dạng tour'] = 'Tour nhóm hằng ngày';
+        // Keep group_id for later if needed, but the user asked to not let it be detected like a technical field
+        // But we might need it for logic. Let's keep it in the base item but maybe rename it in finalAttribute display.
+    }
 
     res.json({ data: { ...item, ...details, attribute: finalAttribute } });
   } catch (err) {
@@ -267,26 +292,97 @@ export async function updateServiceDetail(req: Request, res: Response) {
 
     // Update base item
     if (groupId) {
-      // Update all instances in the group for common fields
-      // Preserve specific instance's attribute keys like departureDate, arrivalDate if they exist
-      await client.query(
-        `UPDATE bookable_items bi
-         SET title = $1, 
-             price = $2, 
-             description = $3, 
-             star_rating = $4,
-             attribute = jsonb_set(COALESCE(bi.attribute, '{}'::jsonb), '{group_attribute}', $5::jsonb, true)
-         FROM bookable_items bi_group
-         WHERE bi.id_item = bi_group.id_item AND bi_group.attribute->>'group_id' = $6`,
-        [
-          title,
-          price,
-          req.body.description || null,
-          extraData?.starRating || 0,
-          attribute ? JSON.stringify(attribute) : null,
-          groupId
-        ]
+      // Fetch all instances in the group ordered by their current start date
+      const { rows: instances } = await client.query(
+        `SELECT bi.id_item, bi.attribute, t.start_at, t.end_at 
+         FROM bookable_items bi
+         LEFT JOIN tours t ON t.id_item = bi.id_item
+         WHERE bi.attribute->>'group_id' = $1
+         ORDER BY t.start_at ASC`,
+        [groupId]
       );
+
+      const targetStartAt = extraData?.startAt ? new Date(extraData.startAt) : null;
+      // Note: we don't necessarily update endAt for every day to be the MAX, 
+      // instead each day is 1 day.
+
+      for (let i = 0; i < instances.length; i++) {
+        const inst = instances[i];
+        // Prepare attribute: merge group-level changes but keep instance-specific ones.
+        const cleanedAttribute = { ...(attribute || {}) };
+        
+        // Remove individual date-specific attributes that shouldn't be bulk-updated
+        const dateKeys = ['departureDate', 'arrivalDate', 'startAt', 'endAt', 'bookingDate', 'startDate', 'endDate'];
+        dateKeys.forEach(key => delete cleanedAttribute[key]);
+
+        const updatedAttr = { 
+          ...(inst.attribute || {}), 
+          ...cleanedAttribute,
+          group_id: groupId
+        };
+
+        await client.query(
+          `UPDATE bookable_items 
+           SET title = $1, price = $2, attribute = $3, description = $4, star_rating = $5 
+           WHERE id_item = $6`,
+          [
+            title,
+            price,
+            JSON.stringify(updatedAttr),
+            req.body.description || null,
+            extraData?.starRating || 0,
+            inst.id_item
+          ]
+        );
+
+        // Update type-specific details if it's a tour
+        if (itemType === 'tour' && extraData) {
+          // If a new range start was provided, shift each day accordingly
+          let instStart = inst.start_at;
+          let instEnd = inst.end_at;
+
+          if (targetStartAt) {
+            const newDayStart = new Date(targetStartAt);
+            newDayStart.setDate(newDayStart.getDate() + i);
+            const newDayEnd = new Date(newDayStart);
+            newDayEnd.setHours(23, 59, 59, 999);
+            
+            instStart = newDayStart;
+            instEnd = newDayEnd;
+          }
+
+          await client.query(
+            `INSERT INTO tours (id_item, guide_language, max_slots, tour_type, start_at, end_at, attribute)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id_item) DO UPDATE 
+             SET guide_language = EXCLUDED.guide_language, 
+                 max_slots = EXCLUDED.max_slots, 
+                 tour_type = EXCLUDED.tour_type,
+                 attribute = EXCLUDED.attribute,
+                 start_at = EXCLUDED.start_at,
+                 end_at = EXCLUDED.end_at`,
+            [
+              inst.id_item, 
+              extraData.guideLanguage || '', 
+              Number(extraData.maxSlots) || 0, 
+              extraData.tourType || 'group',
+              instStart,
+              instEnd,
+              JSON.stringify(updatedAttr)
+            ]
+          );
+        }
+
+        // Sync media from the primary item (the one being edited) to all others
+        if (inst.id_item !== idItem) {
+          await client.query('DELETE FROM item_media WHERE id_item = $1', [inst.id_item]);
+          await client.query(
+            `INSERT INTO item_media (id_item, url, type)
+             SELECT $1, url, type FROM item_media WHERE id_item = $2`,
+            [inst.id_item, idItem]
+          );
+        }
+      }
     } else {
       await client.query(
         `UPDATE bookable_items 
@@ -301,28 +397,10 @@ export async function updateServiceDetail(req: Request, res: Response) {
           idItem
         ]
       );
-    }
 
-    // Update type-specific details
-    if (itemType === 'tour' && extraData) {
-      const startAt = extraData.startAt && extraData.startAt !== '' ? extraData.startAt : null;
-      const endAt = extraData.endAt && extraData.endAt !== '' ? extraData.endAt : null;
-
-      if (groupId) {
-        // Update all instances in the group
-        // Sync everything except start_at/end_at if it's a daily tour group
-        await client.query(
-          `UPDATE tours t
-           SET guide_language = $1, 
-               max_slots = $2,
-               tour_type = $3
-           FROM bookable_items bi
-           WHERE t.id_item = bi.id_item AND bi.attribute->>'group_id' = $4`,
-          [extraData.guideLanguage || '', Number(extraData.maxSlots) || 0, extraData.tourType || 'group', groupId]
-        );
-        // Also update the specific instance's dates if it was edited directly (though usually daily tours stay on their date)
-        await client.query(`UPDATE tours SET start_at = $1, end_at = $2 WHERE id_item = $3`, [startAt, endAt, idItem]);
-      } else {
+      if (itemType === 'tour' && extraData) {
+        const startAt = extraData.startAt && extraData.startAt !== '' ? extraData.startAt : null;
+        const endAt = extraData.endAt && extraData.endAt !== '' ? extraData.endAt : null;
         await client.query(
           `INSERT INTO tours (id_item, guide_language, start_at, end_at, max_slots, attribute, tour_type)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -336,7 +414,10 @@ export async function updateServiceDetail(req: Request, res: Response) {
           [idItem, extraData.guideLanguage || '', startAt, endAt, Number(extraData.maxSlots) || 0, attribute ? JSON.stringify(attribute) : null, extraData.tourType || 'group']
         );
       }
-    } else if (itemType === 'accommodation' && extraData) {
+    }
+
+    // Update other types (accommodation, ticket, vehicle) - Only specific instance
+    if (itemType === 'accommodation' && extraData) {
       const { totalRooms } = extraData;
       const { rows: sumRows } = await client.query(
         'SELECT SUM(quantity) as total FROM accommodations_rooms WHERE id_item = $1',
@@ -703,9 +784,10 @@ export async function addItemMedia(req: Request, res: Response) {
       return res.status(400).json({ message: 'Vui lòng upload ít nhất một hình ảnh' });
     }
 
-    // Check if item belongs to user via provider
+    // Check if item belongs to user via provider and get group_id
     const itemCheck = await pool.query(
-      `SELECT bi.id_item FROM bookable_items bi
+      `SELECT bi.id_item, bi.attribute->>'group_id' as group_id 
+       FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
        WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
       [idItem, userId, req.user!.role]
@@ -715,15 +797,35 @@ export async function addItemMedia(req: Request, res: Response) {
       return res.status(403).json({ message: 'Bạn không có quyền thêm ảnh cho dịch vụ này' });
     }
 
+    const groupId = itemCheck.rows[0].group_id;
+    let targetItemIds = [idItem];
+
+    // If part of a daily tour group, find all related items
+    if (groupId) {
+      const relatedItems = await pool.query(
+        "SELECT id_item FROM bookable_items WHERE attribute->>'group_id' = $1",
+        [groupId]
+      );
+      if (relatedItems.rows.length > 0) {
+        targetItemIds = relatedItems.rows.map(r => r.id_item);
+      }
+    }
+
     const insertedMedia = [];
     for (const file of files) {
       const imageUrl = `/uploads/${file.filename}`;
-      const { rows } = await pool.query(
-        `INSERT INTO item_media (id_item, url, type) VALUES ($1, $2, 'image')
-         RETURNING id_media, id_item, url, type`,
-        [idItem, imageUrl]
-      );
-      insertedMedia.push(toCamel(rows[0] as Record<string, unknown>));
+      // Insert for all target items
+      for (const targetId of targetItemIds) {
+        const { rows } = await pool.query(
+          `INSERT INTO item_media (id_item, url, type) VALUES ($1, $2, 'image')
+           RETURNING id_media, id_item, url, type`,
+          [targetId, imageUrl]
+        );
+        // Only collect media for the requested idItem to return in response
+        if (String(targetId) === String(idItem)) {
+          insertedMedia.push(toCamel(rows[0] as Record<string, unknown>));
+        }
+      }
     }
 
     res.status(201).json({ data: insertedMedia });
@@ -748,11 +850,26 @@ export async function deleteItemMedia(req: Request, res: Response) {
       [idMedia, userId, req.user!.role]
     );
 
-    if (check.rows.length === 0) {
-      return res.status(403).json({ message: 'Bạn không có quyền xóa hình ảnh này' });
+    const { rows: mediaInfo } = await pool.query(
+      `SELECT url, id_item, (SELECT attribute->>'group_id' FROM bookable_items WHERE id_item = im.id_item) as group_id 
+       FROM item_media im WHERE id_media = $1`, 
+      [idMedia]
+    );
+
+    if (mediaInfo.length > 0) {
+      const { url, group_id } = mediaInfo[0];
+      if (group_id) {
+        // Delete this URL for the entire group
+        await pool.query(
+          `DELETE FROM item_media 
+           WHERE url = $1 AND id_item IN (SELECT id_item FROM bookable_items WHERE attribute->>'group_id' = $2)`,
+          [url, group_id]
+        );
+      } else {
+        await pool.query('DELETE FROM item_media WHERE id_media = $1', [idMedia]);
+      }
     }
 
-    await pool.query('DELETE FROM item_media WHERE id_media = $1', [idMedia]);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete item media error:', err);
@@ -1501,18 +1618,26 @@ export async function getOrder(req: Request, res: Response) {
     // 3. Fetch payments
     const payments = await pool.query('SELECT * FROM payments WHERE id_order = $1', [idOrder]);
 
-    res.json({
-      data: {
-        order: {
-          ...order,
-          total_amount: parseFloat(order.total_amount),
-          subtotal_amount: parseFloat(order.subtotal_amount),
-          discount_amount: parseFloat(order.discount_amount),
-        },
-        details,
-        payments: payments.rows
-      }
-    });
+    const result = {
+      order: {
+        ...order,
+        total_amount: parseFloat(order.total_amount),
+        subtotal_amount: parseFloat(order.subtotal_amount),
+        discount_amount: parseFloat(order.discount_amount),
+      },
+      details,
+      payments: payments.rows
+    };
+
+    // Prioritize guest_info from details if available
+    if (details && details.guest_info) {
+      const gInfo = typeof details.guest_info === 'string' ? JSON.parse(details.guest_info) : details.guest_info;
+      if (gInfo.fullName) result.order.customer_name = gInfo.fullName;
+      if (gInfo.phone) result.order.customer_phone = gInfo.phone;
+      if (gInfo.email) result.order.customer_email = gInfo.email;
+    }
+
+    res.json({ data: result });
   } catch (err) {
     console.error('Get owner order detail error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ' });

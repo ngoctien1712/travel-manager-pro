@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
 import { geographyApi } from '@/api/geography.api';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,10 @@ import { ServiceCardSkeleton } from '@/components/LoadingSkeleton';
 
 export const ActivityLanding = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
-    const [selectedDate, setSelectedDate] = useState('');
+    // Search Filters
+    const [selectedDate, setSelectedDate] = useState(searchParams.get('date') || '');
     const [provinceId, setProvinceId] = useState('');
     const [provinces, setProvinces] = useState<any[]>([]);
 

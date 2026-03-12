@@ -60,14 +60,20 @@ export default function BookingPage() {
         }));
     }, []);
 
-    useEffect(() => {
-        const fetchService = async () => {
-            try {
-                setLoading(true);
-                const data = await customerApi.getServiceDetail(id!);
-                setService(data);
+    const fetchService = async (silent = false) => {
+        try {
+            if (!silent && !service) setLoading(true);
+            
+            // Pass current dates to get accurate availability/pricing for that period
+            const data = await customerApi.getServiceDetail(id!, {
+                checkIn: formData.checkInDate || formData.bookingDate,
+                checkOut: formData.checkOutDate
+            });
+            
+            setService(data);
 
-                // Set fixed booking date for Group/Daily tours
+            if (!silent) {
+                // Initial setup for fixed-date tours
                 const tType = data.tour_type || data.tour_attribute?.tour_type;
                 if (data.item_type === 'tour' && (tType === 'group' || tType === 'daily') && data.start_at) {
                     const fixedDate = new Date(data.start_at).toISOString().split('T')[0];
@@ -76,43 +82,96 @@ export default function BookingPage() {
 
                 // For Private Tours, set quantity fixed to max_slots
                 if (data.item_type === 'tour' && tType === 'private') {
-                    setFormData(prev => ({ ...prev, quantity: data.tour_attribute?.max_slots || 1 }));
+                    const privateMaxSlots = data.max_slots || data.tour_attribute?.max_slots || 1;
+                    setFormData(prev => ({ ...prev, quantity: privateMaxSlots }));
                 }
 
                 // Fetch applicable vouchers
                 const vData = await customerApi.getApplicableVouchers(id!);
                 setVouchers(vData);
-
-                setError(null);
-            } catch (err) {
-                setError('Không tìm thấy thông tin dịch vụ');
-            } finally {
-                setLoading(false);
             }
-        };
+
+            setError(null);
+        } catch (err) {
+            if (!service) setError('Không tìm thấy thông tin dịch vụ');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Initial load and dependency-based refresh
+    useEffect(() => {
         if (id) fetchService();
-    }, [id]);
+    }, [id, formData.checkInDate, formData.checkOutDate, formData.bookingDate]);
+
+    // Polling for real-time updates (every 3 seconds)
+    useEffect(() => {
+        if (id) {
+            const interval = setInterval(() => {
+                fetchService(true);
+            }, 3000);
+            return () => clearInterval(interval);
+        }
+    }, [id, formData.checkInDate, formData.checkOutDate, formData.bookingDate]);
+
+    // Auto-cap quantity if availability changes in real-time
+    useEffect(() => {
+        if (service) {
+            const limit = getQuantityLimit();
+            if (formData.quantity > limit && limit > 0) {
+                setFormData(prev => ({ ...prev, quantity: limit }));
+            }
+        }
+    }, [service?.remaining_slots, service?.rooms, formData.id_room]);
 
     useEffect(() => {
         const fetchUserData = async () => {
             try {
-                const profile = await customerApi.getProfile();
-                if (profile && profile.fullName) {
+                // 1. Try to get from localStorage first (User might have edited it previously)
+                const storedContacts = JSON.parse(localStorage.getItem('temp_booking_contacts') || '{}');
+                const cached = storedContacts[id!];
+
+                if (cached && Date.now() - cached.timestamp < 30 * 60 * 1000) { // 30 mins cache
                     setFormData(prev => ({
                         ...prev,
                         guestInfo: {
-                            fullName: profile.fullName || '',
-                            email: profile.email || '',
-                            phone: profile.phone || ''
+                            fullName: cached.fullName || '',
+                            email: cached.email || '',
+                            phone: cached.phone || ''
                         }
                     }));
+                } else {
+                    // 2. Fallback to profile
+                    const profile = await customerApi.getProfile();
+                    if (profile && profile.fullName) {
+                        setFormData(prev => ({
+                            ...prev,
+                            guestInfo: {
+                                fullName: profile.fullName || '',
+                                email: profile.email || '',
+                                phone: profile.phone || ''
+                            }
+                        }));
+                    }
                 }
             } catch (err) {
                 console.error('Error fetching profile:', err);
             }
         };
         fetchUserData();
-    }, []);
+    }, [id]);
+
+    // Auto-save guest info to localStorage for "real-time" persistence
+    useEffect(() => {
+        if (id && formData.guestInfo.phone) {
+            const storedContacts = JSON.parse(localStorage.getItem('temp_booking_contacts') || '{}');
+            storedContacts[id] = {
+                ...formData.guestInfo,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('temp_booking_contacts', JSON.stringify(storedContacts));
+        }
+    }, [formData.guestInfo, id]);
 
     useEffect(() => {
         const fetchBookedSeats = async () => {
@@ -125,6 +184,15 @@ export default function BookingPage() {
         };
         if (id) fetchBookedSeats();
     }, [id, formData.id_trip]);
+
+    const getQuantityLimit = () => {
+        if (!service) return 99;
+        if (service.item_type === 'accommodation' && formData.id_room) {
+            const room = service.rooms?.find((r: any) => String(r.id_room || r.idRoom) === String(formData.id_room));
+            return room?.quantity || 0;
+        }
+        return service.remaining_slots || service.max_slots || 99;
+    };
 
     const handleNext = () => {
         // Basic validation
@@ -196,8 +264,8 @@ export default function BookingPage() {
 
         const quantity = Number(formData.quantity || 1);
 
-        // For Private tours, the price is flat for the whole tour (e.g. 1.000.000đ for 2 guests)
-        if (service?.item_type === 'tour' && service.tour_attribute?.tour_type === 'private') {
+        // For Private tours, the price is flat for the whole tour (e.g. 8.000.000đ for the whole group)
+        if (service?.item_type === 'tour' && (service.tour_type === 'private' || service.tour_attribute?.tour_type === 'private')) {
             return price;
         }
 
@@ -279,6 +347,13 @@ export default function BookingPage() {
             });
 
             if (result.success) {
+                // Clear the temporary draft contact info as the booking is now created
+                const storedContacts = JSON.parse(localStorage.getItem('temp_booking_contacts') || '{}');
+                if (storedContacts[id!]) {
+                    delete storedContacts[id!];
+                    localStorage.setItem('temp_booking_contacts', JSON.stringify(storedContacts));
+                }
+
                 // Also store contact info indexed by the NEW order ID so OrderDetail can find it
                 const orderContacts = JSON.parse(localStorage.getItem('order_pending_contacts') || '{}');
                 orderContacts[result.id_order] = formData.guestInfo;
@@ -428,28 +503,45 @@ export default function BookingPage() {
                                                 <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] text-center block">
                                                     Số lượng {service.item_type === 'accommodation' ? 'phòng đặt' : 'khách tham gia'}
                                                 </label>
-                                                <div className={`flex items-center gap-6 bg-gray-50 p-3 rounded-3xl border border-gray-100 max-w-sm mx-auto shadow-inner ${service.tour_attribute?.tour_type === 'private' ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
-                                                    <button
-                                                        onClick={() => setFormData({ ...formData, quantity: Math.max(1, (formData.quantity || 1) - 1) })}
-                                                        className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                                        disabled={formData.quantity <= 1}
-                                                    >
-                                                        -
-                                                    </button>
-                                                    <div className="flex-1 text-center">
-                                                        <span className="text-4xl font-black text-gray-900">{formData.quantity}</span>
+                                                {((service.tour_type || service.tour_attribute?.tour_type) === 'private') ? (
+                                                    <div className="flex items-center justify-center p-4 bg-blue-50/50 rounded-2xl border border-blue-100 max-w-sm mx-auto">
+                                                        <span className="text-xl font-black text-blue-700 uppercase tracking-tight">
+                                                            Trọn gói {formData.quantity} khách
+                                                        </span>
                                                     </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            const limit = service?.remaining_slots || (service?.max_slots) || 99;
-                                                            setFormData({ ...formData, quantity: Math.min(limit, (formData.quantity || 1) + 1) });
-                                                        }}
-                                                        className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
-                                                        disabled={formData.quantity >= (service?.remaining_slots || (service?.max_slots) || 99)}
-                                                    >
-                                                        +
-                                                    </button>
-                                                </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-6 bg-gray-50 p-3 rounded-3xl border border-gray-100 max-w-sm mx-auto shadow-inner">
+                                                        <button
+                                                            onClick={() => setFormData({ ...formData, quantity: Math.max(1, (formData.quantity || 1) - 1) })}
+                                                            className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
+                                                            disabled={formData.quantity <= 1}
+                                                        >
+                                                            -
+                                                        </button>
+                                                        <div className="flex-1 text-center">
+                                                            <span className="text-4xl font-black text-gray-900">{formData.quantity}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => {
+                                                                const limit = getQuantityLimit();
+                                                                if (formData.quantity >= limit) {
+                                                                    alert(`Rất tiếc, số lượng tối đa hiện có là ${limit} phòng/chỗ trống.`);
+                                                                    return;
+                                                                }
+                                                                setFormData({ ...formData, quantity: (formData.quantity || 1) + 1 });
+                                                            }}
+                                                            className="w-14 h-14 rounded-2xl bg-white shadow-lg flex items-center justify-center font-black text-2xl hover:bg-gray-900 hover:text-white transition-all active:scale-90"
+                                                            disabled={formData.quantity >= getQuantityLimit()}
+                                                        >
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                {formData.quantity >= getQuantityLimit() && getQuantityLimit() > 0 && service.tour_attribute?.tour_type !== 'private' && (
+                                                    <p className="text-[10px] text-orange-600 font-black text-center mt-2 uppercase tracking-tighter animate-bounce">
+                                                        ⚠️ Đã đạt số lượng tối đa hiện có ({getQuantityLimit()} {service.item_type === 'accommodation' ? 'phòng' : 'chỗ'})
+                                                    </p>
+                                                )}
                                                 {service.tour_attribute?.tour_type === 'private' && (
                                                     <p className="text-[10px] text-blue-600 font-bold text-center mt-2 italic">* Tour riêng trọn gói cho {formData.quantity} người</p>
                                                 )}
@@ -864,10 +956,12 @@ export default function BookingPage() {
                                                 </span>
                                             </div>
                                         ) : (
-                                            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
-                                                <span>Số lượng</span>
-                                                <span className="text-gray-900">x{formData.quantity}</span>
-                                            </div>
+                                            ((service.tour_type || service.tour_attribute?.tour_type) !== 'private') && (
+                                                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-gray-400">
+                                                    <span>Số lượng</span>
+                                                    <span className="text-gray-900">x{formData.quantity}</span>
+                                                </div>
+                                            )
                                         )}
                                         <div className="h-px bg-gray-50" />
                                         <div className="flex items-center justify-between">

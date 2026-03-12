@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,13 +16,14 @@ import { geographyApi } from '@/api/geography.api';
 
 export const VehicleLanding = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [fromProvinceId, setFromProvinceId] = useState('');
     const [toProvinceId, setToProvinceId] = useState('');
     const [provinces, setProvinces] = useState<any[]>([]);
     const [isRoundTrip, setIsRoundTrip] = useState(false);
 
     // Search Filters
-    const [departureDate, setDepartureDate] = useState('');
+    const [departureDate, setDepartureDate] = useState(searchParams.get('date') || searchParams.get('departureDate') || '');
     const [returnDate, setReturnDate] = useState('');
     const [departureTime, setDepartureTime] = useState('08:00');
     const [returnTime, setReturnTime] = useState('18:00');

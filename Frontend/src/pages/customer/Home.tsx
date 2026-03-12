@@ -61,53 +61,60 @@ const iconMap: Record<string, React.ReactNode> = {
   experience: <Sparkles className="h-5 w-5" />,
 };
 
-const ServiceCard = ({ service, getImageUrl }: { service: any; getImageUrl: (url: string | null) => string }) => (
-  <Link to={`/services/${service.id}`} className="group h-full">
-    <Card className="h-full border-none shadow-sm hover:shadow-2xl transition-all duration-500 rounded-[2.5rem] overflow-hidden bg-white group-hover:-translate-y-2">
-      <div className="relative h-60 overflow-hidden">
-        <img
-          src={getImageUrl(service.thumbnail)}
-          alt={service.name}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-        />
-        <div className="absolute top-4 left-4 flex flex-col gap-2">
-          <Badge className="bg-white/90 backdrop-blur text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border-none shadow-sm">
-            {service.type === 'accommodation' ? 'Khách sạn' : service.type === 'tour' ? 'Tour' : service.type === 'vehicle' ? 'Vận chuyển' : 'Vé'}
-          </Badge>
-          <div className="bg-black/50 backdrop-blur text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm text-[10px] font-bold">
-            <MapPin size={10} className="text-blue-400" />
-            {service.location || service.city}
+const ServiceCard = ({ service, getImageUrl, filters }: { service: any; getImageUrl: (url: string | null) => string; filters?: any }) => {
+  const dateParams = filters?.date 
+    ? `?${service.type === 'accommodation' 
+        ? `checkIn=${filters.date}${filters.checkOut ? `&checkOut=${filters.checkOut}` : ''}` 
+        : `date=${filters.date}`}` 
+    : '';
+  return (
+    <Link to={`/services/${service.id}${dateParams}`} className="group h-full">
+      <Card className="h-full border-none shadow-sm hover:shadow-2xl transition-all duration-500 rounded-[2.5rem] overflow-hidden bg-white group-hover:-translate-y-2">
+        <div className="relative h-60 overflow-hidden">
+          <img
+            src={getImageUrl(service.thumbnail)}
+            alt={service.name}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+          />
+          <div className="absolute top-4 left-4 flex flex-col gap-2">
+            <Badge className="bg-white/90 backdrop-blur text-blue-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border-none shadow-sm">
+              {service.type === 'accommodation' ? 'Khách sạn' : service.type === 'tour' ? 'Tour' : service.type === 'vehicle' ? 'Vận chuyển' : 'Vé'}
+            </Badge>
+            <div className="bg-black/50 backdrop-blur text-white rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm text-[10px] font-bold">
+              <MapPin size={10} className="text-blue-400" />
+              {service.location || service.city}
+            </div>
           </div>
         </div>
-      </div>
-      <CardContent className="p-6">
-        <div className="flex items-center gap-1 text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">
-          {iconMap[service.type] || <Sparkles size={12} />}
-          <span>{service.type}</span>
-        </div>
-        <h3 className="text-lg font-black text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors h-12 mb-4">
-          {service.name}
-        </h3>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-1 text-xs font-bold text-blue-500 uppercase tracking-widest mb-2">
+            {iconMap[service.type] || <Sparkles size={12} />}
+            <span>{service.type}</span>
+          </div>
+          <h3 className="text-lg font-black text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors h-12 mb-4">
+            {service.name}
+          </h3>
 
-        <div className="flex items-center gap-1 mb-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star key={i} size={12} className={i < (service.rating || 5) ? "fill-yellow-400 text-yellow-400" : "fill-gray-100 text-gray-200"} />
-          ))}
-        </div>
+          <div className="flex items-center gap-1 mb-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} size={12} className={i < (service.rating || 5) ? "fill-yellow-400 text-yellow-400" : "fill-gray-100 text-gray-200"} />
+            ))}
+          </div>
 
-        <div className="flex items-center justify-between border-t border-gray-50 pt-4">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Giá chỉ từ</p>
-            <span className="text-xl font-black text-blue-600">{formatCurrency(service.price)}</span>
+          <div className="flex items-center justify-between border-t border-gray-50 pt-4">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Giá chỉ từ</p>
+              <span className="text-xl font-black text-blue-600">{formatCurrency(service.price)}</span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:rotate-45">
+              <ArrowRight size={20} />
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:rotate-45">
-            <ArrowRight size={20} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  </Link>
-);
+        </CardContent>
+      </Card>
+    </Link>
+  );
+};
 
 interface ServiceFilters {
   q: string;
@@ -116,6 +123,7 @@ interface ServiceFilters {
   minPrice?: number;
   maxPrice?: number;
   date?: string;
+  checkOut?: string;
 }
 
 export const Home = () => {
@@ -128,7 +136,8 @@ export const Home = () => {
     provinceId: searchParams.get('provinceId') || '',
     minPrice: searchParams.get('minPrice') ? Number(searchParams.get('minPrice')) : undefined,
     maxPrice: searchParams.get('maxPrice') ? Number(searchParams.get('maxPrice')) : undefined,
-    date: searchParams.get('date') || '',
+    date: searchParams.get('date') || searchParams.get('checkIn') || '',
+    checkOut: searchParams.get('checkOut') || '',
   });
 
   const [showComingSoon, setShowComingSoon] = useState(false);
@@ -181,6 +190,7 @@ export const Home = () => {
     if (filters.minPrice != null) nextParams.minPrice = String(filters.minPrice);
     if (filters.maxPrice != null) nextParams.maxPrice = String(filters.maxPrice);
     if (filters.date) nextParams.date = filters.date;
+    if (filters.checkOut) nextParams.checkOut = filters.checkOut;
     setSearchParams(nextParams);
   }, [filters]);
 
@@ -275,18 +285,48 @@ export const Home = () => {
                   <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest z-10">Danh mục</div>
                 </div>
 
-                <div className="md:col-span-3 relative group">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
-                    <Calendar className="h-5 w-5" />
+                {filters.type === 'accommodation' ? (
+                  <div className="md:col-span-3 grid grid-cols-2 gap-2">
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      <Input
+                        type="date"
+                        className="pl-9 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-[11px] font-bold"
+                        value={filters.date || ''}
+                        onChange={(e) => setFilters({ ...filters, date: e.target.value })}
+                      />
+                      <div className="absolute top-[-10px] left-3 bg-white px-2 text-[9px] font-bold text-gray-400 uppercase tracking-widest">Nhận phòng</div>
+                    </div>
+                    <div className="relative group">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none">
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      <Input
+                        type="date"
+                        className="pl-9 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-[11px] font-bold"
+                        value={filters.checkOut || ''}
+                        onChange={(e) => setFilters({ ...filters, checkOut: e.target.value })}
+                        min={filters.date}
+                      />
+                      <div className="absolute top-[-10px] left-3 bg-white px-2 text-[9px] font-bold text-gray-400 uppercase tracking-widest">Trả phòng</div>
+                    </div>
                   </div>
-                  <Input
-                    type="date"
-                    className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-sm md:text-md font-medium"
-                    value={filters.date || ''}
-                    onChange={(e) => setFilters({ ...filters, date: e.target.value })}
-                  />
-                  <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Thời gian</div>
-                </div>
+                ) : (
+                  <div className="md:col-span-3 relative group">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                      <Calendar className="h-5 w-5" />
+                    </div>
+                    <Input
+                      type="date"
+                      className="pl-12 h-14 bg-gray-50 border-gray-100 rounded-2xl focus-visible:ring-blue-500 text-sm md:text-md font-medium"
+                      value={filters.date || ''}
+                      onChange={(e) => setFilters({ ...filters, date: e.target.value })}
+                    />
+                    <div className="absolute top-[-10px] left-4 bg-white px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Thời gian</div>
+                  </div>
+                )}
 
                 <div className="md:col-span-2">
                   <Button type="submit" className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-2xl shadow-lg shadow-blue-200 transition-all active:scale-95">
@@ -303,7 +343,7 @@ export const Home = () => {
       <section className="container max-w-7xl pt-24 pb-12 overflow-x-auto scrollbar-hide">
         <div className="flex justify-center gap-6 min-w-max px-4">
           <Link
-            to="/activities"
+            to={`/activities${filters.date ? `?date=${filters.date}` : ''}`}
             className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-blue-300 hover:bg-blue-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
             <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-blue-50 text-blue-600 transition-all duration-500 group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
@@ -312,7 +352,7 @@ export const Home = () => {
             <span className="font-black text-sm uppercase tracking-tight">Tour du lịch</span>
           </Link>
           <Link
-            to="/hotels"
+            to={`/hotels${filters.date ? `?checkIn=${filters.date}` : ''}${filters.checkOut ? `&checkOut=${filters.checkOut}` : ''}`}
             className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-orange-300 hover:bg-orange-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
             <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-orange-50 text-orange-600 transition-all duration-500 group-hover:bg-orange-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
@@ -321,7 +361,7 @@ export const Home = () => {
             <span className="font-black text-sm uppercase tracking-tight">Khách sạn</span>
           </Link>
           <Link
-            to="/bus-shuttle"
+            to={`/bus-shuttle${filters.date ? `?date=${filters.date}` : ''}`}
             className="flex flex-col items-center gap-4 p-8 rounded-[3.5rem] min-w-[180px] transition-all duration-500 border bg-white text-gray-700 border-gray-100 hover:border-emerald-300 hover:bg-emerald-50/50 shadow-sm hover:shadow-2xl hover:-translate-y-2 group"
           >
             <div className="w-16 h-16 rounded-[1.8rem] flex items-center justify-center bg-emerald-50 text-emerald-600 transition-all duration-500 group-hover:bg-emerald-600 group-hover:text-white group-hover:rotate-12 shadow-inner">
@@ -619,7 +659,7 @@ export const Home = () => {
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
                   {homeData.topAccommodations.map((service) => (
-                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} filters={filters} />
                   ))}
                 </div>
               </section>
@@ -641,7 +681,7 @@ export const Home = () => {
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
                   {homeData.topTours.map((service) => (
-                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} />
+                    <ServiceCard key={service.id} service={service} getImageUrl={getImageUrl} filters={filters} />
                   ))}
                 </div>
               </section>
@@ -704,13 +744,16 @@ export const Home = () => {
                 <div className="col-span-full py-10">
                   <EmptyState title="Không tìm thấy dịch vụ nào" description="Hãy thử thay đổi từ khóa hoặc bộ lọc của bạn." />
                 </div>
-              ) : (
-                servicesData?.items.map((service) => (
-                  <Link key={service.id_item} to={`/services/${service.id_item}`} className="group">
-                    <ServiceCard service={{ ...service, id: service.id_item, name: service.title, type: service.item_type, rating: service.rating || service.star_rating, location: service.city_name }} getImageUrl={getImageUrl} />
-                  </Link>
-                ))
-              )}
+                ) : (
+                  servicesData?.items.map((service) => (
+                    <ServiceCard
+                      key={service.id_item}
+                      service={{ ...service, id: service.id_item, name: service.title, type: service.item_type, rating: service.rating || service.star_rating, location: service.city_name }}
+                      getImageUrl={getImageUrl}
+                      filters={filters}
+                    />
+                  ))
+                )}
             </div>
           </section>
         )}

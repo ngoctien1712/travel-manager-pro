@@ -22,7 +22,8 @@ export const generateRefreshToken = async (userId: string): Promise<string> => {
     await revokeAllUserRefreshTokens(userId);
 
     const secret = process.env.JWT_REFRESH_SECRET || 'default-refresh-secret';
-    const token = jwt.sign({ userId }, secret, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
+    // Use Date.now() to ensure uniqueness even if called multiple times in the same second
+    const token = jwt.sign({ userId, iat: Date.now() }, secret, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days

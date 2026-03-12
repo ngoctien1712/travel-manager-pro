@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import adLeft from '@/assets/banners/ads-left.jpg';
 import adRight from '@/assets/banners/ads-right.jpg';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,8 @@ import {
   ShieldCheck,
   ExternalLink,
   MessageCircle,
-  Armchair
+  Armchair,
+  Loader2
 } from 'lucide-react';
 import {
   Dialog,
@@ -216,9 +217,10 @@ export default function ServiceDetail() {
     };
   };
 
+  const [searchParams] = useSearchParams();
   const defaults = getDefaultDates();
-  const [checkInDate, setCheckInDate] = useState<string>(defaults.start);
-  const [checkOutDate, setCheckOutDate] = useState<string>(defaults.end);
+  const [checkInDate, setCheckInDate] = useState<string>(searchParams.get('checkIn') || defaults.start);
+  const [checkOutDate, setCheckOutDate] = useState<string>(searchParams.get('checkOut') || defaults.end);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [stickyStyle, setStickyStyle] = useState<React.CSSProperties>({ position: 'sticky', top: '96px' });
 
@@ -260,11 +262,11 @@ export default function ServiceDetail() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const loadService = async (serviceId: string) => {
+  const loadService = async (serviceId: string, silent = false) => {
     try {
-      if (!service) {
+      if (!service && !silent) {
         setLoading(true);
-      } else {
+      } else if (!silent) {
         setIsFetching(true);
       }
 
@@ -273,11 +275,12 @@ export default function ServiceDetail() {
         customerApi.getApplicableVouchers(serviceId)
       ]);
 
+      // If we are switching instances within the same group, update softly
       setService(data);
       setVouchers(vData);
 
       // Fetch related services in the same city
-      if (data.city_name) {
+      if (data.city_name && (!service || service.city_name !== data.city_name)) {
         try {
           const related = await customerApi.listServices({ city: data.city_name });
           setRelatedServices(related.items.filter((item: any) => item.id_item !== serviceId).slice(0, 4));
@@ -291,13 +294,15 @@ export default function ServiceDetail() {
         setActiveImage(data.media[0].url);
       }
 
-      // Set default booking date for fixed-date tours
-      const tType = data.tour_type || data.tour_attribute?.tour_type;
-      if (data.item_type === 'tour' && (tType === 'group' || tType === 'daily') && data.start_at) {
-        setBookingDate(new Date(data.start_at).toISOString().split('T')[0]);
-      } else if (data.item_type === 'tour' && tType === 'private') {
-        // Tomorrow as default for private
-        setBookingDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]);
+      // Set default booking date for fixed-date tours - only on initial load
+      if (!silent && (!service || service.id_item !== data.id_item)) {
+        const tType = data.tour_type || data.tour_attribute?.tour_type;
+        if (data.item_type === 'tour' && (tType === 'group' || tType === 'daily') && data.start_at) {
+          setBookingDate(new Date(data.start_at).toISOString().split('T')[0]);
+        } else if (data.item_type === 'tour' && tType === 'private') {
+          // Tomorrow as default for private
+          setBookingDate(new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]);
+        }
       }
 
       setError(null);
@@ -313,8 +318,26 @@ export default function ServiceDetail() {
   useEffect(() => {
     if (id) {
       loadService(id);
+
+      // Polling for real-time price/availability updates every 3 seconds
+      const pollInterval = setInterval(() => {
+        loadService(id, true);
+      }, 3000);
+
+      return () => clearInterval(pollInterval);
     }
   }, [id, checkInDate, checkOutDate]);
+
+  // Sync selectedRoom with the latest data from polling to ensure real-time accuracy
+  useEffect(() => {
+    if (selectedRoom && service?.rooms) {
+      const latestRoomData = service.rooms.find((r: any) => String(r.id_room || r.idRoom) === String(selectedRoom.id_room || selectedRoom.idRoom));
+      if (latestRoomData) {
+        // If availability changed, update the selectedRoom state silently
+        setSelectedRoom(latestRoomData);
+      }
+    }
+  }, [service?.rooms]);
 
   // No need to fetch booked seats here anymore as it is done in BookingPage.tsx
 
@@ -374,9 +397,7 @@ export default function ServiceDetail() {
   };
 
   return (
-    <div className={`bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans relative transition-all duration-500 ${isFetching ? 'opacity-60 grayscale-[0.2] pointer-events-none' : 'opacity-100'}`}>
-
-
+    <div className="bg-[#f8fafc] min-h-screen pb-20 overflow-x-hidden font-sans relative">
       <div className="container mx-auto px-4 lg:px-20 py-8">
         {/* Navigation Breadcrumb */}
         <button
@@ -885,6 +906,7 @@ export default function ServiceDetail() {
 
                                 <div className="flex flex-col items-center gap-3">
                                   <Button
+                                    disabled={room.quantity === 0}
                                     onClick={() => {
                                       setSelectedRoom(room);
                                       // Scroll to booking confirmation bar directly
@@ -895,15 +917,23 @@ export default function ServiceDetail() {
                                         }
                                       }, 100);
                                     }}
-                                    className={`h-14 px-10 rounded-[1.25rem] font-black text-sm uppercase tracking-widest shadow-lg transition-all duration-300 ${isSelected ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' : 'bg-[#0094FF] hover:bg-blue-600 shadow-blue-200'
+                                    className={`h-14 px-10 rounded-[1.25rem] font-black text-sm uppercase tracking-widest shadow-lg transition-all duration-300 ${isSelected ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-200' :
+                                      room.quantity === 0 ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-[#0094FF] hover:bg-blue-600 shadow-blue-200'
                                       }`}
                                   >
-                                    {isSelected ? 'ĐÃ CHỌN' : 'CHỌN'}
+                                    {room.quantity === 0 ? 'HẾT PHÒNG' : isSelected ? 'ĐÃ CHỌN' : 'CHỌN'}
                                   </Button>
-                                  {room.quantity !== undefined && (
+                                  {room.quantity !== undefined && room.quantity > 0 && (
                                     <div className="flex flex-col items-center">
                                       <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest animate-pulse italic">
                                         CÒN {room.quantity} PHÒNG!
+                                      </span>
+                                    </div>
+                                  )}
+                                  {room.quantity === 0 && (
+                                    <div className="flex flex-col items-center">
+                                      <span className="text-[10px] font-black text-red-500 uppercase tracking-widest italic opacity-60">
+                                        Vừa hết chỗ
                                       </span>
                                     </div>
                                   )}
@@ -966,10 +996,11 @@ export default function ServiceDetail() {
 
                           <Button
                             onClick={handleBookingRedirect}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-8 h-14 rounded-xl font-black text-sm shadow-xl shadow-blue-900/50 hover:shadow-blue-600/40 transition-all hover:scale-105 active:scale-95 group uppercase tracking-tight flex items-center gap-3 w-full sm:w-auto"
+                            disabled={selectedRoom.quantity === 0}
+                            className={`bg-blue-600 hover:bg-blue-500 text-white px-8 h-14 rounded-xl font-black text-sm shadow-xl shadow-blue-900/50 hover:shadow-blue-600/40 transition-all hover:scale-105 active:scale-95 group uppercase tracking-tight flex items-center gap-3 w-full sm:w-auto ${selectedRoom.quantity === 0 ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                           >
-                            ĐẶT PHÒNG NGAY
-                            <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            {selectedRoom.quantity === 0 ? 'PHÒNG VỪA HẾT' : 'ĐẶT PHÒNG NGAY'}
+                            {selectedRoom.quantity !== 0 && <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />}
                           </Button>
                         </div>
                       </div>
@@ -1260,13 +1291,18 @@ export default function ServiceDetail() {
                 <div className="mb-8 text-center md:text-left">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3">Thông tin đặt chỗ</p>
                   <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-4xl font-black tracking-tighter text-gray-900">
+                    <span className={`text-4xl font-black tracking-tighter text-gray-900 transition-all duration-300 ${isFetching ? 'opacity-40 translate-y-1' : 'opacity-100 translate-y-0'}`}>
                       {service.item_type === 'vehicle'
                         ? (Number(service.price || 0)).toLocaleString()
-                        : (quantity * (service.price || 0)).toLocaleString()
+                        : ((service.tour_type || service.tour_attribute?.tour_type) === 'private' 
+                          ? (Number(service.price || 0)) 
+                          : (quantity * (service.price || 0))
+                        ).toLocaleString()
                       }đ
                     </span>
-                    <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">tổng phí</span>
+                    <span className="text-gray-400 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2">
+                      tổng phí {isFetching && <Loader2 size={12} className="animate-spin text-blue-500" />}
+                    </span>
                   </div>
                 </div>
 
@@ -1283,34 +1319,39 @@ export default function ServiceDetail() {
                             <div className="flex flex-wrap gap-2">
                               {service.instances.map((inst) => {
                                 const date = new Date(inst.start_at);
-                                const isSelected = service.id_item === inst.id_item;
+                                const isSelected = id === String(inst.id_item);
                                 const dayName = date.toLocaleDateString('vi-VN', { weekday: 'short' }).replace('.', '').toUpperCase();
                                 const isPast = new Date(inst.start_at) < new Date(new Date().setHours(0, 0, 0, 0));
 
                                 if (isPast) return null;
 
-                                return (
-                                  <button
-                                    key={inst.id_item}
-                                    onClick={() => {
-                                      loadService(inst.id_item);
-                                      window.history.pushState({}, '', `/services/${inst.id_item}`);
-                                    }}
-                                    className={`flex flex-col items-center justify-center min-w-[60px] p-3 rounded-2xl border-2 transition-all ${isSelected
-                                      ? 'border-blue-600 bg-blue-600 text-white shadow-lg scale-105 z-10'
-                                      : 'border-white bg-white text-gray-900 hover:border-blue-200 shadow-sm'
-                                      } ${inst.remaining_slots <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    disabled={inst.remaining_slots <= 0}
-                                  >
-                                    <span className={`text-[8px] font-black mb-1 ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
-                                      {dayName}
-                                    </span>
-                                    <span className="font-black text-sm">{date.getDate()}/{date.getMonth() + 1}</span>
-                                    <span className={`text-[7px] font-bold mt-1 ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
-                                      {inst.remaining_slots} chỗ
-                                    </span>
-                                  </button>
-                                );
+                                  return (
+                                    <button
+                                      key={inst.id_item}
+                                      onClick={() => {
+                                        navigate(`/services/${inst.id_item}`, { state: { noScroll: true } });
+                                      }}
+                                      className={`flex flex-col items-center justify-center min-w-[60px] p-3 rounded-2xl border-2 transition-all duration-300 ${isSelected
+                                        ? `border-blue-600 bg-blue-600 text-white shadow-lg scale-105 z-10 ${isFetching ? 'animate-pulse opacity-70' : ''}`
+                                        : 'border-white bg-white text-gray-900 hover:border-blue-200 shadow-sm'
+                                        } ${inst.remaining_slots <= 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                      disabled={inst.remaining_slots <= 0 || (isSelected && isFetching)}
+                                    >
+                                      <span className={`text-[8px] font-black mb-1 ${isSelected ? 'text-blue-100' : 'text-gray-400'}`}>
+                                        {dayName}
+                                      </span>
+                                      <span className="font-black text-sm">
+                                        {isFetching && isSelected ? (
+                                          <Loader2 size={12} className="animate-spin" />
+                                        ) : (
+                                          `${date.getDate()}/${date.getMonth() + 1}`
+                                        )}
+                                      </span>
+                                      <span className={`text-[7px] font-bold mt-1 ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                                        {inst.remaining_slots} chỗ
+                                      </span>
+                                    </button>
+                                  );
                               })}
                             </div>
                             <p className="text-[10px] font-bold text-blue-600 italic">* Các ngày đã qua hoặc hết chỗ sẽ không hiển thị</p>

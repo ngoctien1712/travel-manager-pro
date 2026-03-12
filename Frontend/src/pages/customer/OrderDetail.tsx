@@ -287,10 +287,20 @@ export default function OrderDetail() {
                           </div>
                           <div className="pt-6 border-t border-white/10 flex flex-col items-end gap-1">
                             <span className="font-black text-[10px] uppercase tracking-[0.3em] text-blue-400">Tổng thanh toán</span>
-                            <div className="flex items-baseline gap-1">
-                              <span className="text-4xl font-black text-white tracking-tighter">{Number(order.total_amount).toLocaleString()}</span>
-                              <span className="font-black text-blue-400 text-sm italic">VNĐ</span>
-                            </div>
+                            {order.order_type === 'tour' && order.details.tour_type === 'private' ? (
+                              <div className="flex flex-col items-end">
+                                <Badge variant="outline" className="text-[9px] text-blue-300 border-blue-400 mb-1">TRỌN GÓI</Badge>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-4xl font-black text-white tracking-tighter">{Number(order.total_amount).toLocaleString()}</span>
+                                  <span className="font-black text-blue-400 text-sm italic">VNĐ</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-4xl font-black text-white tracking-tighter">{Number(order.total_amount).toLocaleString()}</span>
+                                <span className="font-black text-blue-400 text-sm italic">VNĐ</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -424,6 +434,40 @@ export default function OrderDetail() {
                 </div>
               </Card>
             )}
+
+            {/* Contact Information Section - NEW */}
+            <Card className="p-10 rounded-[2.5rem] border-none shadow-xl space-y-8 bg-white overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center">
+                  <Users size={24} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Thông tin liên hệ</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                  <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Họ và tên</p>
+                  <p className="font-black text-gray-900 text-lg">{order.details?.guest_info?.fullName || order.user_full_name}</p>
+                </div>
+                <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                  <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Số điện thoại</p>
+                  <p className="font-black text-blue-600 text-lg">{order.details?.guest_info?.phone || order.user_phone}</p>
+                </div>
+                <div className="p-6 rounded-3xl bg-gray-50 border border-gray-100">
+                  <p className="text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest">Email</p>
+                  <p className="font-black text-gray-900 text-sm truncate">{order.details?.guest_info?.email || order.user_email}</p>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-3xl bg-blue-50/50 border border-blue-100/50 flex items-center gap-4">
+                <Info size={16} className="text-blue-500 shrink-0" />
+                <p className="text-[11px] font-bold text-blue-700/70 leading-relaxed">
+                  Đây là thông tin liên hệ được sử dụng để nhận vé điện tử và thông báo từ nhà cung cấp dịch vụ. 
+                  {order.details?.guest_info ? ' (Thông tin này đã được bạn điều chỉnh lúc đặt hàng)' : ' (Sử dụng thông tin mặc định từ tài khoản)'}
+                </p>
+              </div>
+            </Card>
           </div>
 
           {/* Sidebar */}

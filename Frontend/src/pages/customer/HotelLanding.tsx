@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { customerApi } from '@/api/customer.api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,10 +22,24 @@ export const HotelLanding = () => {
     const [provinces, setProvinces] = useState<any[]>([]);
     const [wards, setWards] = useState<any[]>([]);
 
+    const [searchParams, setSearchParams] = useSearchParams();
+    
     // Search Filters
-    const [checkInDate, setCheckInDate] = useState('');
-    const [checkOutDate, setCheckOutDate] = useState('');
-    const [guestCount, setGuestCount] = useState('2');
+    const [checkInDate, setCheckInDate] = useState(searchParams.get('checkIn') || '');
+    const [checkOutDate, setCheckOutDate] = useState(searchParams.get('checkOut') || '');
+    const [guestCount, setGuestCount] = useState(searchParams.get('guestCount') || '2');
+
+    // Sync filters to URL for consistency
+    useEffect(() => {
+        const nextParams: Record<string, string> = {};
+        if (search) nextParams.q = search;
+        if (provinceId) nextParams.provinceId = provinceId;
+        if (wardId) nextParams.wardId = wardId;
+        if (checkInDate) nextParams.checkIn = checkInDate;
+        if (checkOutDate) nextParams.checkOut = checkOutDate;
+        if (guestCount) nextParams.guestCount = guestCount;
+        setSearchParams(nextParams, { replace: true });
+    }, [search, provinceId, wardId, checkInDate, checkOutDate, guestCount]);
 
     const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
     const getImageUrl = (url: string | null) => {
@@ -271,7 +285,11 @@ export const HotelLanding = () => {
                         Array.from({ length: 4 }).map((_, i) => <ServiceCardSkeleton key={i} />)
                     ) : (
                         data?.items.map((hotel: any) => (
-                            <Link key={hotel.id_item} to={`/services/${hotel.id_item}`} className="group">
+                            <Link
+                                key={hotel.id_item}
+                                to={`/services/${hotel.id_item}${checkInDate && checkOutDate ? `?checkIn=${checkInDate}&checkOut=${checkOutDate}` : ''}`}
+                                className="group"
+                            >
                                 <Card className="h-full border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-[2rem] overflow-hidden bg-white">
                                     <div className="relative h-48 overflow-hidden">
                                         <img

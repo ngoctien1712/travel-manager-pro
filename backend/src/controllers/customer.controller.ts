@@ -332,7 +332,15 @@ export const getService = async (req: Request, res: Response) => {
         [id]
       );
       details = tourRows[0] || {};
-      details.remaining_slots = Math.max(0, (details.max_slots || 0) - Number(details.booked_slots || 0));
+      
+      // Calculate remaining slots
+      const booked = Number(details.booked_slots || 0);
+      if (details.tour_type === 'private') {
+        // For private tours, if anyone has booked it (even 1 slot), it's fully booked
+        details.remaining_slots = booked > 0 ? 0 : details.max_slots;
+      } else {
+        details.remaining_slots = Math.max(0, (details.max_slots || 0) - booked);
+      }
 
       // Handle daily tours: join with other instances in the same group
       const groupId = item.attribute?.group_id;
@@ -346,13 +354,17 @@ export const getService = async (req: Request, res: Response) => {
            ORDER BY t.start_at ASC`,
           [groupId]
         );
-        details.instances = instances.map(i => ({
-          id_item: i.id_item,
-          start_at: i.start_at,
-          end_at: i.end_at,
-          max_slots: i.max_slots,
-          remaining_slots: Math.max(0, (i.max_slots || 0) - Number(i.booked_slots || 0))
-        }));
+        details.instances = instances.map(i => {
+          const iBooked = Number(i.booked_slots || 0);
+          const isPrivate = details.tour_type === 'private';
+          return {
+            id_item: i.id_item,
+            start_at: i.start_at,
+            end_at: i.end_at,
+            max_slots: i.max_slots,
+            remaining_slots: isPrivate ? (iBooked > 0 ? 0 : i.max_slots) : Math.max(0, (i.max_slots || 0) - iBooked)
+          };
+        });
       }
     } else if (itemType === 'accommodation') {
       const { rows: accDetails } = await query(
@@ -394,7 +406,7 @@ export const getService = async (req: Request, res: Response) => {
         return d.toISOString().split('T')[0];
       })();
 
-      console.log(`[getService] Checking availability for room ${id} from ${startDate} to ${endDate}`);
+      //console.log(`[getService] Checking availability for room ${id} from ${startDate} to ${endDate}`);
       // Fetch rooms and calculate availability
       const { rows: rooms } = await query(
         `SELECT r.id_room, r.name_room, r.max_guest, r.price, r.attribute, r.media, r.description, r.quantity as total_quantity,
@@ -412,7 +424,7 @@ export const getService = async (req: Request, res: Response) => {
         [id, startDate, endDate]
       );
 
-      console.log(`[getService] Results:`, rooms.map(r => ({ name: r.name_room, total: r.total_quantity, booked: r.booked_quantity })));
+      //console.log(`[getService] Results:`, rooms.map(r => ({ name: r.name_room, total: r.total_quantity, booked: r.booked_quantity })));
 
       details.rooms = rooms.map(r => ({
         ...r,
@@ -480,9 +492,26 @@ export const getService = async (req: Request, res: Response) => {
       [id]
     );
 
+    // 5. Clean attributes for UI
+    const finalItem = { ...item };
+    const finalDetails = { ...details };
+
+    if (finalItem.attribute && typeof finalItem.attribute === 'object') {
+      if (finalItem.attribute.group_id) {
+        finalItem.attribute['Dạng tour'] = 'Tour nhóm hằng ngày';
+        delete finalItem.attribute.group_id;
+      }
+    }
+    if (finalDetails.tour_attribute && typeof finalDetails.tour_attribute === 'object') {
+      if (finalDetails.tour_attribute.group_id) {
+        finalDetails.tour_attribute['Dạng tour'] = 'Tour nhóm hằng ngày';
+        delete finalDetails.tour_attribute.group_id;
+      }
+    }
+
     res.json({
-      ...item,
-      ...details,
+      ...finalItem,
+      ...finalDetails,
       media: media.rows,
       tags: tags.rows.map((t: any) => t.tag)
     });
@@ -563,7 +592,21 @@ export const createBooking = async (req: Request, res: Response) => {
         return res.status(404).json({ message: 'Không tìm thấy thông tin chi tiết tour.' });
       }
 
-      if (tour.tour_type === 'group' || tour.tour_type === 'daily') {
+      if (tour.tour_type === 'private') {
+        const dateFilter = tour.tour_type === 'daily' ? 'AND booking_date = $2' : '';
+        const dateParams = tour.tour_type === 'daily' ? [id_item, booking_date] : [id_item];
+
+        const { rows: bookedRows } = await query(
+          `SELECT COUNT(*) as count 
+           FROM order_tour_detail d
+           JOIN "order" o ON o.id_order = d.id_order
+           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') ${dateFilter}`,
+          dateParams
+        );
+        if (Number(bookedRows[0].count) > 0) {
+          return res.status(400).json({ message: 'Tour này đã được đặt trọn gói cho ngày này. Vui lòng chọn ngày khác.' });
+        }
+      } else if (tour.tour_type === 'group' || tour.tour_type === 'daily') {
         const dateFilter = tour.tour_type === 'daily' ? 'AND booking_date = $2' : '';
         const dateParams = tour.tour_type === 'daily' ? [id_item, booking_date] : [id_item];
 
@@ -579,7 +622,12 @@ export const createBooking = async (req: Request, res: Response) => {
           return res.status(400).json({ message: `Xin lỗi, chỉ còn ${tour.max_slots - alreadyBooked} chỗ trống.` });
         }
       }
-      subtotal = price * totalItemQuantity;
+      
+      if (tour.tour_type === 'private') {
+        subtotal = price;
+      } else {
+        subtotal = price * totalItemQuantity;
+      }
     } else if (item_type === 'accommodation') {
       const { id_room, start_date, end_date, quantity } = details;
       totalItemQuantity = Number(quantity || 1);
@@ -739,14 +787,14 @@ export const createBooking = async (req: Request, res: Response) => {
         [id_item, idOrder, quantity || 1, price, JSON.stringify(guest_info), booking_date]
       );
     } else if (item_type === 'accommodation') {
-      const { id_room, start_date, end_date, quantity } = details;
+      const { id_room, start_date, end_date, quantity, guest_info } = details;
       await query(
-        `INSERT INTO order_accommodations_detail (id_order, id_room, start_date, end_date, quantity, price) 
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [idOrder, id_room, start_date, end_date, quantity || 1, price]
+        `INSERT INTO order_accommodations_detail (id_order, id_room, start_date, end_date, quantity, price, guest_info) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [idOrder, id_room, start_date, end_date, quantity || 1, price, JSON.stringify(guest_info)]
       );
     } else if (item_type === 'vehicle') {
-      const { id_position, seats, id_trip } = details;
+      const { id_position, seats, id_trip, guest_info } = details;
       const seatIds = seats || (id_position ? [id_position] : []);
 
       let finalPrice = price;
@@ -768,9 +816,9 @@ export const createBooking = async (req: Request, res: Response) => {
         const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
 
         await query(
-          `INSERT INTO order_pos_vehicle_detail (${columns.join(', ')}) 
-           VALUES (${placeholders})`,
-          values
+          `INSERT INTO order_pos_vehicle_detail (${columns.join(', ')}, guest_info) 
+           VALUES (${placeholders}, $${values.length + 1})`,
+          [...values, JSON.stringify(guest_info)]
         );
       }
     } else if (item_type === 'ticket') {
@@ -957,6 +1005,15 @@ export const getOrder = async (req: Request, res: Response) => {
     }
 
     const payments = await query(`SELECT * FROM payments WHERE id_order = $1`, [id]);
+    
+    // Prioritize guest_info from details if available
+    if (details && details.guest_info) {
+      const gInfo = typeof details.guest_info === 'string' ? JSON.parse(details.guest_info) : details.guest_info;
+      if (gInfo.fullName) order.user_full_name = gInfo.fullName;
+      if (gInfo.phone) order.user_phone = gInfo.phone;
+      if (gInfo.email) order.user_email = gInfo.email;
+    }
+
     res.json({ order, details, payments: payments.rows });
   } catch (err) {
     console.error(err);
@@ -1117,10 +1174,26 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
     }
 
     // 4. Cập nhật trạng thái thành công
+    const { guest_info } = req.body;
     await query(
       `UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`,
       [finalTransId || 'DEMO_ID', order.id_order]
     );
+
+    // If guest_info is provided in the webhook (e.g. from the Demo button), update the detail table
+    if (guest_info) {
+      const infoStr = JSON.stringify(guest_info);
+      if (order.order_type === 'tour') {
+        await query('UPDATE order_tour_detail SET guest_info = $1 WHERE id_order = $2', [infoStr, order.id_order]);
+      } else if (order.order_type === 'accommodation') {
+        await query('UPDATE order_accommodations_detail SET guest_info = $1 WHERE id_order = $2', [infoStr, order.id_order]);
+      } else if (order.order_type === 'ticket') {
+        await query('UPDATE order_ticket_detail SET guest_info = $1 WHERE id_order = $2', [infoStr, order.id_order]);
+      } else if (order.order_type === 'vehicle') {
+        await query('UPDATE order_pos_vehicle_detail SET guest_info = $1 WHERE id_order = $2', [infoStr, order.id_order]);
+      }
+    }
+
     await query(
       `UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`,
       [order.id_order]
