@@ -18,32 +18,42 @@ export default function ChatWidget({ providerId, providerName, itemId, itemName 
     const [isOpen, setIsOpen] = useState(false);
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [currentUser, setCurrentUser] = useState<any>(null);
+    const [ownerId, setOwnerId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
 
     useEffect(() => {
-        const fetchUser = async () => {
+        const fetchUserAndOwner = async () => {
             try {
                 const user = await userApi.getProfile();
                 setCurrentUser(user);
 
-                if (user) {
-                    const roomPath = `${user.id}_${providerId}`.replace(/\./g, '_');
-                    const unreadRef = ref(database, `chats/${roomPath}/unread/${user.id}`);
+                // We need to know the owner_id to track unread messages
+                // For now, we'll get it from the initialize call or a lightweight check
+                const res = await chatApi.initializeChat({
+                    customer_id: user?.id || 'guest',
+                    item_id: itemId,
+                    item_name: itemName,
+                    customer_name: user?.fullName || 'Khách'
+                });
+                
+                setOwnerId(res.owner_id);
+                setConversationId(res.conversation_id);
+
+                if (user && res.owner_id) {
+                    const unreadRef = ref(database, `chats/${res.conversation_id}/unread/${user.id}`);
                     onValue(unreadRef, (snap) => {
                         setUnreadCount(snap.val() || 0);
                     });
                 }
             } catch (err) {
-                console.error("Failed to fetch user for chat", err);
+                console.error("Failed to fetch chat info", err);
             }
         };
-        fetchUser();
+        fetchUserAndOwner();
 
-        // Reset state when provider changes
         setIsOpen(false);
-        setConversationId(null);
-    }, [providerId]);
+    }, [itemId]);
 
     const handleOpenChat = async () => {
         if (!currentUser) {
@@ -56,26 +66,11 @@ export default function ChatWidget({ providerId, providerName, itemId, itemName 
             return;
         }
 
-        try {
-            setLoading(true);
-            const res = await chatApi.initializeChat({
-                customer_id: currentUser.id,
-                provider_id: providerId,
-                item_id: itemId,
-                item_name: itemName,
-                customer_name: currentUser.fullName
-            });
-            setConversationId(res.conversation_id);
+        if (conversationId) {
             setIsOpen(true);
-
             if (unreadCount > 0) {
-                await chatApi.markRead(res.conversation_id, currentUser.id);
+                await chatApi.markRead(conversationId, currentUser.id);
             }
-        } catch (err) {
-            console.error("Failed to initialize chat", err);
-            alert("Không thể bắt đầu chat. Vui lòng thử lại sau.");
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -91,6 +86,7 @@ export default function ChatWidget({ providerId, providerName, itemId, itemName 
                         title={`Chat với ${providerName}`}
                         itemId={itemId}
                         itemName={itemName}
+                        providerId={providerId}
                     />
                 </div>
             )}

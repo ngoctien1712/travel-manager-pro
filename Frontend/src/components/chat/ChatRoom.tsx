@@ -25,9 +25,10 @@ interface ChatRoomProps {
     title?: string;
     itemId?: string;
     itemName?: string;
+    providerId?: string;
 }
 
-export default function ChatRoom({ conversationId, currentUser, onClose, title, itemId, itemName }: ChatRoomProps) {
+export default function ChatRoom({ conversationId, currentUser, onClose, title, itemId, itemName, providerId }: ChatRoomProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(true);
@@ -55,7 +56,8 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
                             const timeB = typeof b.timestamp === 'number' ? b.timestamp : 0;
                             return timeA - timeB;
                         });
-                        setMessages(msgs);
+                        // Limit to last 50 messages on client side for performance
+                        setMessages(msgs.slice(-50));
                     } else {
                         setMessages([]);
                     }
@@ -93,25 +95,29 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
             const newMessageRef = push(messagesRef);
             const ts = serverTimestamp();
 
-            await set(newMessageRef, {
+            const messageData = {
                 sender_id: currentUser.id,
                 sender_name: currentUser.fullName,
                 content: msgContent,
                 timestamp: ts,
-            });
+                id_item: itemId // Link message to specific item context
+            };
+            
+            await set(newMessageRef, messageData);
 
-            // Update only necessary per-message metadata
-            await set(ref(database, `chats/${conversationId}/last_message`), msgContent);
-            await set(ref(database, `chats/${conversationId}/updated_at`), ts);
-            await set(ref(database, `chats/${conversationId}/last_sender_id`), currentUser.id);
+            // Extract IDs from conversationId (customer_id_owner_id)
+            const parts = conversationId.split('_');
+            const custId = parts[0];
+            const ownerId = parts[1];
 
-            // Sync with SQL database for dashboard listings
-            const [cust_id, prov_id] = conversationId.split('_');
+            // Sync with SQL database
             await chatApi.trackActivity({
                 conversation_id: conversationId,
-                customer_id: cust_id,
-                provider_id: prov_id,
+                customer_id: custId,
+                owner_id: ownerId,
+                provider_id: providerId, // Passed from props
                 customer_name: (currentUser.role === 'customer') ? (currentUser.fullName) : (title || 'Khách hàng'),
+                item_id: itemId,
                 item_name: itemName || 'Dịch vụ',
                 last_message: msgContent,
                 sender_id: currentUser.id
@@ -134,7 +140,6 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
 
     return (
         <div className="flex flex-col h-full bg-[#f8f9fa] rounded-t-2xl overflow-hidden shadow-2xl border border-gray-200">
-            {/* Header - Shopee Style (Orange/Blue gradient or Premium Dark) */}
             <div className="bg-gradient-to-r from-blue-700 to-indigo-600 p-4 flex items-center justify-between text-white shadow-md z-10">
                 <div className="flex items-center gap-3">
                     <div className="relative">
@@ -157,9 +162,7 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
                 )}
             </div>
 
-            {/* Messages Body */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth custom-scrollbar relative">
-                {/* Contextual Action Banner for Customers */}
                 {currentUser.role === 'customer' && itemName && showContextBanner && (
                     <div className="sticky top-0 z-20 mb-4 animate-in slide-in-from-top-4 duration-500">
                         <div className="bg-white/95 backdrop-blur-md border border-blue-100 rounded-2xl p-3 shadow-xl flex items-center justify-between gap-3 overflow-hidden group">
@@ -203,7 +206,6 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
                             <X size={24} />
                         </div>
                         <p className="text-sm font-bold text-gray-600">{error}</p>
-                        <p className="text-[10px] text-gray-400 uppercase font-black">Hãy mở Project Settings &gt; Authentication &gt; Sign-in method và Bật "Anonymous" trên Firebase Console.</p>
                     </div>
                 ) : messages.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full opacity-40">
@@ -245,7 +247,6 @@ export default function ChatRoom({ conversationId, currentUser, onClose, title, 
                 )}
             </div>
 
-            {/* Input Bar - Premium Shadow & Focus */}
             <div className="p-4 bg-white border-t border-gray-100 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
                 <form onSubmit={handleSendMessage} className="flex gap-2.5 items-center">
                     <div className="relative flex-1 group">

@@ -22,7 +22,7 @@ export default function Messages() {
     const chatsMapRef = useRef<Record<string, any>>({});
     const listenersRef = useRef<Record<string, () => void>>({});
     const selectedChatRef = useRef<any>(null);
-    const currentUserRef = useRef<any>(null); // State persistence for listeners
+    const currentUserRef = useRef<any>(null);
 
     const sanitizeUid = (uid: string) => (uid ? uid.replace(/\./g, '_') : '');
 
@@ -44,13 +44,9 @@ export default function Messages() {
                 chatsMapRef.current[roomId] = {
                     id_room: roomId,
                     last_message: '...',
-                    customer_name: 'Khách hàng mới',
+                    customer_name: 'Đang tải...',
                     updated_at: Date.now()
                 };
-                setChats(Object.values(chatsMapRef.current).sort((a, b) => {
-                    const getT = (v: any) => (typeof v === 'number' ? v : new Date(v).getTime() || 0);
-                    return getT(b.updated_at) - getT(a.updated_at);
-                }));
             }
 
             const metaRef = ref(database, `chats/${roomId}`);
@@ -66,16 +62,15 @@ export default function Messages() {
                     id_room: roomId
                 };
 
-                // Tự động đánh dấu đã đọc nếu đang xem
+                // Auto mark as read if viewing
                 if (selectedChatRef.current?.id_room === roomId && metaSnap.exists()) {
-                    const role = currentUserRef.current?.role;
-                    const targetId = (role === 'customer') ? (meta.id_customer || roomId.split('_')[0]) : (meta.id_provider || roomId.split('_')[1]);
-                    const unreadCount = meta.unread?.[targetId] || 0;
+                    const myId = currentUserRef.current?.id;
+                    const unreadCount = meta.unread?.[myId] || 0;
 
-                    if (unreadCount > 0 && targetId) {
-                        chatApi.markRead(roomId, targetId);
+                    if (unreadCount > 0 && myId) {
+                        chatApi.markRead(roomId, myId);
                         if (chatsMapRef.current[roomId].unread) {
-                            chatsMapRef.current[roomId].unread[targetId] = 0;
+                            chatsMapRef.current[roomId].unread[myId] = 0;
                         }
                     }
                 }
@@ -83,10 +78,10 @@ export default function Messages() {
                 const allChats = Object.values(chatsMapRef.current);
                 allChats.sort((a, b) => {
                     const getTs = (v: any) => {
-                        if (!v) return Date.now();
+                        if (!v) return 0;
                         if (typeof v === 'number') return v;
                         const t = new Date(v).getTime();
-                        return isNaN(t) ? Date.now() : t;
+                        return isNaN(t) ? 0 : t;
                     };
                     return getTs(b.updated_at) - getTs(a.updated_at);
                 });
@@ -118,19 +113,8 @@ export default function Messages() {
                     setChats(historical.length > 0 ? [...historical] : []);
                 }
 
-                // 2. Setup Realtime Listener for the User/Provider's Chat Index
-                let chatIdentityId = user.id;
-                if (user.role === 'owner') {
-                    const providerInfo = await chatApi.getProviderInfo();
-                    if (providerInfo?.id_provider) {
-                        chatIdentityId = providerInfo.id_provider;
-                        const augmentedUser = { ...user, id: providerInfo.id_provider };
-                        setCurrentUser(augmentedUser);
-                        currentUserRef.current = augmentedUser;
-                    }
-                }
-
-                const sanitizedTargetId = sanitizeUid(String(chatIdentityId));
+                // 2. Setup Realtime Listener using User ID for both roles
+                const sanitizedTargetId = sanitizeUid(String(user.id));
                 const userChatsRef = ref(database, `user_chats/${sanitizedTargetId}`);
 
                 onValue(userChatsRef, (snapshot) => {
@@ -212,10 +196,10 @@ export default function Messages() {
                                     <Card
                                         onClick={async () => {
                                             setSelectedChat(chat);
-                                            const targetIdForUnread = (currentUser.role === 'customer') ? chat.id_customer : chat.id_provider;
-                                            const unreadCount = chat.unread?.[targetIdForUnread] || 0;
-                                            if (unreadCount > 0 && targetIdForUnread) {
-                                                await chatApi.markRead(chat.id_room, targetIdForUnread);
+                                            const myId = currentUser.id;
+                                            const unreadCount = chat.unread?.[myId] || 0;
+                                            if (unreadCount > 0 && myId) {
+                                                await chatApi.markRead(chat.id_room, myId);
                                             }
                                         }}
                                         className={`p-5 rounded-[28px] cursor-pointer transition-all duration-300 border-2 ${selectedChat?.id_room === chat.id_room ? 'border-blue-600 bg-blue-600 text-white shadow-2xl shadow-blue-200' : 'border-transparent bg-white hover:bg-gray-50 shadow-sm'}`}
@@ -224,8 +208,8 @@ export default function Messages() {
                                             <div className={`relative w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 transition-colors ${selectedChat?.id_room === chat.id_room ? 'bg-white/20' : 'bg-blue-50'}`}>
                                                 <User size={28} className={selectedChat?.id_room === chat.id_room ? 'text-white' : 'text-blue-500'} />
                                                 {(() => {
-                                                    const targetId = (currentUser.role === 'customer') ? chat.id_customer : chat.id_provider;
-                                                    const count = chat.unread?.[targetId] || 0;
+                                                    const myId = currentUser.id;
+                                                    const count = chat.unread?.[myId] || 0;
                                                     return count > 0 && selectedChat?.id_room !== chat.id_room && (
                                                         <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white animate-bounce">
                                                             {count}
@@ -280,6 +264,8 @@ export default function Messages() {
                                 currentUser={{ id: currentUser.id, fullName: currentUser.fullName, role: currentUser.role }}
                                 title={`${selectedChat.customer_name}`}
                                 itemName={selectedChat.item_name}
+                                itemId={selectedChat.id_item}
+                                providerId={selectedChat.id_provider}
                             />
                         </div>
                     ) : (

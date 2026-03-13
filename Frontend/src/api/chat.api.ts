@@ -3,12 +3,11 @@ import { httpClient } from './http';
 export const chatApi = {
     initializeChat: async (data: {
         customer_id: string;
-        provider_id: string;
         item_id: string;
         item_name: string;
         customer_name: string;
     }) => {
-        return httpClient.post<{ conversation_id: string; is_new: boolean }>('/chat/initialize', data);
+        return httpClient.post<{ conversation_id: string; is_new: boolean; owner_id: string }>('/chat/initialize', data);
     },
 
     listMyChats: async () => {
