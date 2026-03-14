@@ -16,11 +16,19 @@
 ## Demo / Screenshots
 *(Dưới đây là mô tả các màn hình chính, bạn hãy thay link ảnh thực tế vào nhé)*
 
-| ![Home Page](https://via.placeholder.com/400x250?text=Landing+Page) | ![AI Planner](https://via.placeholder.com/400x250?text=AI+Trip+Planner) |
+| ![Home Page](https://drive.google.com/file/d/1tskwz7rWU9lqTjHdENA6Yhro4gQn8Wzg/view?usp=drive_link) | 
 |:---:|:---:|
-| **Trang chủ & Tìm kiếm Tour** | **Lập kế hoạch lịch trình bằng AI** |
-| ![Owner Dashboard](https://via.placeholder.com/400x250?text=Owner+Management) | ![Mobile UI](https://via.placeholder.com/400x250?text=Responsive+Booking) |
-| **Bảng điều khiển cho Chủ dịch vụ** | **Giao diện đặt chỗ trên Mobile** |
+| **Trang chủ & Tìm kiếm Tour** | 
+| ![Hotel Service](https://drive.google.com/file/d/1MdSyxh-iZHhzX9XGmSAH05AKwaOCOESB/view?usp=drive_link) | 
+| **Trang dịch vụ khách sạn** |
+| ![Vehicel Service](https://drive.google.com/file/d/1MdSyxh-iZHhzX9XGmSAH05AKwaOCOESB/view?usp=drive_link) | 
+| **Trang dịch vụ xe khách** | 
+| ![Tour Service](https://drive.google.com/file/d/1-uR7lNYYP831bXXbx8YLWRvOophWr7oR/view?usp=drive_link) | 
+| **Trang dịch vụ tour** |
+| ![Owner Dashboard](https://drive.google.com/file/d/1eteRU2D1wYgvUfzQ-08mcMquONNOwWus/view?usp=drive_link) | 
+| **Bảng điều khiển cho Chủ dịch vụ** |
+| ![Admin Dashboard](https://drive.google.com/file/d/1AXkIAIzayNj1QuZOigZmB1hkgKFf8PeK/view?usp=drive_link) | 
+| **Bảng điều khiển cho Admin** |
 
 ---
 
