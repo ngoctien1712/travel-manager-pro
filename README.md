@@ -165,23 +165,16 @@ Một số API tiêu biểu (Đã được test qua Postman):
 - [ ] **Dockerize:** Đóng gói toàn bộ hệ thống bằng Docker & Kubernetes.
 - [ ] **Unit Testing:** Triển khai bộ test toàn diện với Vitest/Supertest.
 
-## 📜 License
-Dự án này được phân phối dưới giấy phép [MIT](https://choosealicense.com/licenses/mit/). Xem file [LICENSE](./LICENSE) để xem toàn bộ nội dung giấy phép.
-
----
-
 ## 👨‍💻 Authors
 
-**1. [Tên Của Bạn]** - Backend Intern Developer (Core)
-- **Email:** [Email Của Bạn]
-- **LinkedIn:** [Link LinkedIn Của Bạn]
-- **Portfolio:** [Link Portfolio Của Bạn]
-- **Github:** [Link Github Của Bạn]
+**1. Trần Phúc Thành** - Backend Developer (Core)
+- **Email:** [tranphucthanh2002@gmail.com]
+- **LinkedIn:** [www.linkedin.com/in/phúc-thành-trần-a01711355]
+- **Github:** [https://github.com/phucthanh1705]
 
-**2. [Tên Thành Viên Thứ 2]** - Frontend/Backend Developer
-- **Email:** [Email Thành Viên 2]
-- **LinkedIn:** [Link LinkedIn Thành Viên 2]
-- **Portfolio:** [Link Portfolio Thành Viên 2]
-- **Github:** [Link Github Thành Viên 2]
+**2. Huỳnh Ngọc Tiên** - Backend Developer
+- **Email:** [ngoctien17122002@gmail.com]
+- **LinkedIn:** [https://www.linkedin.com/in/ngoctien1712/]
+- **Github:** [https://github.com/ngoctien1712]
 
 ---
