@@ -175,7 +175,7 @@ Some key APIs (Tested via Postman):
 - **Github:** [https://github.com/phucthanh1705]
 
 **2. Huynh Ngoc Tien** - Backend Developer
-- **Email:** [ngoctien17122002@gmail.com]
+- **Email:** [huynhngoctien1712@gmail.com]
 - **LinkedIn:** [https://www.linkedin.com/in/ngoctien1712/]
 - **Github:** [https://github.com/ngoctien1712]
 
