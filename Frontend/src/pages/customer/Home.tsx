@@ -221,7 +221,7 @@ export const Home = () => {
             KHÁM PHÁ THẾ GIỚI, <br /><span className="text-blue-400">BẮT ĐẦU TỪ ĐÂY</span>
           </h1>
           <p className="text-xl md:text-2xl opacity-95 drop-shadow-xl font-medium max-w-2xl mx-auto">
-            Đặt tour, khách sạn và phương tiện di chuyển dễ dàng hơn bao giờ hết với TravelPro.
+            Đặt tour, khách sạn và phương tiện di chuyển dễ dàng hơn bao giờ hết với Trip Mana Pro.
           </p>
         </div>
 
@@ -846,7 +846,7 @@ export const Home = () => {
             <div className="max-w-2xl">
               <Badge className="bg-white/10 text-white border-none font-black text-[10px] uppercase tracking-[0.3em] px-4 py-1 mb-4">Đánh giá thực tế</Badge>
               <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-none mb-6">Tiếng nói từ <br /> cộng đồng du lịch</h2>
-              <p className="text-white/50 text-xl font-medium">Hơn 100,000+ khách hàng đã tin tưởng và có những trải nghiệm không thể quên cùng TravelPro.</p>
+              <p className="text-white/50 text-xl font-medium">Hơn 100,000+ khách hàng đã tin tưởng và có những trải nghiệm không thể quên cùng Trip Mana Pro.</p>
             </div>
             <div className="flex gap-4">
               <Button variant="outline" className="rounded-full w-14 h-14 border-white/20 text-white hover:bg-white/10"><ArrowRight className="rotate-180" /></Button>
@@ -871,7 +871,7 @@ export const Home = () => {
               {
                 name: "Thùy Chi",
                 role: "Nhiếp ảnh gia",
-                comment: "Tôi đã đi nhiều nơi và sử dụng nhiều ứng dụng, nhưng sự tinh tế trong cách TravelPro gợi ý điểm đến là thứ làm tôi ấn tượng nhất.",
+                comment: "Tôi đã đi nhiều nơi và sử dụng nhiều ứng dụng, nhưng sự tinh tế trong cách Trip Mana Pro gợi ý điểm đến là thứ làm tôi ấn tượng nhất.",
                 avatar: "https://i.pravatar.cc/150?u=3"
               }
             ].map((review, i) => (

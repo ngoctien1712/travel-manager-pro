@@ -56,5 +56,9 @@ router.get('/owner-activities/providers', adminController.listActivityProviders)
 router.get('/owner-activities/provider/:id_provider/items', adminController.getProviderActivityItems);
 router.patch('/owner-activities/items/:type/:id/status', adminController.updateActivityItemStatus);
 router.patch('/owner-activities/items/:type/:id', adminController.updateActivityItemDetails);
+ 
+// Refund Management
+router.get('/refunds', adminController.listRefundRequests);
+router.post('/refunds/:id/approve', adminController.approveRefund);
 
 export default router;

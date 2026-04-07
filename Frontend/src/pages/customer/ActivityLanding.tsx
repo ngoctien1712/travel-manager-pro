@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import bannerTour from '@/assets/banners/bannerTour.png';
 import { customerApi } from '@/api/customer.api';
 import { geographyApi } from '@/api/geography.api';
 import { Button } from '@/components/ui/button';
@@ -64,7 +65,8 @@ export const ActivityLanding = () => {
             {/* Hero Section */}
             <section className="relative h-[450px] flex items-center justify-center text-white overflow-hidden">
                 <div
-                    className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542332213-31f826288ee2?w=1920')] bg-cover bg-center"
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-[20000ms] hover:scale-110"
+                    style={{ backgroundImage: `url(${bannerTour})` }}
                 />
                 <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" />
 

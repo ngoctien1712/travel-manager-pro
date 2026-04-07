@@ -197,7 +197,7 @@ export default function Cart() {
                 <div className="relative z-10">
                   <Badge className="bg-white text-indigo-600 border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">X2 ĐIỂM THƯỞNG</Badge>
                   <h4 className="text-3xl font-black mb-2 uppercase tracking-tighter leading-none italic">THÀNH VIÊN <br /> THÂN THIẾT</h4>
-                  <p className="text-sm opacity-80 mb-8 font-medium">Tích lũy gấp đôi điểm thưởng TravelPro cho mọi đơn hàng trong tháng này.</p>
+                  <p className="text-sm opacity-80 mb-8 font-medium">Tích lũy gấp đôi điểm thưởng Trip Mana Pro cho mọi đơn hàng trong tháng này.</p>
                   <Button variant="outline" className="bg-transparent border-white text-white hover:bg-white hover:text-indigo-600 rounded-2xl h-12 px-8 font-black text-xs tracking-widest uppercase">XEM NGAY</Button>
                 </div>
               </div>

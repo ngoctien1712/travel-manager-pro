@@ -386,7 +386,7 @@ export const MyProviders = () => {
                 className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
               />
               <Label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer font-normal">
-                Tôi đồng ý với <Link to="/terms" className="text-primary hover:underline font-semibold">Điều khoản & Điều kiện</Link> của VietTravel.
+                Tôi đồng ý với <Link to="/terms" className="text-primary hover:underline font-semibold">Điều khoản & Điều kiện</Link> của Trip Mana Pro.
               </Label>
             </div>
           </div>

@@ -210,7 +210,7 @@ export const BusinessRegister = () => {
     return (
         <div className="container max-w-5xl py-12 px-4">
             <div className="text-center mb-10">
-                <h1 className="text-4xl font-bold mb-3 tracking-tight">Hợp tác cùng VietTravel</h1>
+                <h1 className="text-4xl font-bold mb-3 tracking-tight">Hợp tác cùng Trip Mana Pro</h1>
                 <p className="text-muted-foreground text-lg">Đăng ký tài khoản Đối tác & Cung cấp hồ sơ pháp lý doanh nghiệp</p>
             </div>
 
@@ -395,7 +395,7 @@ export const BusinessRegister = () => {
                                 required
                             />
                             <Label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer">
-                                Tôi đồng ý với <Link to="/terms" className="text-primary hover:underline font-semibold">Điều khoản & Điều kiện</Link> của VietTravel và cam kết thông tin cung cấp là chính xác.
+                                Tôi đồng ý với <Link to="/terms" className="text-primary hover:underline font-semibold">Điều khoản & Điều kiện</Link> của Trip Mana Pro và cam kết thông tin cung cấp là chính xác.
                             </Label>
                         </div>
 

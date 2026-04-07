@@ -10,6 +10,10 @@ export const startEmailWorker = () => {
             if (job.name === 'verification') {
                 const { email, otp } = job.data;
                 await sendVerificationEmail(email, otp);
+            } else if (job.name === 'refund') {
+                const { email, customerName, orderCode, amount } = job.data;
+                const { sendRefundEmail } = await import('../utils/mail.js');
+                await sendRefundEmail(email, customerName, orderCode, amount);
             }
         },
         {

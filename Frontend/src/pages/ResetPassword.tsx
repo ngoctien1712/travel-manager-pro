@@ -47,10 +47,8 @@ export const ResetPassword = () => {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 px-4 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl gradient-ocean mb-4">
-              <Map className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <h1 className="text-3xl font-display font-bold">VietTravel</h1>
+            <img src="/logo.png" alt="Logo" className="mx-auto h-16 w-16 mb-4 object-contain" />
+            <h1 className="text-3xl font-display font-bold">Trip Mana Pro</h1>
           </div>
           <Card className="card-elevated">
             <CardContent className="pt-6">
@@ -77,10 +75,8 @@ export const ResetPassword = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl gradient-ocean mb-4">
-            <Map className="h-7 w-7 text-primary-foreground" />
-          </div>
-          <h1 className="text-3xl font-display font-bold">VietTravel</h1>
+          <img src="/logo.png" alt="Logo" className="mx-auto h-16 w-16 mb-4 object-contain" />
+          <h1 className="text-3xl font-display font-bold">Trip Mana Pro</h1>
           <p className="text-muted-foreground mt-2">Đặt lại mật khẩu</p>
         </div>
 

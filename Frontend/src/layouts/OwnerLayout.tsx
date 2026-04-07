@@ -74,12 +74,10 @@ export const OwnerLayout = () => {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border">
           <Link to="/owner/dashboard" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-sunset">
-              <Map className="h-5 w-5 text-accent-foreground" />
-            </div>
+            <img src="/logo.png" alt="Logo" className={cn("h-9 w-9 object-contain transition-all", sidebarOpen ? "mr-2" : "mx-auto")} />
             {sidebarOpen && (
               <span className="font-display text-lg font-semibold text-sidebar-foreground">
-                Provider Hub
+                Trip Mana Pro
               </span>
             )}
           </Link>

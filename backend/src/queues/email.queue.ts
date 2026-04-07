@@ -16,6 +16,6 @@ export const emailQueue = new Queue(EMAIL_QUEUE_NAME, {
     },
 });
 
-export const addEmailJob = async (type: 'verification', data: { email: string; otp: string }) => {
+export const addEmailJob = async (type: 'verification' | 'refund', data: any) => {
     await emailQueue.add(type, data);
 };

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import { MomoService } from '../services/momo.service.js';
+import { NotificationService } from '../services/notification.service.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -600,7 +601,7 @@ export const createBooking = async (req: Request, res: Response) => {
           `SELECT COUNT(*) as count 
            FROM order_tour_detail d
            JOIN "order" o ON o.id_order = d.id_order
-           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') ${dateFilter}`,
+           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed', 'refunded') ${dateFilter}`,
           dateParams
         );
         if (Number(bookedRows[0].count) > 0) {
@@ -614,7 +615,7 @@ export const createBooking = async (req: Request, res: Response) => {
           `SELECT SUM(quantity) as total 
            FROM order_tour_detail d
            JOIN "order" o ON o.id_order = d.id_order
-           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') ${dateFilter}`,
+           WHERE d.id_item = $1 AND o.status NOT IN ('cancelled', 'failed', 'refunded') ${dateFilter}`,
           dateParams
         );
         const alreadyBooked = Number(bookedRows[0].total || 0);
@@ -648,7 +649,7 @@ export const createBooking = async (req: Request, res: Response) => {
          FROM order_accommodations_detail d
          JOIN "order" o ON o.id_order = d.id_order
          WHERE d.id_room = $1 
-           AND o.status NOT IN ('cancelled', 'failed') 
+           AND o.status NOT IN ('cancelled', 'failed', 'refunded') 
            AND NOT (d.end_date::date <= $2::date OR d.start_date::date >= $3::date)`,
         [id_room, start_date, end_date]
       );
@@ -676,7 +677,7 @@ export const createBooking = async (req: Request, res: Response) => {
           `SELECT d.id_position 
            FROM order_pos_vehicle_detail d
            JOIN "order" o ON o.id_order = d.id_order
-           WHERE d.id_trip = $1 AND o.status NOT IN ('cancelled', 'failed') AND d.id_position = ANY($2::uuid[])`,
+           WHERE d.id_trip = $1 AND o.status NOT IN ('cancelled', 'failed', 'refunded') AND d.id_position = ANY($2::uuid[])`,
           [id_trip, seatIds]
         );
         if (booked.length > 0) {
@@ -693,7 +694,7 @@ export const createBooking = async (req: Request, res: Response) => {
            JOIN "order" o ON o.id_order = opvd.id_order
            JOIN positions p ON p.id_position = opvd.id_position
            JOIN vehicle v ON v.id_vehicle = p.id_vehicle
-           WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed') AND opvd.id_position = ANY($2::uuid[])`,
+           WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed', 'refunded') AND opvd.id_position = ANY($2::uuid[])`,
           [id_item, seatIds]
         );
         if (booked.length > 0) {
@@ -881,7 +882,7 @@ export const getBookedSeats = async (req: Request, res: Response) => {
          JOIN "order" o ON o.id_order = opvd.id_order
          JOIN positions p ON p.id_position = opvd.id_position
          JOIN vehicle v ON v.id_vehicle = p.id_vehicle
-         WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed')`,
+         WHERE v.id_item = $1 AND o.status NOT IN ('cancelled', 'failed', 'refunded')`,
         [idItem]
       );
       return res.json(rows.map((r: any) => r.id_position));
@@ -1025,8 +1026,30 @@ export const getOrder = async (req: Request, res: Response) => {
 export const cancelOrder = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.user?.userId;
+
+    // Check status first
+    const { rows } = await query('SELECT status FROM "order" WHERE id_order = $1 AND id_user = $2', [id, userId]);
+    if (rows.length === 0) return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    
+    const currentStatus = rows[0].status;
+    if (currentStatus !== 'pending') {
+        return res.status(400).json({ 
+            message: 'Đơn hàng này đã được thanh toán hoặc đang xử lý. Vui lòng sử dụng chức năng yêu cầu hoàn tiền thay vì hủy đơn.' 
+        });
+    }
+
     await query(`UPDATE "order" SET status = $1 WHERE id_order = $2`, ['cancelled', id]);
-    await query(`INSERT INTO order_status_history (id_order, from_status, to_status) VALUES ($1,$2,$3)`, [id, 'unknown', 'cancelled']);
+    await query(`INSERT INTO order_status_history (id_order, from_status, to_status) VALUES ($1, $2, $3)`, [id, currentStatus, 'cancelled']);
+    
+    // Notifications
+    await NotificationService.create({
+        userId: userId!,
+        title: 'Đơn hàng đã hủy',
+        message: 'Bạn đã hủy đơn hàng thành công.',
+        type: 'info'
+    });
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -1038,12 +1061,64 @@ export const requestRefund = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.userId;
     const { id } = req.params; // order id
-    const { amount, reason } = req.body;
-    const insert = await query(`INSERT INTO refund_requests (id_order, id_user, amount, reason) VALUES ($1,$2,$3,$4) RETURNING *`, [id, userId, amount, reason]);
-    res.json(insert.rows[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi khi yêu cầu hoàn tiền' });
+    const { reason } = req.body;
+
+    // 1. Check order ownership and status
+    const orderRes = await query(
+      `SELECT o.*, 
+              (SELECT MIN(start_date) FROM (
+                  SELECT booking_date as start_date FROM order_tour_detail WHERE id_order = o.id_order
+                  UNION ALL
+                  SELECT start_date FROM order_accommodations_detail WHERE id_order = o.id_order
+                  UNION ALL
+                  SELECT visit_date as start_date FROM order_ticket_detail WHERE id_order = o.id_order
+                  UNION ALL
+                  SELECT vt.departure_time as start_date FROM order_pos_vehicle_detail ovd JOIN vehicle_trips vt ON ovd.id_trip = vt.id_trip WHERE ovd.id_order = o.id_order
+               ) d) as trip_start_date
+       FROM "order" o 
+       WHERE o.id_order = $1 AND o.id_user = $2`, 
+      [id, userId]
+    );
+
+    if (orderRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
+    }
+
+    const order = orderRes.rows[0];
+
+    // 2. Validate refund conditions (e.g. status must be paid/confirmed)
+    if (order.status !== 'confirmed' && order.status !== 'completed' && order.status !== 'processing') {
+      return res.status(400).json({ message: 'Chỉ các đơn hàng đã thanh toán hoặc đã xác nhận mới có thể yêu cầu hoàn tiền.' });
+    }
+
+    // 3. Time check (e.g. before 24h of trip start as per activity diagram)
+    const tripStart = order.trip_start_date ? new Date(order.trip_start_date) : null;
+    if (tripStart) {
+        const now = new Date();
+        const diffHours = (tripStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+        if (diffHours < 24) {
+            return res.status(400).json({ message: 'Đã quá thời gian được phép hoàn tiền (phải yêu cầu trước 24h tính từ thời điểm khởi hành).' });
+        }
+    }
+
+    // 4. Check if already requested
+    const existing = await query('SELECT id_refund_request FROM refund_requests WHERE id_order = $1 AND status = \'pending\'', [id]);
+    if (existing.rows.length > 0) {
+        return res.status(400).json({ message: 'Yêu cầu hoàn tiền đang được xử lý.' });
+    }
+
+    // 5. Insert new request
+    const insert = await query(
+      `INSERT INTO refund_requests (id_order, id_user, amount, reason, status) 
+       VALUES ($1, $2, $3, $4, 'pending') 
+       RETURNING *`, 
+      [id, userId, order.total_amount, reason]
+    );
+    
+    res.json({ success: true, data: insert.rows[0] });
+  } catch (err: any) {
+    console.error('Request refund error:', err);
+    res.status(500).json({ message: 'Lỗi khi yêu cầu hoàn tiền: ' + err.message });
   }
 };
 

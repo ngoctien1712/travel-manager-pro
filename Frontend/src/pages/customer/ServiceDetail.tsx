@@ -1093,7 +1093,7 @@ export default function ServiceDetail() {
                 <Sparkles size={120} className="text-blue-500" />
               </div>
               <div className="flex items-center gap-4 relative z-10">
-                <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full">GỢI Ý TỪ TRAVELPRO</Badge>
+                <Badge className="bg-blue-600 text-white border-none font-black text-[10px] uppercase tracking-widest px-4 py-1.5 rounded-full">GỢI Ý TỪ TRIP MANA PRO</Badge>
                 <h3 className="text-2xl font-black text-gray-900 tracking-tight">Trải nghiệm không nên bỏ lỡ</h3>
               </div>
 
@@ -1109,7 +1109,7 @@ export default function ServiceDetail() {
                   <div className="aspect-video rounded-3xl overflow-hidden mb-4 shadow-lg border border-gray-100">
                     <img src={getImageUrl('/uploads/ads/platinum-member.jpg')} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Ad 2" />
                   </div>
-                  <h4 className="font-black text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Thẻ Thành viên TravelPro Platinum</h4>
+                  <h4 className="font-black text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">Thẻ Thành viên Trip Mana Pro Platinum</h4>
                   <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Đặc quyền phòng chờ thương gia & Bảo hiểm cao cấp</p>
                 </div>
               </div>
@@ -1129,7 +1129,7 @@ export default function ServiceDetail() {
               <div className="absolute inset-0 flex flex-col justify-center p-12 text-white">
                 <Badge className="w-fit bg-blue-600 mb-4 border-none font-black text-[10px] uppercase tracking-[0.2em] px-4 py-1 text-white">Đặc quyền VIP</Badge>
                 <h3 className="text-3xl font-black tracking-tight mb-2 uppercase italic text-white italic">Giảm thêm 15% khi đặt qua App</h3>
-                <p className="text-sm font-medium opacity-80 max-w-md text-white/80">Quét mã QR để nhận coupon giảm giá đặc biệt dành riêng cho khách hàng thân thiết của TravelPro.</p>
+                <p className="text-sm font-medium opacity-80 max-w-md text-white/80">Quét mã QR để nhận coupon giảm giá đặc biệt dành riêng cho khách hàng thân thiết của Trip Mana Pro.</p>
                 <div className="mt-8 flex items-center gap-4">
                   <div className="w-16 h-16 bg-white p-1 rounded-xl shadow-lg">
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://travel-pro.vn/app" className="w-full h-full" alt="QR" />
@@ -1246,7 +1246,7 @@ export default function ServiceDetail() {
                           <ShieldCheck size={20} className="text-white/80" />
                           <p className="text-[10px] font-black uppercase tracking-widest">Đặc quyền Premium</p>
                         </div>
-                        <p className="text-xs font-medium text-white/90 leading-relaxed italic">Nhận ngay ưu đãi nâng hạng phòng khi đặt qua App TravelPro.</p>
+                        <p className="text-xs font-medium text-white/90 leading-relaxed italic">Nhận ngay ưu đãi nâng hạng phòng khi đặt qua App Trip Mana Pro.</p>
                         <Button className="w-full bg-white text-blue-600 hover:bg-blue-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TẢI APP NGAY</Button>
                       </div>
                     </div>
@@ -1442,7 +1442,7 @@ export default function ServiceDetail() {
                 <div className="p-6 bg-blue-50 border-t border-blue-100 flex items-center gap-4">
                   <ShieldCheck className="text-blue-600 shrink-0" size={24} />
                   <div>
-                    <p className="text-[10px] font-black text-blue-900 uppercase">TravelPro Guarantee</p>
+                    <p className="text-[10px] font-black text-blue-900 uppercase">Trip Mana Pro Guarantee</p>
                     <p className="text-[9px] font-medium text-blue-700">Giá tốt nhất - Hoàn tiền nếu tìm được giá rẻ hơn.</p>
                   </div>
                 </div>
@@ -1461,7 +1461,7 @@ export default function ServiceDetail() {
                     )}
                   </div>
                   <div>
-                    <h4 className="font-black text-lg text-gray-900 leading-tight">{service.provider_name || 'VietTravel Premium'}</h4>
+                    <h4 className="font-black text-lg text-gray-900 leading-tight">{service.provider_name || 'Trip Mana Pro Premium'}</h4>
                   </div>
                 </div>
                 {service.provider_description && (
@@ -1535,7 +1535,7 @@ export default function ServiceDetail() {
                   <div className="absolute inset-0 p-8 flex flex-col justify-end text-white text-right items-end">
                     <Badge className="w-fit bg-white text-emerald-600 mb-4 border-none font-black text-[9px] uppercase tracking-widest px-3 py-1">MIỄN PHÍ</Badge>
                     <h4 className="text-xl font-black mb-1 leading-tight uppercase tracking-tighter italic">Bảo hiểm <br /> Du lịch Toàn cầu</h4>
-                    <p className="text-[10px] font-medium opacity-80 mb-4">An tâm tận hưởng mọi hành trình cùng TravelPro Care</p>
+                    <p className="text-[10px] font-medium opacity-80 mb-4">An tâm tận hưởng mọi hành trình cùng Trip Mana Pro Care</p>
                     <Button className="w-full bg-white text-emerald-600 hover:bg-emerald-50 rounded-xl font-black text-[10px] uppercase tracking-widest h-10">TÌM HIỂM THÊM</Button>
                   </div>
                 </div>

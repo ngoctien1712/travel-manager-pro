@@ -284,7 +284,7 @@ export default function Checkout() {
                   <ShieldCheck size={20} className="text-emerald-400" />
                   <span className="font-black text-xs uppercase tracking-widest text-emerald-400">Cam kết bảo mật</span>
                 </div>
-                <p className="text-sm opacity-60 font-medium whitespace-nowrap">Bằng việc nhấn "Thanh toán", bạn đồng ý với Điều khoản của TravelPro.</p>
+                <p className="text-sm opacity-60 font-medium whitespace-nowrap">Bằng việc nhấn "Thanh toán", bạn đồng ý với Điều khoản của Trip Mana Pro.</p>
               </div>
               <Button
                 onClick={handleSubmit}
@@ -388,7 +388,7 @@ export default function Checkout() {
               <img src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600" className="w-full h-full object-cover opacity-60 transition-transform duration-1000 group-hover:scale-110" alt="Promotion" />
               <div className="absolute inset-0 flex flex-col justify-end p-8 text-white bg-gradient-to-t from-blue-900 to-transparent">
                 <h3 className="text-2xl font-black mb-2 leading-tight uppercase tracking-tighter">Ưu đãi <br /> Đặc quyền App</h3>
-                <p className="text-xs font-medium opacity-80 mb-6">Giảm ngay 100k cho lần đặt đầu tiên trên TravelPro Mobile!</p>
+                <p className="text-xs font-medium opacity-80 mb-6">Giảm ngay 100k cho lần đặt đầu tiên trên Trip Mana Pro Mobile!</p>
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-white p-1 rounded-lg">
                     <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://travel-pro.vn/app" className="w-full h-full" alt="QR" />

@@ -274,7 +274,7 @@ export const VehicleLanding = () => {
                             <ShieldCheck size={36} />
                         </div>
                         <h4 className="font-black text-gray-900 tracking-tight text-sm uppercase">Bảo hiểm hành trình</h4>
-                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Luôn có bảo hiểm kèm theo mỗi lượt vé đặt tại VietTravel</p>
+                        <p className="text-[11px] text-gray-400 font-bold leading-relaxed">Luôn có bảo hiểm kèm theo mỗi lượt vé đặt tại Trip Mana Pro</p>
                     </div>
                     <div className="flex flex-col items-center text-center gap-4 p-8 rounded-[2.5rem] bg-white shadow-sm border border-gray-50 group hover:border-blue-200 transition-all">
                         <div className="w-16 h-16 rounded-[2rem] bg-orange-50 text-orange-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">

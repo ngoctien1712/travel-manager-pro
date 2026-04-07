@@ -51,11 +51,9 @@ export const CustomerLayout = () => {
         <div className="container flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 shadow-lg shadow-blue-200">
-              <Map className="h-5 w-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="Logo" className="h-9 w-9 object-contain" />
             <span className="font-display text-xl font-bold tracking-tight text-gray-900">
-              VietTravel
+              Trip Mana Pro
             </span>
           </Link>
 
@@ -128,10 +126,8 @@ export const CustomerLayout = () => {
               <SheetContent side="right" className="w-[300px] rounded-l-[2rem] border-none shadow-2xl">
                 <div className="flex flex-col h-full py-8">
                   <div className="flex items-center gap-2 mb-12 px-2">
-                    <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center">
-                      <Map className="h-6 w-6 text-white" />
-                    </div>
-                    <span className="font-display text-2xl font-black text-gray-900">VietTravel</span>
+                    <img src="/logo.png" alt="Logo" className="h-10 w-10 object-contain" />
+                    <span className="font-display text-2xl font-black text-gray-900">Trip Mana Pro</span>
                   </div>
 
                   <nav className="flex flex-col gap-2">
@@ -175,10 +171,8 @@ export const CustomerLayout = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-16 mb-20">
             <div className="md:col-span-4 space-y-8">
               <Link to="/" className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-100">
-                  <Map className="h-6 w-6 text-white" />
-                </div>
-                <span className="font-display text-2xl font-black tracking-tight text-gray-900">VietTravel</span>
+                <img src="/logo.png" alt="Logo" className="h-12 w-12 object-contain" />
+                <span className="font-display text-2xl font-black tracking-tight text-gray-900">Trip Mana Pro</span>
               </Link>
               <p className="text-gray-500 font-medium leading-relaxed">
                 Nâng tầm trải nghiệm du lịch Việt Nam với dịch vụ chuyên nghiệp, minh bạch và tận tâm. Khám phá vẻ đẹp di sản qua những hành trình được thiết kế riêng cho bạn.
@@ -230,7 +224,7 @@ export const CustomerLayout = () => {
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-gray-400 uppercase">Email</p>
-                    <p className="text-sm font-black text-gray-900">support@viettravel.vn</p>
+                    <p className="text-sm font-black text-gray-900">support@tripmanapro.vn</p>
                   </div>
                 </div>
               </div>
@@ -239,7 +233,7 @@ export const CustomerLayout = () => {
 
           <div className="pt-12 border-t border-gray-50 flex flex-col md:flex-row items-center justify-between gap-6">
             <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.1em]">
-              © 2024 VIETTRAVEL GLOBAL. ALL RIGHTS RESERVED.
+              © 2024 TRIP MANA PRO GLOBAL. ALL RIGHTS RESERVED.
             </p>
             <div className="flex gap-8 text-[11px] font-black text-gray-400 uppercase tracking-[0.1em]">
               <span className="cursor-pointer hover:text-gray-900 transition-colors">Privacy</span>

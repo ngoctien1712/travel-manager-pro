@@ -17,7 +17,7 @@ export const PayrollHistory = () => {
     return (
         <div className="page-enter space-y-8 p-6">
             <PageHeader
-                title="Lịch sử thanh toán"
+                title="Lịch sử nhận lương"
                 description="Xem danh sách các đơn thanh toán doanh thu từ hệ thống"
             />
 

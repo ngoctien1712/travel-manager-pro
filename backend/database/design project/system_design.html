@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Manager Pro - Full Class Diagram (High Detail)</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@panzoom/panzoom/dist/panzoom.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --accent-color: #0284c7;
+            --border-color: #cbd5e1;
+            --header-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: #0f172a;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .header {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: var(--header-bg);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: var(--accent-color);
+            text-transform: uppercase;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: var(--header-bg);
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .btn {
+            background: white;
+            color: #334155;
+            border: 1px solid var(--border-color);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #f1f5f9;
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        #diagram-container {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: radial-gradient(#e2e8f0 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+        }
+
+        #diagram-container:active {
+            cursor: grabbing;
+        }
+
+        #diagram {
+            padding: 500px;
+            transform-origin: center center;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        svg {
+            max-width: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>Travel Manager Pro</h1>
+        <p>Hệ thống 36 đối tượng (Đầy đủ Thuộc tính & Hàm - Zoom x20)</p>
+    </div>
+
+    <div class="controls">
+        <button class="btn" id="zoom-in">Phóng to (+)</button>
+        <button class="btn" id="zoom-out">Thu nhỏ (-)</button>
+        <button class="btn" id="reset">Đặt lại (Center)</button>
+        <span style="font-size: 10px; color: #94a3b8; text-align: center; margin-top: 5px;">
+            Cuộn chuột để Phóng to cực đại
+        </span>
+    </div>
+
+    <div class="loading" id="loading">Đang tải toàn bộ kiến trúc 36 thực thể...</div>
+
+    <div id="diagram-container">
+        <div id="diagram">
+            <pre class="mermaid">
+classDiagram
+    class Country {
+        -id_country UUID
+        -code String
+        -name String
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+    class City {
+        -id_city UUID
+        -id_country UUID
+        -name String
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+    class Area {
+        -id_area UUID
+        -id_city UUID
+        -name String
+        -status String
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+    class Ward {
+        -id_ward UUID
+        -id_area UUID
+        -name String
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+    class PointOfInterest {
+        -id_poi UUID
+        -id_area UUID
+        -name String
+        +create()
+        +read()
+        +update()
+        +delete()
+    }
+    class User {
+        -id_user UUID
+        -email String
+        -phone String
+        -status String
+        +login()
+        +register()
+        +verifyOTP()
+        +resetPassword()
+        +updateProfile()
+    }
+    class Role {
+        -id_role UUID
+        -code String
+        +create()
+        +delete()
+    }
+    class RoleDetail {
+        -id_role UUID
+        -id_user UUID
+        +assign()
+        +remove()
+    }
+    class CustomerProfile {
+        -id_user UUID
+        -travel_style String
+        +updateProfile()
+    }
+    class AdminProfile {
+        -id_user UUID
+        -department String
+        +updateProfile()
+    }
+    class AreaOwnerProfile {
+        -id_user UUID
+        -business_name String
+        +updateProfile()
+    }
+    class UserRefreshToken {
+        -id_token UUID
+        -id_user UUID
+        -token String
+        +createToken()
+        +revokeToken()
+    }
+    class Provider {
+        -id_provider UUID
+        -id_user UUID
+        -id_area UUID
+        -name String
+        -status String
+        +register()
+        +updateStatus()
+        +getRevenue()
+    }
+    class BookableItem {
+        -id_item UUID
+        -id_provider UUID
+        -item_type String
+        -price Decimal
+        -status String
+        +create()
+        +update()
+        +delete()
+        +search()
+    }
+    class ItemMedia {
+        -id_media UUID
+        -id_item UUID
+        -url String
+        +upload()
+        +delete()
+    }
+    class ItemTag {
+        -tag String
+        -id_item UUID
+        +addTag()
+        +removeTag()
+    }
+    class Tour {
+        -id_item UUID
+        -guide_language String
+        -tour_type String
+        +updateTour()
+        +getSlots()
+    }
+    class Ticket {
+        -id_item UUID
+        -ticket_kind String
+        +updateTicket()
+    }
+    class Accommodation {
+        -id_item UUID
+        -address String
+        -hotel_type String
+        -star_rating Int
+        +updateInfo()
+    }
+    class AccommodationRoom {
+        -id_room UUID
+        -id_item UUID
+        -name_room String
+        -price Decimal
+        +updatePrice()
+        +checkAvailable()
+    }
+    class Vehicle {
+        -id_vehicle UUID
+        -id_item UUID
+        -code_vehicle String
+        +updateInfo()
+    }
+    class VehicleTrip {
+        -id_trip UUID
+        -id_vehicle UUID
+        -departure_time DateTime
+        +createTrip()
+        +cancelTrip()
+    }
+    class Position {
+        -id_position UUID
+        -id_vehicle UUID
+        -code_position String
+        +updateStatus()
+        +book()
+    }
+    class Order {
+        -id_order UUID
+        -id_user UUID
+        -order_code String
+        -status String
+        +checkout()
+        +cancel()
+        +updateStatus()
+    }
+    class OrderTourDetail {
+        -id_item UUID
+        -id_order UUID
+        -guest_info JSONB
+        +saveGuestInfo()
+    }
+    class OrderTicketDetail {
+        -id_item UUID
+        -id_order UUID
+        -visit_date Date
+        +saveTicketInfo()
+    }
+    class OrderAccommodationsDetail {
+        -id_room UUID
+        -id_order UUID
+        +saveRoomInfo()
+    }
+    class OrderPosVehicleDetail {
+        -id_order UUID
+        -id_position UUID
+        -id_trip UUID
+        +saveSeatInfo()
+    }
+    class Payment {
+        -id_pay UUID
+        -id_order UUID
+        -amount Decimal
+        -method String
+        +process()
+        +verify()
+    }
+    class Refund {
+        -id_refund UUID
+        -id_pay UUID
+        -amount Decimal
+        +execute()
+    }
+    class PayrollTransaction {
+        -id_payroll UUID
+        -id_provider UUID
+        -amount Decimal
+        +calculate()
+        +pay()
+    }
+    class Voucher {
+        -id_voucher UUID
+        -code String
+        -discount_value Decimal
+        +create()
+        +checkValid()
+    }
+    class VoucherDetail {
+        -id_voucher UUID
+        -id_order UUID
+        +apply()
+    }
+    class Notification {
+        -id_notification UUID
+        -id_user UUID
+        -message String
+        +send()
+        +markRead()
+    }
+    class ChatRoom {
+        -id_room String
+        -id_customer UUID
+        -id_provider UUID
+        +sendMessage()
+        +close()
+    }
+    class TripPlan {
+        -id_trip_plan UUID
+        -plan JSONB
+        +generateAI()
+        +save()
+    }
+
+    Country "1" -- "*" City
+    City "1" -- "*" Area
+    Area "1" -- "*" PointOfInterest
+    Area "1" -- "*" Ward
+    User "1" -- "0..1" CustomerProfile
+    User "1" -- "0..1" AdminProfile
+    User "1" -- "0..1" AreaOwnerProfile
+    User "1" -- "*" RoleDetail
+    Role "1" -- "*" RoleDetail
+    User "1" -- "*" UserRefreshToken
+    User "1" -- "*" Provider
+    Provider "*" -- "1" Area
+    BookableItem <|-- Tour
+    BookableItem <|-- Ticket
+    BookableItem <|-- Accommodation
+    BookableItem <|-- Vehicle
+    BookableItem "1" -- "*" ItemMedia
+    BookableItem "1" -- "*" ItemTag
+    Provider "1" -- "*" BookableItem
+    Accommodation "1" -- "*" AccommodationRoom
+    Vehicle "1" -- "*" VehicleTrip
+    Vehicle "1" -- "*" Position
+    User "1" -- "*" Order
+    Order "1" -- "*" OrderTourDetail
+    Order "1" -- "*" OrderTicketDetail
+    Order "1" -- "*" OrderAccommodationsDetail
+    Order "1" -- "*" OrderPosVehicleDetail
+    VehicleTrip "1" -- "*" OrderPosVehicleDetail
+    Order "1" -- "0..1" Payment
+    Payment "1" -- "*" Refund
+    PayrollTransaction "1" -- "*" Order
+    Provider "1" -- "*" PayrollTransaction
+    Voucher "1" -- "*" VoucherDetail
+    Order "1" -- "*" VoucherDetail
+    User "1" -- "*" Notification
+    User "1" -- "*" TripPlan
+    User "1" -- "*" ChatRoom
+    Provider "1" -- "*" ChatRoom
+    BookableItem "1" -- "*" ChatRoom
+            </pre>
+        </div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                primaryColor: '#ffffff',
+                primaryTextColor: '#0f172a',
+                primaryBorderColor: '#0f172a',
+                lineColor: '#334155',
+                secondaryColor: '#f1f5f9',
+                tertiaryColor: '#ffffff'
+            }
+        });
+
+        const diagramElement = document.getElementById('diagram');
+        const container = document.getElementById('diagram-container');
+        const loading = document.getElementById('loading');
+        let instance;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkRender = setInterval(() => {
+                const svg = diagramElement.querySelector('svg');
+                if (svg) {
+                    clearInterval(checkRender);
+                    loading.style.display = 'none';
+                    svg.style.visibility = 'visible';
+
+                    // Center and initial zoom
+                    instance = Panzoom(diagramElement, {
+                        maxScale: 20, // TĂNG LÊN 20 LẦN ĐỂ NHÌN RÕ CHỮ
+                        minScale: 0.01,
+                        contain: 'outside',
+                        startScale: 0.05
+                    });
+
+                    container.addEventListener('wheel', (e) => {
+                        instance.zoomWithWheel(e);
+                    });
+
+                    document.getElementById('zoom-in').addEventListener('click', instance.zoomIn);
+                    document.getElementById('zoom-out').addEventListener('click', instance.zoomOut);
+                    document.getElementById('reset').addEventListener('click', instance.reset);
+                }
+            }, 300);
+        });
+    </script>
+</body>
+
+</html>

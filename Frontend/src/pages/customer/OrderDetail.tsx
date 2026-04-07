@@ -307,7 +307,7 @@ export default function OrderDetail() {
 
                       <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-100 animate-pulse">
                         <ShieldCheck size={18} />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Giao dịch được bảo vệ bởi VietTravel Trust</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Giao dịch được bảo vệ bởi Trip Mana Pro Trust</span>
                       </div>
                     </div>
                   </div>
