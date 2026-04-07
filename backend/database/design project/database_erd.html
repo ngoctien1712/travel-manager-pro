@@ -116,56 +116,38 @@
             animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        svg {
-            max-width: none !important;
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        svg { max-width: none !important; }
     </style>
 </head>
 
 <body>
     <div class="loading-overlay" id="loading">
         <div class="spinner"></div>
-        <p style="margin-top:20px; color:#64748b;">Đang Render sơ đồ thực thể chi tiết (36 bảng)...</p>
-        <p style="font-size:12px; color:#94a3b8;">Có thể mất tới 10 giây do kích thước dữ liệu cực lớn</p>
+        <p style="margin-top:20px; color:#64748b;">Đang Render sơ đồ chi tiết (36 bảng)...</p>
     </div>
 
     <div class="header">
-        <h1>Trip Manager Pro - Master Class Diagram</h1>
+        <h1>Trip Manager Pro - Full Database ERD</h1>
     </div>
 
     <div class="controls">
         <button class="btn" id="zoom-in">Phóng to (+)</button>
         <button class="btn" id="zoom-out">Thu nhỏ (-)</button>
         <button class="btn" id="reset">Reset Camera</button>
-        <button class="btn" onclick="downloadSVG()">Tải SVG (Nếu lỗi hiện hình)</button>
+        <button class="btn" onclick="downloadSVG()">Tải SVG</button>
     </div>
 
     <div id="diagram-container">
         <div id="diagram">
             <pre class="mermaid">
 classDiagram
-    %% MODULE 1: GEOGRAPHY (5 TABLES)
+    %% MODULE 1: GEOGRAPHY
     class Country {
         -id_country UUID
         -code String
         -name String
         -name_vi String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listCountries()
     }
     class City {
         -id_city UUID
@@ -176,12 +158,6 @@ classDiagram
         -latitude Decimal
         -longitude Decimal
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listCities(countryId)
     }
     class Area {
         -id_area UUID
@@ -192,39 +168,22 @@ classDiagram
         -origin Text
         -attribute JSONB
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listAreas(cityId, status)
     }
     class Ward {
         -id_ward UUID
         -id_area UUID
         -name String
         -attribute JSONB
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listWards(areaId)
     }
     class PointOfInterest {
         -id_poi UUID
         -id_area UUID
         -name String
         -poi_type JSONB
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listPois(areaId)
+        -coords JSONB
     }
 
-    %% MODULE 2: IDENTITY & PROVIDER (8 TABLES)
+    %% MODULE 2: IDENTITY
     class User {
         -id_user UUID
         -email String
@@ -234,58 +193,44 @@ classDiagram
         -status String
         -google_id String
         -auth_provider String
+        -email_verified_at DateTime
         -created_at DateTime
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +register()
-        +login()
-        +verifyOTP()
-        +refreshToken()
+        -updated_at DateTime
     }
     class Role {
         -id_role UUID
         -code String
-        +getAll()
-        +create()
     }
     class RoleDetail {
         -id_role UUID
         -id_user UUID
-        +assignRole()
-        +removeRole()
     }
     class CustomerProfile {
         -id_user UUID
-        -travel_style String
         -date Date
-        +getProfile()
-        +updateProfile()
+        -travel_style String
     }
     class AdminProfile {
         -id_user UUID
         -department String
-        +getProfile()
-        +updateProfile()
     }
     class AreaOwnerProfile {
         -id_user UUID
         -business_name String
         -identity_card String
         -business_license Text
-        +getProfile()
-        +updateProfile()
+        -created_at DateTime
+        -updated_at DateTime
     }
     class UserRefreshToken {
         -id_token UUID
         -id_user UUID
         -token Text
         -expires_at DateTime
-        +createToken()
-        +revokeToken()
+        -created_at DateTime
     }
+
+    %% MODULE 3: SERVICES
     class Provider {
         -id_provider UUID
         -id_user UUID
@@ -294,23 +239,15 @@ classDiagram
         -phone String
         -email String
         -website String
-        -legal_documents Text[]
+        -image Text
         -bank_name String
         -bank_account_number String
         -bank_account_name String
         -commission_rate Decimal
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +approveByAdmin()
-        +updateStatus()
-        +getRevenueStats()
+        -agreed_terms Boolean
+        -agreed_at DateTime
     }
-
-    %% MODULE 3: BOOKABLE SERVICES (12 TABLES)
     class BookableItem {
         -id_item UUID
         -id_provider UUID
@@ -322,30 +259,17 @@ classDiagram
         -price Decimal
         -star_rating Decimal
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +listServices(filters)
-        +getHomeData()
+        -created_at DateTime
     }
     class ItemMedia {
         -id_media UUID
         -id_item UUID
         -type String
         -url Text
-        +getAll()
-        +getByItem()
-        +create()
-        +delete()
     }
     class ItemTag {
         -id_item UUID
         -tag String
-        +getAll()
-        +create()
-        +delete()
     }
     class Tour {
         -id_item UUID
@@ -355,11 +279,11 @@ classDiagram
         -start_at DateTime
         -end_at DateTime
         -attribute JSONB
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +syncDailyInstances()
+        -price Decimal
+    }
+    class Ticket {
+        -id_item UUID
+        -ticket_kind String
     }
     class Accommodation {
         -id_item UUID
@@ -369,16 +293,6 @@ classDiagram
         -phone_number String
         -checkin_time String
         -checkout_time String
-        -policies JSONB
-        -province_id UUID
-        -district_id UUID
-        -ward_id UUID
-        -specific_address Text
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +checkAvailability()
     }
     class AccommodationRoom {
         -id_room UUID
@@ -387,31 +301,14 @@ classDiagram
         -max_guest Int
         -price Decimal
         -quantity Int
-        -media JSONB
-        -description Text
         -attribute JSONB
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +checkAvailability(dateRange)
     }
     class Vehicle {
         -id_vehicle UUID
         -id_item UUID
         -code_vehicle String
         -max_guest Int
-        -departure_time Time
-        -arrival_time Time
-        -departure_date Date
-        -arrival_date Date
-        -phone_number String
         -attribute JSONB
-        +getAll()
-        +getById()
-        +create()
-        +update()
     }
     class VehicleTrip {
         -id_trip UUID
@@ -420,52 +317,30 @@ classDiagram
         -arrival_time DateTime
         -price_override Decimal
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +filterByFutureDate()
     }
     class Position {
         -id_position UUID
         -id_vehicle UUID
         -code_position String
         -price Decimal
-        +getAll()
-        +create()
-        +update()
-        +delete()
     }
     class Voucher {
         -id_voucher UUID
         -id_provider UUID
         -id_item UUID
         -code String
-        -voucher_type String
-        -discount_type String
         -discount_value Decimal
-        -min_order_value Decimal
-        -max_discount_amount Decimal
         -quantity Int
-        -quantity_pay Int
         -from DateTime
         -to DateTime
         -status String
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +validateVoucher()
     }
     class VoucherDetail {
         -id_voucher UUID
         -id_order UUID
-        +applyToOrder()
     }
 
-    %% MODULE 4: ORDERS & FINANCE (8 TABLES)
+    %% MODULE 4: ORDERS & FINANCE
     class Order {
         -id_order UUID
         -id_user UUID
@@ -478,17 +353,8 @@ classDiagram
         -commission_amount Decimal
         -owner_amount Decimal
         -payment_method String
-        -payment_expires_at DateTime
         -payroll_status String
-        -created_at DateTime
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +processPayment()
-        +cancelOrder()
-        +getHistory()
+        -create_at DateTime
     }
     class OrderTourDetail {
         -id_order UUID
@@ -497,7 +363,6 @@ classDiagram
         -price Decimal
         -booking_date Date
         -guest_info JSONB
-        +getDetail()
     }
     class OrderAccommodationsDetail {
         -id UUID
@@ -508,7 +373,6 @@ classDiagram
         -quantity Int
         -price Decimal
         -guest_info JSONB
-        +getDetail()
     }
     class OrderPosVehicleDetail {
         -id_order UUID
@@ -516,7 +380,6 @@ classDiagram
         -id_trip UUID
         -price Decimal
         -guest_info JSONB
-        +getDetail()
     }
     class Payment {
         -id_pay UUID
@@ -526,20 +389,24 @@ classDiagram
         -method String
         -transaction_id String
         -paid_at DateTime
-        +getById()
-        +createRecord()
-        +verifyStatus()
     }
     class Refund {
         -id_refund UUID
         -id_pay UUID
+        -id_refund_request UUID
         -amount Decimal
         -status String
-        -reason_code String
         -created_at DateTime
-        +getById()
-        +createRecord()
-        +executeRefund()
+    }
+    class RefundRequest {
+        -id_refund_request UUID
+        -id_order UUID
+        -id_user UUID
+        -amount Decimal
+        -reason Text
+        -status String
+        -created_at DateTime
+        -updated_at DateTime
     }
     class PayrollTransaction {
         -id_payroll UUID
@@ -547,16 +414,10 @@ classDiagram
         -amount Decimal
         -commission_total Decimal
         -status String
-        -bank_info JSONB
-        -transaction_proof Text
         -created_at DateTime
-        +getAll()
-        +getById()
-        +processPayroll()
-        +getPayrollStats()
     }
 
-    %% MODULE 5: UTILITIES (3 TABLES)
+    %% MODULE 5: UTILITIES
     class Notification {
         -id_notification UUID
         -id_user UUID
@@ -565,25 +426,15 @@ classDiagram
         -type String
         -is_read Boolean
         -created_at DateTime
-        +getAll()
-        +getById()
-        +create()
-        +markAsRead()
-        +listUnread()
     }
     class ChatRoom {
-        -id_room VARCHAR
+        -id_room String
         -id_customer UUID
         -id_provider UUID
-        -id_item UUID
         -item_name String
         -last_message Text
         -status String
         -updated_at DateTime
-        +getAll()
-        +getByUser()
-        +createRoom()
-        +sendMessage()
     }
     class TripPlan {
         -id_trip_plan UUID
@@ -593,12 +444,7 @@ classDiagram
         -budget Decimal
         -start_date Date
         -end_date Date
-        +getAll()
-        +getById()
-        +create()
-        +update()
-        +delete()
-        +generateAI()
+        -created_at DateTime
     }
 
     %% RELATIONSHIPS
@@ -608,13 +454,14 @@ classDiagram
     Area "1" -- "*" Ward
     User "1" -- "*" RoleDetail
     Role "1" -- "*" RoleDetail
-    User "1" -- "0..1" CustomerProfile
-    User "1" -- "0..1" AdminProfile
-    User "1" -- "0..1" AreaOwnerProfile
+    User "1" -- "1" CustomerProfile
+    User "1" -- "1" AdminProfile
+    User "1" -- "1" AreaOwnerProfile
     User "1" -- "*" UserRefreshToken
     User "1" -- "*" Provider
     Provider "1" -- "*" BookableItem
     BookableItem <|-- Tour
+    BookableItem <|-- Ticket
     BookableItem <|-- Accommodation
     BookableItem <|-- Vehicle
     BookableItem "1" -- "*" ItemMedia
@@ -628,6 +475,8 @@ classDiagram
     Order "1" -- "*" OrderPosVehicleDetail
     Order "1" -- "*" Payment
     Payment "1" -- "*" Refund
+    Order "1" -- "*" RefundRequest
+    RefundRequest "1" -- "*" Refund
     Order "1" -- "0..1" VoucherDetail
     Voucher "1" -- "*" VoucherDetail
     Provider "1" -- "*" PayrollTransaction
@@ -640,12 +489,11 @@ classDiagram
     </div>
 
     <script>
-        // Cấu hình tối đa cho diagram cực lớn
         mermaid.initialize({
             startOnLoad: true,
             theme: 'default',
             securityLevel: 'loose',
-            maxTextSize: 10000000 // 10 Triệu ký tự (Đảm bảo render hết)
+            maxTextSize: 10000000
         });
 
         const diagramElement = document.getElementById('diagram');
@@ -654,7 +502,6 @@ classDiagram
         let panInstance;
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Theo dõi khi Mermaid hoàn tất render
             const checkRender = setInterval(() => {
                 const svg = diagramElement.querySelector('svg');
                 if (svg) {
@@ -662,7 +509,6 @@ classDiagram
                     loading.style.opacity = '0';
                     setTimeout(() => loading.style.display = 'none', 500);
 
-                    // Khởi tạo Panzoom sau khi SVG có kích thước bộ khung
                     panInstance = Panzoom(diagramElement, {
                         maxScale: 20,
                         minScale: 0.001,
@@ -675,7 +521,6 @@ classDiagram
                     document.getElementById('zoom-out').addEventListener('click', panInstance.zoomOut);
                     document.getElementById('reset').addEventListener('click', panInstance.reset);
 
-                    // Căn giữa sau khi hiển thị
                     panInstance.pan(0, 0);
                 }
             }, 1000);
@@ -690,10 +535,8 @@ classDiagram
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
                 link.href = url;
-                link.download = "travel-manager-architecture.svg";
+                link.download = "trip-mana-pro-master-erd.svg";
                 link.click();
-            } else {
-                alert("Sơ đồ chưa vẽ xong, hãy đợi thêm vài giây.");
             }
         }
     </script>
