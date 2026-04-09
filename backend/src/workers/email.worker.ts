@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { redisConfig } from '../config/redis.js';
 import { EMAIL_QUEUE_NAME } from '../queues/email.queue.js';
 import { sendVerificationEmail } from '../utils/mail.js';
 
@@ -17,7 +17,7 @@ export const startEmailWorker = () => {
             }
         },
         {
-            connection: redisConnection as any,
+            connection: redisConfig,
             concurrency: 5,
         }
     );

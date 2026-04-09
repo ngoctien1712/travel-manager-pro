@@ -1,10 +1,10 @@
 import { Queue } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { redisConfig } from '../config/redis.js';
 
 export const AUTH_QUEUE_NAME = 'auth_monitoring';
 
 export const authQueue = new Queue(AUTH_QUEUE_NAME, {
-    connection: redisConnection as any,
+    connection: redisConfig,
     defaultJobOptions: {
         attempts: 3,
         backoff: {

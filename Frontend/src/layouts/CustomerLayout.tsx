@@ -26,6 +26,8 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 
+import { NotificationCenter } from '@/components/NotificationCenter';
+
 const navLinks = [
   { label: 'Trang chủ', path: '/' },
   { label: 'Khách sạn', path: '/hotels' },
@@ -71,7 +73,8 @@ export const CustomerLayout = () => {
           </nav>
 
           {/* Right side actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {isAuthenticated && <NotificationCenter />}
 
             {isAuthenticated ? (
               <DropdownMenu>

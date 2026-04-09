@@ -23,7 +23,7 @@ export async function getMyBookableItems(req: Request, res: Response) {
        FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
        LEFT JOIN area a ON a.id_area = bi.id_area
-       WHERE (p.id_user = $1 OR $2 = 'admin')
+       WHERE (p.id_user = $1 OR $2 = 'admin') AND bi.status != 'deleted'
        ORDER BY (COALESCE(bi.attribute->>'group_id', bi.id_item::text)), bi.created_at DESC`,
       [userId, req.user!.role]
     );
@@ -138,7 +138,7 @@ export async function getProviderBookableItems(req: Request, res: Response) {
     const { rows } = await pool.query(
       `SELECT id_item, id_provider, id_area, item_type, title, attribute, price, created_at
        FROM bookable_items
-       WHERE id_provider = $1
+       WHERE id_provider = $1 AND status != 'deleted'
        ORDER BY created_at DESC`,
       [providerId]
     );
@@ -164,7 +164,7 @@ export async function getServiceDetail(req: Request, res: Response) {
        FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
        LEFT JOIN area a ON a.id_area = bi.id_area
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -276,7 +276,7 @@ export async function updateServiceDetail(req: Request, res: Response) {
     const { rows: itemRows } = await client.query(
       `SELECT bi.id_item, bi.item_type, bi.attribute FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -575,7 +575,7 @@ export async function updateServiceStatus(req: Request, res: Response) {
     const check = await pool.query(
       `SELECT bi.id_item FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -602,7 +602,7 @@ export async function deleteService(req: Request, res: Response) {
     const check = await client.query(
       `SELECT id_item FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -611,18 +611,7 @@ export async function deleteService(req: Request, res: Response) {
     }
 
     await client.query('BEGIN');
-
-    // Delete from child tables first (tours, accommodations, etc.)
-    // Note: If you have ON DELETE CASCADE in DB, this might be simpler.
-    // Assuming we need to clean up manually for safety or lack of CASCADE.
-    await client.query('DELETE FROM tours WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM accommodations_rooms WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM accommodations WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM vehicle WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM tickets WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM item_media WHERE id_item = $1', [idItem]);
-    await client.query('DELETE FROM bookable_items WHERE id_item = $1', [idItem]);
-
+    await client.query("UPDATE bookable_items SET status = 'deleted' WHERE id_item = $1", [idItem]);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (err) {
@@ -645,7 +634,7 @@ export async function addVehiclePosition(req: Request, res: Response) {
     const { rows: itemRows } = await pool.query(
       `SELECT bi.id_item, bi.item_type FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -694,7 +683,7 @@ export async function bulkAddVehiclePositions(req: Request, res: Response) {
       `SELECT v.id_vehicle FROM vehicle v
        JOIN bookable_items bi ON bi.id_item = v.id_item
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 
@@ -735,7 +724,7 @@ export async function deleteVehiclePosition(req: Request, res: Response) {
        JOIN vehicle v ON v.id_vehicle = pos.id_vehicle
        JOIN bookable_items bi ON bi.id_item = v.id_item
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE pos.id_position = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE pos.id_position = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idPosition, userId, req.user!.role]
     );
 
@@ -789,7 +778,7 @@ export async function addItemMedia(req: Request, res: Response) {
       `SELECT bi.id_item, bi.attribute->>'group_id' as group_id 
        FROM bookable_items bi
        JOIN provider p ON p.id_provider = bi.id_provider
-       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
+       WHERE bi.id_item = $1 AND (p.id_user = $2 OR $3 = 'admin') AND bi.status != 'deleted'`,
       [idItem, userId, req.user!.role]
     );
 

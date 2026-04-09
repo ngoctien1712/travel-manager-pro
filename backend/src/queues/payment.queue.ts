@@ -1,10 +1,10 @@
 import { Queue } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { redisConfig } from '../config/redis.js';
 
 export const PAYMENT_QUEUE_NAME = 'payment_monitoring';
 
 export const paymentQueue = new Queue(PAYMENT_QUEUE_NAME, {
-    connection: redisConnection as any,
+    connection: redisConfig,
     defaultJobOptions: {
         attempts: 3,
         backoff: {

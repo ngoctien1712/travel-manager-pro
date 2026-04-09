@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { query } from '../config/db.js';
 import { MomoService } from '../services/momo.service.js';
 import { NotificationService } from '../services/notification.service.js';
+import { addPaymentCheckJob, removePaymentJob } from '../queues/payment.queue.js';
+import { redisConnection, REDIS_KEYS } from '../config/redis.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,9 +17,6 @@ const momoService = new MomoService({
   ipnUrl: process.env.MOMO_IPN_URL || ''
 });
 
-import { addPaymentCheckJob, removePaymentJob } from '../queues/payment.queue.js';
-import { redisConnection, REDIS_KEYS } from '../config/redis.js';
-
 const toIso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
 export const listServices = async (req: Request, res: Response) => {
@@ -26,7 +25,7 @@ export const listServices = async (req: Request, res: Response) => {
       area, type, minPrice, maxPrice, q, city, provinceId, districtId, wardId, arrivalProvinceId,
       date, checkIn, checkOut, departureDate, returnDate
     } = req.query as Record<string, string>;
-    const conditions: string[] = [];
+    const conditions: string[] = ["bi.status = 'active'"];
     const params: any[] = [];
     let idx = 1;
 
@@ -313,7 +312,7 @@ export const getService = async (req: Request, res: Response) => {
       LEFT JOIN area a ON a.id_area = bi.id_area
       LEFT JOIN cities c ON c.id_city = a.id_city
       LEFT JOIN countries co ON co.id_country = c.id_country
-      WHERE bi.id_item = $1
+      WHERE bi.id_item = $1 AND bi.status != 'deleted'
     `;
     const { rows } = await query(sql, [id]);
     if (!rows[0]) return res.status(404).json({ message: 'Không tìm thấy dịch vụ' });
@@ -1007,6 +1006,10 @@ export const getOrder = async (req: Request, res: Response) => {
 
     const payments = await query(`SELECT * FROM payments WHERE id_order = $1`, [id]);
     
+    // Get refund status
+    const refundRes = await query(`SELECT status FROM refund_requests WHERE id_order = $1 ORDER BY created_at DESC LIMIT 1`, [id]);
+    const refund_status = refundRes.rows[0]?.status || null;
+
     // Prioritize guest_info from details if available
     if (details && details.guest_info) {
       const gInfo = typeof details.guest_info === 'string' ? JSON.parse(details.guest_info) : details.guest_info;
@@ -1015,7 +1018,7 @@ export const getOrder = async (req: Request, res: Response) => {
       if (gInfo.email) order.user_email = gInfo.email;
     }
 
-    res.json({ order, details, payments: payments.rows });
+    res.json({ order, details, payments: payments.rows, refund_status });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy chi tiết đơn' });
@@ -1063,59 +1066,101 @@ export const requestRefund = async (req: Request, res: Response) => {
     const { id } = req.params; // order id
     const { reason } = req.body;
 
-    // 1. Check order ownership and status
-    const orderRes = await query(
-      `SELECT o.*, 
-              (SELECT MIN(start_date) FROM (
-                  SELECT booking_date as start_date FROM order_tour_detail WHERE id_order = o.id_order
-                  UNION ALL
-                  SELECT start_date FROM order_accommodations_detail WHERE id_order = o.id_order
-                  UNION ALL
-                  SELECT visit_date as start_date FROM order_ticket_detail WHERE id_order = o.id_order
-                  UNION ALL
-                  SELECT vt.departure_time as start_date FROM order_pos_vehicle_detail ovd JOIN vehicle_trips vt ON ovd.id_trip = vt.id_trip WHERE ovd.id_order = o.id_order
-               ) d) as trip_start_date
+    // 1. Get fundamental order info
+    const { rows: orders } = await query(
+      `SELECT o.*, u.full_name, u.email as user_email
        FROM "order" o 
+       JOIN users u ON o.id_user = u.id_user
        WHERE o.id_order = $1 AND o.id_user = $2`, 
       [id, userId]
     );
 
-    if (orderRes.rows.length === 0) {
+    if (orders.length === 0) {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     }
 
-    const order = orderRes.rows[0];
+    const order = orders[0];
 
-    // 2. Validate refund conditions (e.g. status must be paid/confirmed)
+    // 2. Validate refund conditions
     if (order.status !== 'confirmed' && order.status !== 'completed' && order.status !== 'processing') {
       return res.status(400).json({ message: 'Chỉ các đơn hàng đã thanh toán hoặc đã xác nhận mới có thể yêu cầu hoàn tiền.' });
     }
 
-    // 3. Time check (e.g. before 24h of trip start as per activity diagram)
-    const tripStart = order.trip_start_date ? new Date(order.trip_start_date) : null;
-    if (tripStart) {
+    // 3. Find Trip Start Date (using multiple queries for stability)
+    let tripStartDate: Date | null = null;
+    
+    const [tours, accs, tickets, vehicles] = await Promise.all([
+      query('SELECT MIN(booking_date) as d FROM order_tour_detail WHERE id_order = $1', [id]),
+      query('SELECT MIN(start_date) as d FROM order_accommodations_detail WHERE id_order = $1', [id]),
+      query('SELECT MIN(visit_date) as d FROM order_ticket_detail WHERE id_order = $1', [id]),
+      query('SELECT MIN(vt.departure_time) as d FROM order_pos_vehicle_detail ovd JOIN vehicle_trips vt ON ovd.id_trip = vt.id_trip WHERE ovd.id_order = $1', [id])
+    ]);
+
+    const dates = [
+      tours.rows[0]?.d,
+      accs.rows[0]?.d,
+      tickets.rows[0]?.d,
+      vehicles.rows[0]?.d
+    ].filter(d => d).map(d => new Date(d));
+
+    if (dates.length > 0) {
+      tripStartDate = new Date(Math.min(...dates.map(d => d.getTime())));
+    }
+
+    // 4. Time policy check (24h before departure)
+    if (tripStartDate) {
         const now = new Date();
-        const diffHours = (tripStart.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const diffHours = (tripStartDate.getTime() - now.getTime()) / (1000 * 60 * 60);
         if (diffHours < 24) {
-            return res.status(400).json({ message: 'Đã quá thời gian được phép hoàn tiền (phải yêu cầu trước 24h tính từ thời điểm khởi hành).' });
+            return res.status(400).json({ message: 'Đã quá thời gian được phép hoàn tiền (phải yêu cầu trước ít nhất 24h tính từ thời điểm khởi hành).' });
         }
     }
 
-    // 4. Check if already requested
+    // 5. Check if already requested
     const existing = await query('SELECT id_refund_request FROM refund_requests WHERE id_order = $1 AND status = \'pending\'', [id]);
     if (existing.rows.length > 0) {
-        return res.status(400).json({ message: 'Yêu cầu hoàn tiền đang được xử lý.' });
+        return res.status(400).json({ message: 'Yêu cầu hoàn tiền của bạn đang được xử lý.' });
     }
 
-    // 5. Insert new request
-    const insert = await query(
-      `INSERT INTO refund_requests (id_order, id_user, amount, reason, status) 
-       VALUES ($1, $2, $3, $4, 'pending') 
-       RETURNING *`, 
-      [id, userId, order.total_amount, reason]
-    );
-    
-    res.json({ success: true, data: insert.rows[0] });
+    // 6. Perform inserts
+    await query('BEGIN');
+    try {
+      const insert = await query(
+        `INSERT INTO refund_requests (id_order, id_user, amount, reason, status) 
+         VALUES ($1, $2, $3, $4, 'pending') 
+         RETURNING *`, 
+        [id, userId, order.total_amount, reason]
+      );
+
+      // Audit status change
+      await query(
+        `INSERT INTO order_status_history (id_order, from_status, to_status, changed_by) 
+         VALUES ($1, $2, $3, $4)`,
+        [id, order.status, 'refund_pending', userId]
+      );
+
+      await query('COMMIT');
+
+      // 7. Notify Admins
+      const admins = await query(
+          `SELECT rd.id_user FROM role_detail rd 
+           JOIN roles r ON rd.id_role = r.id_role 
+           WHERE r.code = 'ADMIN'`
+      );
+      for (const admin of admins.rows) {
+          await NotificationService.create({
+              userId: admin.id_user,
+              title: 'Yêu cầu hoàn tiền mới',
+              message: `Khách hàng ${order.full_name} đã yêu cầu hoàn tiền cho đơn hàng ${order.order_code}.`,
+              type: 'warning'
+          });
+      }
+
+      res.json({ success: true, data: insert.rows[0], message: 'Yêu cầu hoàn tiền đã được gửi. Chúng tôi sẽ thông báo kết quả qua email.' });
+    } catch (dbErr) {
+      await query('ROLLBACK');
+      throw dbErr;
+    }
   } catch (err: any) {
     console.error('Request refund error:', err);
     res.status(500).json({ message: 'Lỗi khi yêu cầu hoàn tiền: ' + err.message });
@@ -1185,11 +1230,32 @@ export const handleMomoIPN = async (req: Request, res: Response) => {
           return res.status(204).send();
         }
         const idOrder = order.id_order;
-        await query(`UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`, [transId, idOrder]);
+        await query(`UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1, confirmed_at = NOW() WHERE id_order = $2`, [transId, idOrder]);
         await query(`UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`, [idOrder]);
-
-        // remove the monitoring job immediately
+        
+        // remove the monitoring job
         await removePaymentJob(idOrder);
+
+        // Notifications
+        await NotificationService.create({
+          userId: order.id_user,
+          title: 'Đơn hàng Momo đã xác nhận',
+          message: `Thanh toán Momo cho đơn hàng #${order.order_code} thành công.`,
+          type: 'success'
+        });
+
+        // Notification for provider
+        if (order.id_provider) {
+           const { rows: ownerRows } = await query('SELECT id_user FROM provider WHERE id_provider = $1', [order.id_provider]);
+           if (ownerRows[0]) {
+             await NotificationService.create({
+                userId: ownerRows[0].id_user,
+                title: 'Có đơn đặt chỗ mới (Momo)',
+                message: `Khách hàng vừa thanh toán đơn #${order.order_code} qua Momo.`,
+                type: 'info'
+             });
+           }
+        }
       }
     } else {
       // Payment failed or cancelled
@@ -1250,7 +1316,7 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
     // 4. Cập nhật trạng thái thành công
     const { guest_info } = req.body;
     await query(
-      `UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1 WHERE id_order = $2`,
+      `UPDATE "order" SET status = 'confirmed', payment_transaction_id = $1, confirmed_at = NOW() WHERE id_order = $2`,
       [finalTransId || 'DEMO_ID', order.id_order]
     );
 
@@ -1272,6 +1338,32 @@ export const handleProjectWebhook = async (req: Request, res: Response) => {
       `UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id_order = $1`,
       [order.id_order]
     );
+
+    // ---- 5. Notifications ----
+    // Notification for customer
+    await NotificationService.create({
+      userId: order.id_user,
+      title: 'Đơn hàng đã được xác nhận',
+      message: `Cảm ơn bạn! Đơn hàng #${order.order_code} đã được thanh toán thành công và xác nhận.`,
+      type: 'success'
+    });
+
+    // Notification for provider
+    if (order.id_provider) {
+       // Get owner of provider
+       const { rows: ownerRows } = await query(
+         'SELECT id_user FROM provider WHERE id_provider = $1',
+         [order.id_provider]
+       );
+       if (ownerRows[0]) {
+         await NotificationService.create({
+            userId: ownerRows[0].id_user,
+            title: 'Có đơn đặt chỗ mới',
+            message: `Bạn vừa nhận được một đơn đặt chỗ mới #${order.order_code} cho dịch vụ của mình.`,
+            type: 'info'
+         });
+       }
+    }
 
     // remove the monitoring job immediately
     await removePaymentJob(order.id_order);

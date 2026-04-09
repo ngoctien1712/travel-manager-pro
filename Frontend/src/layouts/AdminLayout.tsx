@@ -18,6 +18,7 @@ import {
   MapPin,
   Wallet,
   Activity,
+  Undo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,8 +41,7 @@ const sidebarItems = [
   { icon: Building2, label: 'Duyệt nhà cung cấp', path: '/admin/providers' },
   { icon: Map, label: 'Giám sát dịch vụ', path: '/admin/activities' },
   { icon: Wallet, label: 'Tính lương đối tác', path: '/admin/payroll' },
-  { icon: ShoppingBag, label: 'Đơn hàng', path: '/admin/orders' },
-  { icon: Ticket, label: 'Voucher', path: '/admin/vouchers' },
+  { icon: Undo2, label: 'Quản lý hoàn tiền', path: '/admin/refunds' },
 ];
 
 export const AdminLayout = () => {

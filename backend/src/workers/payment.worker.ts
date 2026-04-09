@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { redisConnection, REDIS_KEYS } from '../config/redis.js';
+import { redisConfig, REDIS_KEYS } from '../config/redis.js';
 import { PAYMENT_QUEUE_NAME } from '../queues/payment.queue.js';
 import pool from '../config/db.js';
 
@@ -75,7 +75,7 @@ export const startPaymentWorker = () => {
             }
         },
         {
-            connection: redisConnection as any,
+            connection: redisConfig,
             concurrency: 5, // Process 5 checks in parallel
         }
     );

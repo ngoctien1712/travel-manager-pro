@@ -20,7 +20,7 @@ export async function getVoucherDetail(req: Request, res: Response) {
             `SELECT v.*, p.name AS provider_name, bi.title AS item_title
        FROM voucher v
        JOIN provider p ON p.id_provider = v.id_provider
-       LEFT JOIN bookable_items bi ON bi.id_item = v.id_item
+       LEFT JOIN bookable_items bi ON bi.id_item = v.id_item AND bi.status != 'deleted'
        WHERE v.id_voucher = $1 AND (p.id_user = $2 OR $3 = 'admin')`,
             [idVoucher, userId, req.user!.role]
         );
@@ -43,7 +43,7 @@ export async function getMyVouchers(req: Request, res: Response) {
             `SELECT v.*, p.name AS provider_name, bi.title AS item_title
        FROM voucher v
        JOIN provider p ON p.id_provider = v.id_provider
-       LEFT JOIN bookable_items bi ON bi.id_item = v.id_item
+       LEFT JOIN bookable_items bi ON bi.id_item = v.id_item AND bi.status != 'deleted'
        WHERE (p.id_user = $1 OR $2 = 'admin')
        ORDER BY v.created_at DESC`,
             [userId, req.user!.role]

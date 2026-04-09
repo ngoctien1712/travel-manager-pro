@@ -1,5 +1,5 @@
 import { Worker, Job } from 'bullmq';
-import { redisConnection } from '../config/redis.js';
+import { redisConfig } from '../config/redis.js';
 import { AUTH_QUEUE_NAME } from '../queues/auth.queue.js';
 import pool from '../config/db.js';
 
@@ -47,7 +47,7 @@ export const startAuthWorker = () => {
             }
         },
         {
-            connection: redisConnection as any,
+            connection: redisConfig,
             concurrency: 5,
         }
     );

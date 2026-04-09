@@ -84,6 +84,9 @@ export default function OrderDetail() {
       await customerApi.requestRefund(id!, Number(refundData.amount), refundData.reason);
       alert('Yêu cầu hoàn tiền đã được gửi');
       setShowRefundForm(false);
+      // Fetch order again to update UI status
+      const data = await customerApi.getMyOrder(id!);
+      setOrder(data);
     } catch (error) {
       alert('Lỗi khi gửi yêu cầu hoàn tiền');
     }
@@ -503,13 +506,34 @@ export default function OrderDetail() {
                     Hủy đơn hàng này
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRefundForm(!showRefundForm)}
-                  className="w-full border-gray-100 font-black text-[10px] uppercase tracking-widest h-12 rounded-xl"
-                >
-                  Yêu cầu hoàn tiền
-                </Button>
+                
+                {(order.status === 'confirmed' || order.status === 'completed' || order.status === 'processing') && (
+                  <>
+                    {order.refund_status === 'pending' ? (
+                      <Button
+                        disabled
+                        className="w-full bg-yellow-50 text-yellow-600 border border-yellow-100 font-black text-[10px] uppercase tracking-widest h-12 rounded-xl"
+                      >
+                        Yêu cầu đang chờ duyệt
+                      </Button>
+                    ) : order.refund_status === 'approved' ? (
+                      <Button
+                        disabled
+                        className="w-full bg-green-50 text-green-600 border border-green-100 font-black text-[10px] uppercase tracking-widest h-12 rounded-xl"
+                      >
+                        Đã hoàn tiền
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowRefundForm(!showRefundForm)}
+                        className="w-full border-gray-100 font-black text-[10px] uppercase tracking-widest h-12 rounded-xl"
+                      >
+                        {order.refund_status === 'rejected' ? 'Gửi lại yêu cầu hoàn tiền' : 'Yêu cầu hoàn tiền'}
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             </Card>
 

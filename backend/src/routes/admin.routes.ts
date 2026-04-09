@@ -60,5 +60,6 @@ router.patch('/owner-activities/items/:type/:id', adminController.updateActivity
 // Refund Management
 router.get('/refunds', adminController.listRefundRequests);
 router.post('/refunds/:id/approve', adminController.approveRefund);
+router.post('/refunds/:id/reject', adminController.rejectRefund);
 
 export default router;

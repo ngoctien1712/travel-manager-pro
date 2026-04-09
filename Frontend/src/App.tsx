@@ -43,6 +43,7 @@ import OwnerMyProviders from "@/pages/owner/MyProviders";
 import OwnerMyServices from "@/pages/owner/MyServices";
 import OwnerServiceDetail from "@/pages/owner/ServiceDetail";
 import { VoucherDetail as AdminVoucherDetail } from "@/pages/admin/VoucherDetail";
+import RefundManagement from "@/pages/admin/RefundManagement";
 import OwnerOrders from "@/pages/owner/Orders";
 import OwnerOrderDetail from "@/pages/owner/OrderDetails";
 import OwnerVouchers from "@/pages/owner/Vouchers";
@@ -139,6 +140,7 @@ const App = () => (
                 <Route path="activities" element={<ActivityMonitoring />} />
                 <Route path="services/:idItem" element={<OwnerServiceDetail />} />
                 <Route path="vouchers/:idVoucher" element={<AdminVoucherDetail />} />
+                <Route path="refunds" element={<RefundManagement />} />
                 <Route path="profile" element={<Profile />} />
               </Route>
 

@@ -117,4 +117,18 @@ export const adminApi = {
   async approveBusiness(userId: string): Promise<any> {
     return httpClient.post(`/admin/approve-business-account/${userId}`, {});
   },
+
+  // Refunds
+  async listRefundRequests(status?: string): Promise<{ data: any[] }> {
+    const query = status ? `?status=${status}` : '';
+    return httpClient.get(`/admin/refunds${query}`);
+  },
+
+  async approveRefund(id: string, adminNote?: string): Promise<any> {
+    return httpClient.post(`/admin/refunds/${id}/approve`, { adminNote });
+  },
+
+  async rejectRefund(id: string, adminNote: string): Promise<any> {
+    return httpClient.post(`/admin/refunds/${id}/reject`, { adminNote });
+  },
 };

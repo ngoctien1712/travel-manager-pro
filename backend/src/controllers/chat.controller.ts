@@ -111,8 +111,8 @@ export const trackChatActivity = async (req: Request, res: Response) => {
         const now = new Date();
         // Sync to SQL
         await query(
-            `INSERT INTO chat_rooms (id_room, id_customer, id_owner, id_provider, id_item, item_name, customer_name, last_message, last_sender_id, updated_at, is_active_for_customer, is_active_for_provider)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, true)
+            `INSERT INTO chat_rooms (id_room, id_customer, id_provider, id_item, item_name, customer_name, last_message, last_sender_id, updated_at, is_active_for_customer, is_active_for_provider)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, true)
              ON CONFLICT (id_room) DO UPDATE 
              SET updated_at = EXCLUDED.updated_at, 
                  last_message = EXCLUDED.last_message, 
@@ -121,7 +121,7 @@ export const trackChatActivity = async (req: Request, res: Response) => {
                  id_provider = EXCLUDED.id_provider,
                  item_name = EXCLUDED.item_name,
                  customer_name = EXCLUDED.customer_name`,
-            [conversation_id, customer_id, owner_id, provider_id, item_id, item_name, customer_name, last_message, sender_id, now]
+            [conversation_id, customer_id, provider_id, item_id, item_name, customer_name, last_message, sender_id, now]
         );
 
         // Update Unread
@@ -195,7 +195,10 @@ export const listMyChats = async (req: Request, res: Response) => {
 
         let sql = role === 'customer'
             ? `SELECT * FROM chat_rooms WHERE id_customer = $1 AND is_active_for_customer = true ORDER BY updated_at DESC`
-            : `SELECT * FROM chat_rooms WHERE id_owner = $1 AND is_active_for_provider = true ORDER BY updated_at DESC`;
+            : `SELECT cr.* FROM chat_rooms cr
+               JOIN provider p ON cr.id_provider = p.id_provider
+               WHERE p.id_user = $1 AND cr.is_active_for_provider = true 
+               ORDER BY cr.updated_at DESC`;
 
         const { rows } = await query(sql, [userId]);
         res.json(rows);

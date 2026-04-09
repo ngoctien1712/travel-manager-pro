@@ -833,19 +833,31 @@ export async function updateActivityItemDetails(req: Request, res: Response) {
     res.status(500).json({ message: 'Lỗi máy chủ' });
   }
 }
+
 // ---------- Refund Management ----------
 export async function listRefundRequests(req: Request, res: Response) {
   try {
-    const { status = 'pending' } = req.query;
-    const { rows } = await pool.query(
-      `SELECT rr.*, o.order_code, u.full_name as customer_name, u.email as customer_email
+    const { status } = req.query;
+    let queryStr = `
+       SELECT rr.*, o.order_code, u.full_name, u.email
        FROM refund_requests rr
        JOIN "order" o ON rr.id_order = o.id_order
        JOIN users u ON rr.id_user = u.id_user
-       WHERE rr.status = $1
-       ORDER BY rr.created_at DESC`,
-      [status]
-    );
+    `;
+    let params: any[] = [];
+
+    if (status === 'history') {
+      queryStr += ` WHERE rr.status != 'pending' `;
+    } else if (status) {
+      queryStr += ` WHERE rr.status = $1 `;
+      params.push(status);
+    } else {
+      queryStr += ` WHERE rr.status = 'pending' `;
+    }
+
+    queryStr += ` ORDER BY rr.updated_at DESC, rr.created_at DESC `;
+
+    const { rows } = await pool.query(queryStr, params);
     res.json({ data: rows });
   } catch (err) {
     console.error('List refund requests error:', err);
@@ -864,39 +876,51 @@ export async function approveRefund(req: Request, res: Response) {
 
     // 1. Get refund request details
     const { rows: rrRows } = await client.query(
-      `SELECT rr.*, o.order_code, o.id_order, o.total_amount, u.full_name as customer_name, u.email as customer_email, o.id_voucher
+      `SELECT rr.*, o.order_code, o.id_order, o.total_amount, o.payment_method, 
+              u.full_name as customer_name, u.email as customer_email, o.id_voucher,
+              o.confirmed_at
        FROM refund_requests rr
        JOIN "order" o ON rr.id_order = o.id_order
-       JOIN users u ON rr.id_user = u.id_user
+       JOIN users u ON u.id_user = rr.id_user
        WHERE rr.id_refund_request = $1 AND rr.status = 'pending'`,
       [id]
     );
 
     if (rrRows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoàn tiền hoặc yêu cầu đã được xử lý' });
+      return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoặc yêu cầu đã được xử lý' });
     }
 
     const rr = rrRows[0];
 
-    // 2. Perform automated refund (Simulated API call)
-    // In a real system, this is where you'd call Momo/ZaloPay/Stripe Refund API
-    console.log(`[REFUND] Calling payment gateway to refund ${rr.amount} VND for order ${rr.order_code}`);
+    // 2. 24h Policy Validation (FINAL CHECK)
+    const confirmedAt = rr.confirmed_at || rr.created_at;
+    const diffHours = (Date.now() - new Date(confirmedAt).getTime()) / (1000 * 60 * 60);
+    if (diffHours > 24) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'Yêu cầu không hợp lệ: Đã quá 24h kể từ thời điểm thanh toán.' });
+    }
+
+    // 3. Process the Actual/Mock Refund
+    const isMock = rr.payment_method?.toLowerCase().includes('demo') || rr.payment_method?.toLowerCase().includes('momo'); 
     
-    // 3. Update refund request status
+    if (isMock) {
+      console.log(`[REFUND-DEMO] Simulating refund for ${rr.order_code} via ${rr.payment_method}: ${rr.amount} VND`);
+    } else {
+      console.log(`[REFUND-REAL] Marking bank refund for ${rr.order_code} as processed by Admin.`);
+    }
+
+    // 4. Update Database
     await client.query(
       `UPDATE refund_requests SET status = 'approved', admin_note = $1, id_admin = $2, updated_at = NOW()
        WHERE id_refund_request = $3`,
       [adminNote || 'Đã phê duyệt hoàn tiền', adminId, id]
     );
 
-    // 4. Update order and payment status
-    await client.query(
-      `UPDATE "order" SET status = 'refunded' WHERE id_order = $1`,
-      [rr.id_order]
-    );
+    // Update order status correctly
+    await client.query(`UPDATE "order" SET status = 'refunded' WHERE id_order = $1`, [rr.id_order]);
     
-    // Check if there's a payment record to update
+    // Update payment and record refund
     const { rows: payRows } = await client.query(
         'SELECT id_pay FROM payments WHERE id_order = $1 ORDER BY paid_at DESC LIMIT 1',
         [rr.id_order]
@@ -904,55 +928,107 @@ export async function approveRefund(req: Request, res: Response) {
     const idPay = payRows[0]?.id_pay;
 
     if (idPay) {
-        await client.query(
-            "UPDATE payments SET status = 'refunded' WHERE id_pay = $1",
-            [idPay]
-        );
-        
-        // Record in refunds table as per schema
+        await client.query("UPDATE payments SET status = 'refunded' WHERE id_pay = $1", [idPay]);
         await client.query(
             `INSERT INTO refunds (amount, status, reason_code, id_pay, id_refund_request)
-             VALUES ($1, $2, $3, $4, $5)`,
-            [rr.amount, 'completed', rr.reason || 'Requested by customer', idPay, rr.id_refund_request]
+             VALUES ($1, 'completed', $2, $3, $4)`,
+            [rr.amount, rr.reason || 'Sự cố từ phía khách hàng', idPay, id]
         );
     }
 
-    // 5. Release Inventory (Implicit via status='refunded' in booking queries)
-    // However, if we used vouchers, we should return them
     if (rr.id_voucher) {
         await client.query(
-            `UPDATE voucher SET 
-                quantity = CASE WHEN quantity IS NOT NULL THEN quantity + 1 ELSE quantity END,
-                quantity_pay = GREATEST(0, COALESCE(quantity_pay, 0) - 1)
-             WHERE id_voucher = $1`,
+            `UPDATE voucher SET quantity = quantity + 1, quantity_pay = GREATEST(0, quantity_pay - 1) WHERE id_voucher = $1`,
             [rr.id_voucher]
         );
     }
 
-    // 6. Send Notifications
-    await NotificationService.create({
-      userId: rr.id_user,
-      title: 'Yêu cầu hoàn tiền đã được xử lý',
-      message: `Đơn hàng ${rr.order_code} của bạn đã được hoàn tiền ${rr.amount.toLocaleString('vi-VN')} VND.`,
-      type: 'success'
+    // 5. Send Email Notifications
+    const { EmailService } = await import('../services/email.service.js');
+    await EmailService.notifyRefundDecision({
+        customerEmail: rr.customer_email,
+        orderCode: rr.order_code,
+        isApproved: true,
+        adminNote: adminNote,
+        amount: Number(rr.amount)
     });
+    console.log(`[Email] Phê duyệt hoàn tiền: Đã gửi mail tới ${rr.customer_email}`);
 
-    // Send Email via Queue
-    await addEmailJob('refund', {
-      email: rr.customer_email,
-      customerName: rr.customer_name,
-      orderCode: rr.order_code,
-      amount: parseFloat(rr.amount)
+    // In-app notification for customer
+    await NotificationService.create({
+        userId: rr.id_user,
+        title: 'Yêu cầu hoàn tiền đã hội duyệt',
+        message: `Yêu cầu hoàn tiền cho đơn hàng #${rr.order_code} đã được phê duyệt. Số tiền ${Number(rr.amount).toLocaleString('vi-VN')}đ sẽ được chuyển về tài khoản của bạn.`,
+        type: 'success'
     });
 
     await client.query('COMMIT');
-    res.json({ success: true, message: 'Đã hoàn tiền thành công' });
+    res.json({ success: true, message: 'Đã hoàn tiền và thông báo tới khách hàng thành công' });
 
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Approve refund error:', err);
-    res.status(500).json({ message: 'Lỗi máy chủ khi xử lý hoàn tiền' });
+    res.status(500).json({ message: 'Lỗi khi xử lý hoàn tiền' });
   } finally {
-    client.release();
+    if (client) client.release();
+  }
+}
+
+export async function rejectRefund(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const { adminNote } = req.body;
+    const adminId = req.user!.userId;
+
+    if (!adminNote) {
+      return res.status(400).json({ message: 'Vui lòng nhập lý do từ chối' });
+    }
+
+    // 1. Get request
+    const { rows: rrRows } = await pool.query(
+      `SELECT rr.*, o.order_code, u.email as customer_email 
+       FROM refund_requests rr
+       JOIN "order" o ON rr.id_order = o.id_order
+       JOIN users u ON u.id_user = rr.id_user
+       WHERE rr.id_refund_request = $1 AND rr.status = 'pending'`,
+      [id]
+    );
+
+    if (rrRows.length === 0) {
+      return res.status(404).json({ message: 'Không tìm thấy yêu cầu hoặc yêu cầu đã được xử lý' });
+    }
+
+    const rr = rrRows[0];
+
+    // 2. Update status
+    await pool.query(
+      `UPDATE refund_requests SET status = 'rejected', admin_note = $1, id_admin = $2, updated_at = NOW()
+       WHERE id_refund_request = $3`,
+      [adminNote, adminId, id]
+    );
+
+    // 3. Send notification email
+    const { EmailService } = await import('../services/email.service.js');
+    await EmailService.notifyRefundDecision({
+        customerEmail: rr.customer_email,
+        orderCode: rr.order_code,
+        isApproved: false,
+        adminNote: adminNote,
+        amount: Number(rr.amount)
+    });
+    console.log(`[Email] Từ chối hoàn tiền: Đã gửi mail tới ${rr.customer_email}`);
+
+    // In-app notification for customer
+    await NotificationService.create({
+        userId: rr.id_user,
+        title: 'Yêu cầu hoàn tiền bị từ chối',
+        message: `Yêu cầu hoàn tiền cho đơn hàng #${rr.order_code} đã bị từ chối. Lý do: ${adminNote}`,
+        type: 'error'
+    });
+
+    res.json({ success: true, message: 'Đã từ chối yêu cầu hoàn tiền' });
+  } catch (err) {
+    console.error('Reject refund error:', err);
+    res.status(500).json({ message: 'Lỗi khi từ chối hoàn tiền' });
   }
 }
